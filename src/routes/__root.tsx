@@ -15,6 +15,8 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { CommerceProvider } from "@/lib/commerce-store";
 import { Toaster } from "@/components/ui/sonner";
+import { SupportProvider } from "@/components/support/support-context";
+import { FloatingSupport } from "@/components/support/FloatingSupport";
 
 function NotFoundComponent() {
   return (
@@ -100,7 +102,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap",
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
@@ -131,15 +133,18 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <CommerceProvider>
-        <div className="flex min-h-screen flex-col">
-          <SiteHeader />
-          <main className="flex-1">
-            {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-            <Outlet />
-          </main>
-          <SiteFooter />
-        </div>
-        <Toaster position="top-right" />
+        <SupportProvider>
+          <div className="flex min-h-dvh flex-col">
+            <SiteHeader />
+            <main className="flex-1">
+              {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+              <Outlet />
+            </main>
+            <SiteFooter />
+          </div>
+          <FloatingSupport />
+          <Toaster position="top-right" />
+        </SupportProvider>
       </CommerceProvider>
     </QueryClientProvider>
   );
