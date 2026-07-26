@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 
 import { CATEGORIES, PROJECTS } from "@/data/categories";
-import { fetchProducts } from "@/services/catalog.service";
+import { listProducts } from "@/services/catalog.service";
 
 // TODO: replace with your project URL once a project name or custom domain is set.
 const BASE_URL = "";
@@ -17,7 +17,7 @@ export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
-        const products = await fetchProducts({});
+        const products = await listProducts({});
 
         const entries: SitemapEntry[] = [
           { path: "/", changefreq: "weekly", priority: "1.0" },
