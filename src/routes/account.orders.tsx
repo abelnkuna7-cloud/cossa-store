@@ -17,8 +17,10 @@ function AccountOrders() {
   async function handleTrack(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const result = await trackOrder(String(form.get("reference") ?? ""));
-    setMessage(result.message);
+    await trackOrder(String(form.get("reference") ?? ""));
+    setMessage(
+      "Order tracking is not connected yet, so we can't look this up automatically. Please contact us with your reference and we'll respond directly.",
+    );
   }
 
   return (
