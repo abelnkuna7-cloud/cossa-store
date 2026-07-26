@@ -235,6 +235,8 @@ function ProductDetail({ product }: { product: Product }) {
                 </Link>
               </p>
             </section>
+
+            <ServiceCrossSell categorySlug={product.category} />
           </div>
         </div>
       </div>
