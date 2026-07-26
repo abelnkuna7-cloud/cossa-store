@@ -14,6 +14,7 @@ import { Route as ShopByProjectRouteImport } from './routes/shop-by-project'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as RequestAQuoteRouteImport } from './routes/request-a-quote'
+import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as CartRouteImport } from './routes/cart'
 import { Route as BusinessAccountRouteImport } from './routes/business-account'
 import { Route as IndexRouteImport } from './routes/index'
@@ -44,6 +45,11 @@ const SearchRoute = SearchRouteImport.update({
 const RequestAQuoteRoute = RequestAQuoteRouteImport.update({
   id: '/request-a-quote',
   path: '/request-a-quote',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutRoute = CheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CartRoute = CartRouteImport.update({
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/business-account': typeof BusinessAccountRoute
   '/cart': typeof CartRoute
+  '/checkout': typeof CheckoutRoute
   '/request-a-quote': typeof RequestAQuoteRoute
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
@@ -94,6 +101,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/business-account': typeof BusinessAccountRoute
   '/cart': typeof CartRoute
+  '/checkout': typeof CheckoutRoute
   '/request-a-quote': typeof RequestAQuoteRoute
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
@@ -108,6 +116,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/business-account': typeof BusinessAccountRoute
   '/cart': typeof CartRoute
+  '/checkout': typeof CheckoutRoute
   '/request-a-quote': typeof RequestAQuoteRoute
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
@@ -123,6 +132,7 @@ export interface FileRouteTypes {
     | '/'
     | '/business-account'
     | '/cart'
+    | '/checkout'
     | '/request-a-quote'
     | '/search'
     | '/shop'
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/'
     | '/business-account'
     | '/cart'
+    | '/checkout'
     | '/request-a-quote'
     | '/search'
     | '/shop'
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/'
     | '/business-account'
     | '/cart'
+    | '/checkout'
     | '/request-a-quote'
     | '/search'
     | '/shop'
@@ -163,6 +175,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BusinessAccountRoute: typeof BusinessAccountRoute
   CartRoute: typeof CartRoute
+  CheckoutRoute: typeof CheckoutRoute
   RequestAQuoteRoute: typeof RequestAQuoteRoute
   SearchRoute: typeof SearchRoute
   ShopRoute: typeof ShopRoute
@@ -208,6 +221,13 @@ declare module '@tanstack/react-router' {
       path: '/request-a-quote'
       fullPath: '/request-a-quote'
       preLoaderRoute: typeof RequestAQuoteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout': {
+      id: '/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof CheckoutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cart': {
@@ -259,6 +279,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BusinessAccountRoute: BusinessAccountRoute,
   CartRoute: CartRoute,
+  CheckoutRoute: CheckoutRoute,
   RequestAQuoteRoute: RequestAQuoteRoute,
   SearchRoute: SearchRoute,
   ShopRoute: ShopRoute,
