@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SupplierApplicationRouteImport } from './routes/supplier-application'
 import { Route as ShopByProjectRouteImport } from './routes/shop-by-project'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SearchRouteImport } from './routes/search'
@@ -20,6 +21,11 @@ import { Route as ProjectSlugRouteImport } from './routes/project.$slug'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as CategorySlugRouteImport } from './routes/category.$slug'
 
+const SupplierApplicationRoute = SupplierApplicationRouteImport.update({
+  id: '/supplier-application',
+  path: '/supplier-application',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShopByProjectRoute = ShopByProjectRouteImport.update({
   id: '/shop-by-project',
   path: '/shop-by-project',
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
   '/shop-by-project': typeof ShopByProjectRoute
+  '/supplier-application': typeof SupplierApplicationRoute
   '/category/$slug': typeof CategorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
   '/shop-by-project': typeof ShopByProjectRoute
+  '/supplier-application': typeof SupplierApplicationRoute
   '/category/$slug': typeof CategorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
   '/shop-by-project': typeof ShopByProjectRoute
+  '/supplier-application': typeof SupplierApplicationRoute
   '/category/$slug': typeof CategorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/shop'
     | '/shop-by-project'
+    | '/supplier-application'
     | '/category/$slug'
     | '/product/$slug'
     | '/project/$slug'
@@ -130,6 +140,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/shop'
     | '/shop-by-project'
+    | '/supplier-application'
     | '/category/$slug'
     | '/product/$slug'
     | '/project/$slug'
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/shop'
     | '/shop-by-project'
+    | '/supplier-application'
     | '/category/$slug'
     | '/product/$slug'
     | '/project/$slug'
@@ -155,6 +167,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   ShopRoute: typeof ShopRoute
   ShopByProjectRoute: typeof ShopByProjectRoute
+  SupplierApplicationRoute: typeof SupplierApplicationRoute
   CategorySlugRoute: typeof CategorySlugRoute
   ProductSlugRoute: typeof ProductSlugRoute
   ProjectSlugRoute: typeof ProjectSlugRoute
@@ -162,6 +175,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/supplier-application': {
+      id: '/supplier-application'
+      path: '/supplier-application'
+      fullPath: '/supplier-application'
+      preLoaderRoute: typeof SupplierApplicationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/shop-by-project': {
       id: '/shop-by-project'
       path: '/shop-by-project'
@@ -243,6 +263,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   ShopRoute: ShopRoute,
   ShopByProjectRoute: ShopByProjectRoute,
+  SupplierApplicationRoute: SupplierApplicationRoute,
   CategorySlugRoute: CategorySlugRoute,
   ProductSlugRoute: ProductSlugRoute,
   ProjectSlugRoute: ProjectSlugRoute,
