@@ -213,17 +213,17 @@ function Home() {
       </Section>
 
       {/* Suppliers */}
-      <section className="bg-primary text-primary-foreground">
+      <section className="border-y border-border bg-card">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-14 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div className="max-w-2xl">
             <h2 className="font-display text-2xl font-semibold">Supply Cossa Store</h2>
-            <p className="mt-3 text-sm text-primary-foreground/80">
+            <p className="mt-3 text-sm text-muted-foreground">
               We are building a supplier network across construction, facility supplies and
               technology. If you offer wholesale, dropshipping or local distribution, apply to be
               listed.
             </p>
           </div>
-          <Button asChild size="lg" variant="secondary">
+          <Button asChild size="lg">
             <Link to="/supplier-application">Apply as a supplier</Link>
           </Button>
         </div>
@@ -235,7 +235,7 @@ function Home() {
           {[
             { icon: Landmark, title: "South African business", body: "Operated locally under Cossa Nexus Holdings." },
             { icon: ShieldCheck, title: "Secure checkout", body: "Checkout is being finalised; payment processing is not live yet." },
-            { icon: MessageCircle, title: "Local support", body: "Reach a South African team by email or WhatsApp." },
+            { icon: MessageCircle, title: "Talk to a real person", body: `Call or WhatsApp the Cossa team on ${SITE.phoneDisplay}.` },
             { icon: Truck, title: "Clear delivery information", body: "Delivery expectations shown per product and range." },
             { icon: Undo2, title: "Transparent returns", body: "Published returns and refunds terms before you buy." },
           ].map(({ icon: Icon, title, body }) => (
