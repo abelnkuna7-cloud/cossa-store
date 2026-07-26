@@ -53,7 +53,8 @@ export const Route = createFileRoute("/category/$slug")({
 });
 
 function CategoryPage() {
-  const { category } = Route.useLoaderData();
+  const { slug } = Route.useParams();
+  const category = getCategory(slug) as Category;
   const query = useQuery(productsQuery({ category: category.slug }));
 
   return (
