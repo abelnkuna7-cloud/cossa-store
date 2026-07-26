@@ -20,6 +20,7 @@ import { Route as CartRouteImport } from './routes/cart'
 import { Route as BusinessAccountRouteImport } from './routes/business-account'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccountIndexRouteImport } from './routes/account.index'
 import { Route as ProjectSlugRouteImport } from './routes/project.$slug'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as CategorySlugRouteImport } from './routes/category.$slug'
@@ -79,6 +80,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountIndexRoute = AccountIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AccountRoute,
+} as any)
 const ProjectSlugRoute = ProjectSlugRouteImport.update({
   id: '/project/$slug',
   path: '/project/$slug',
@@ -97,7 +103,7 @@ const CategorySlugRoute = CategorySlugRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/account': typeof AccountRoute
+  '/account': typeof AccountRouteWithChildren
   '/business-account': typeof BusinessAccountRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
@@ -110,10 +116,10 @@ export interface FileRoutesByFullPath {
   '/category/$slug': typeof CategorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
+  '/account/': typeof AccountIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/account': typeof AccountRoute
   '/business-account': typeof BusinessAccountRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
@@ -126,11 +132,12 @@ export interface FileRoutesByTo {
   '/category/$slug': typeof CategorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
+  '/account': typeof AccountIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/account': typeof AccountRoute
+  '/account': typeof AccountRouteWithChildren
   '/business-account': typeof BusinessAccountRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
@@ -143,6 +150,7 @@ export interface FileRoutesById {
   '/category/$slug': typeof CategorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
+  '/account/': typeof AccountIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -161,10 +169,10 @@ export interface FileRouteTypes {
     | '/category/$slug'
     | '/product/$slug'
     | '/project/$slug'
+    | '/account/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/account'
     | '/business-account'
     | '/cart'
     | '/checkout'
@@ -177,6 +185,7 @@ export interface FileRouteTypes {
     | '/category/$slug'
     | '/product/$slug'
     | '/project/$slug'
+    | '/account'
   id:
     | '__root__'
     | '/'
@@ -193,11 +202,12 @@ export interface FileRouteTypes {
     | '/category/$slug'
     | '/product/$slug'
     | '/project/$slug'
+    | '/account/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AccountRoute: typeof AccountRoute
+  AccountRoute: typeof AccountRouteWithChildren
   BusinessAccountRoute: typeof BusinessAccountRoute
   CartRoute: typeof CartRoute
   CheckoutRoute: typeof CheckoutRoute
@@ -291,6 +301,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/account/': {
+      id: '/account/'
+      path: '/'
+      fullPath: '/account/'
+      preLoaderRoute: typeof AccountIndexRouteImport
+      parentRoute: typeof AccountRoute
+    }
     '/project/$slug': {
       id: '/project/$slug'
       path: '/project/$slug'
@@ -315,9 +332,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AccountRouteChildren {
+  AccountIndexRoute: typeof AccountIndexRoute
+}
+
+const AccountRouteChildren: AccountRouteChildren = {
+  AccountIndexRoute: AccountIndexRoute,
+}
+
+const AccountRouteWithChildren =
+  AccountRoute._addFileChildren(AccountRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AccountRoute: AccountRoute,
+  AccountRoute: AccountRouteWithChildren,
   BusinessAccountRoute: BusinessAccountRoute,
   CartRoute: CartRoute,
   CheckoutRoute: CheckoutRoute,
