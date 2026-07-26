@@ -39,7 +39,7 @@ function QuotePage() {
   const [reference, setReference] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const get = (key: string) => String(form.get(key) ?? "").trim();
@@ -52,7 +52,7 @@ function QuotePage() {
     setState("submitting");
     setError(null);
     try {
-      const result = submitQuoteRequest({
+      const result = await submitQuoteRequest({
         contact_name: get("contact_name"),
         company: get("company") || null,
         email: get("email"),
