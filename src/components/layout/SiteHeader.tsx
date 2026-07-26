@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Heart, Menu, MessageCircle, Search, ShoppingCart, User, X } from "lucide-react";
+import { FileText, Heart, Menu, MessageCircle, Phone, Search, ShoppingCart, User, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CATEGORIES } from "@/data/categories";
 import { SITE, whatsappLink } from "@/config/site";
 import { useCommerce } from "@/lib/commerce-store";
+import { trackEvent } from "@/lib/analytics";
+import { useSupport } from "@/components/support/support-context";
 
 const NAV = [
   { label: "Home", to: "/" as const },
@@ -22,6 +24,7 @@ export function SiteHeader() {
   const [term, setTerm] = useState("");
   const navigate = useNavigate();
   const { cartCount, wishlistCount, hydrated } = useCommerce();
+  const { open: openSupport } = useSupport();
 
   function runSearch(event: React.FormEvent) {
     event.preventDefault();
@@ -33,18 +36,40 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background">
-      <div className="bg-primary text-primary-foreground">
+      <div className="border-b border-border bg-secondary">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2 text-xs sm:px-6 lg:px-8">
-          <p className="truncate">South African supplier · Nationwide delivery</p>
-          <a
-            href={whatsappLink()}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex shrink-0 items-center gap-1.5 font-medium underline-offset-4 hover:underline"
-          >
-            <MessageCircle className="h-3.5 w-3.5" aria-hidden />
-            {SITE.whatsappDisplay}
-          </a>
+          <p className="truncate text-muted-foreground">
+            South African owned · Speak to a real person
+          </p>
+          <div className="flex shrink-0 items-center gap-4">
+            <a
+              href={SITE.phoneHref}
+              onClick={() => trackEvent("phone_call_clicked")}
+              className="inline-flex items-center gap-1.5 font-medium text-primary underline-offset-4 hover:underline"
+            >
+              <Phone className="h-3.5 w-3.5" aria-hidden />
+              <span className="hidden sm:inline">{SITE.phoneDisplay}</span>
+              <span className="sr-only sm:hidden">Call {SITE.phoneDisplay}</span>
+            </a>
+            <a
+              href={whatsappLink()}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => trackEvent("whatsapp_opened", { trigger: "header" })}
+              className="inline-flex items-center gap-1.5 font-medium underline-offset-4 hover:underline"
+            >
+              <MessageCircle className="h-3.5 w-3.5 text-primary" aria-hidden />
+              <span className="hidden sm:inline">WhatsApp support</span>
+              <span className="sr-only sm:hidden">WhatsApp support</span>
+            </a>
+            <button
+              type="button"
+              onClick={() => openSupport("quote")}
+              className="hidden items-center gap-1.5 font-medium underline-offset-4 hover:underline md:inline-flex"
+            >
+              <FileText className="h-3.5 w-3.5 text-primary" aria-hidden /> Request a quote
+            </button>
+          </div>
         </div>
       </div>
 
@@ -76,6 +101,15 @@ export function SiteHeader() {
         </form>
 
         <div className="ml-auto flex items-center gap-1 md:ml-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Support menu"
+            className="md:hidden"
+            onClick={() => openSupport("whatsapp")}
+          >
+            <MessageCircle className="h-5 w-5" />
+          </Button>
           <Button asChild variant="ghost" size="icon" aria-label="Account">
             <Link to="/account">
               <User className="h-5 w-5" />
