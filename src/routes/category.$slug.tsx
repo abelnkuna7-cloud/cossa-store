@@ -7,9 +7,10 @@ import { ProductGrid } from "@/components/shop/ProductCard";
 import { Button } from "@/components/ui/button";
 import { getCategory } from "@/data/categories";
 import { productsQuery } from "@/lib/queries";
+import type { Category } from "@/types/catalog";
 
 export const Route = createFileRoute("/category/$slug")({
-  loader: ({ params }) => {
+  loader: ({ params }): { category: Category } => {
     const category = getCategory(params.slug);
     if (!category) throw notFound();
     return { category };
