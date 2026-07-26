@@ -119,8 +119,18 @@ function ContactPage() {
             </a>
           </p>
           <p>
+            <a href={SITE.phoneHref} className="underline">
+              Call {SITE.phoneDisplay}
+            </a>
+          </p>
+          <p>
             <a href={whatsappLink()} className="underline" target="_blank" rel="noreferrer">
-              Chat on WhatsApp
+              WhatsApp {SITE.phoneDisplay}
+            </a>
+          </p>
+          <p>
+            <a href={SITE.website} className="underline" target="_blank" rel="noreferrer">
+              {SITE.domain}
             </a>
           </p>
           <p className="text-muted-foreground">
