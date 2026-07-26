@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CALLBACK_REASONS, SA_PROVINCES, SITE } from "@/config/site";
 import { CATEGORIES } from "@/data/categories";
@@ -215,5 +214,3 @@ function Field({
     </div>
   );
 }
-
-export { Textarea as _Textarea };
