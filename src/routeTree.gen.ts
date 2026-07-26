@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SupplierApplicationRouteImport } from './routes/supplier-application'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ShopByProjectRouteImport } from './routes/shop-by-project'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SearchRouteImport } from './routes/search'
@@ -40,6 +41,11 @@ const TermsRoute = TermsRouteImport.update({
 const SupplierApplicationRoute = SupplierApplicationRouteImport.update({
   id: '/supplier-application',
   path: '/supplier-application',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopByProjectRoute = ShopByProjectRouteImport.update({
@@ -158,6 +164,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
   '/shop-by-project': typeof ShopByProjectRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/supplier-application': typeof SupplierApplicationRoute
   '/terms': typeof TermsRoute
   '/account/orders': typeof AccountOrdersRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
   '/shop-by-project': typeof ShopByProjectRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/supplier-application': typeof SupplierApplicationRoute
   '/terms': typeof TermsRoute
   '/account/orders': typeof AccountOrdersRoute
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
   '/shop-by-project': typeof ShopByProjectRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/supplier-application': typeof SupplierApplicationRoute
   '/terms': typeof TermsRoute
   '/account/orders': typeof AccountOrdersRoute
@@ -232,6 +241,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/shop'
     | '/shop-by-project'
+    | '/sitemap.xml'
     | '/supplier-application'
     | '/terms'
     | '/account/orders'
@@ -255,6 +265,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/shop'
     | '/shop-by-project'
+    | '/sitemap.xml'
     | '/supplier-application'
     | '/terms'
     | '/account/orders'
@@ -279,6 +290,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/shop'
     | '/shop-by-project'
+    | '/sitemap.xml'
     | '/supplier-application'
     | '/terms'
     | '/account/orders'
@@ -304,6 +316,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   ShopRoute: typeof ShopRoute
   ShopByProjectRoute: typeof ShopByProjectRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SupplierApplicationRoute: typeof SupplierApplicationRoute
   TermsRoute: typeof TermsRoute
   CategorySlugRoute: typeof CategorySlugRoute
@@ -325,6 +338,13 @@ declare module '@tanstack/react-router' {
       path: '/supplier-application'
       fullPath: '/supplier-application'
       preLoaderRoute: typeof SupplierApplicationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop-by-project': {
@@ -500,6 +520,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   ShopRoute: ShopRoute,
   ShopByProjectRoute: ShopByProjectRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   SupplierApplicationRoute: SupplierApplicationRoute,
   TermsRoute: TermsRoute,
   CategorySlugRoute: CategorySlugRoute,
