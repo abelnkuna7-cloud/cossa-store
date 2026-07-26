@@ -14,6 +14,7 @@ import { formatZar } from "@/lib/format";
 import { productQuery, relatedProductsQuery } from "@/lib/queries";
 import { fetchProductBySlug } from "@/services/catalog.service";
 import type { Product } from "@/types/catalog";
+import { ServiceCrossSell } from "@/components/support/ServiceCrossSell";
 
 export const Route = createFileRoute("/product/$slug")({
   loader: async ({ params, context }): Promise<{ product: Product }> => {
