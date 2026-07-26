@@ -14,6 +14,7 @@ import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as RequestAQuoteRouteImport } from './routes/request-a-quote'
 import { Route as CartRouteImport } from './routes/cart'
+import { Route as BusinessAccountRouteImport } from './routes/business-account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectSlugRouteImport } from './routes/project.$slug'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
@@ -44,6 +45,11 @@ const CartRoute = CartRouteImport.update({
   path: '/cart',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BusinessAccountRoute = BusinessAccountRouteImport.update({
+  id: '/business-account',
+  path: '/business-account',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -67,6 +73,7 @@ const CategorySlugRoute = CategorySlugRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/business-account': typeof BusinessAccountRoute
   '/cart': typeof CartRoute
   '/request-a-quote': typeof RequestAQuoteRoute
   '/search': typeof SearchRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/business-account': typeof BusinessAccountRoute
   '/cart': typeof CartRoute
   '/request-a-quote': typeof RequestAQuoteRoute
   '/search': typeof SearchRoute
@@ -90,6 +98,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/business-account': typeof BusinessAccountRoute
   '/cart': typeof CartRoute
   '/request-a-quote': typeof RequestAQuoteRoute
   '/search': typeof SearchRoute
@@ -103,6 +112,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/business-account'
     | '/cart'
     | '/request-a-quote'
     | '/search'
@@ -114,6 +124,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/business-account'
     | '/cart'
     | '/request-a-quote'
     | '/search'
@@ -125,6 +136,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/business-account'
     | '/cart'
     | '/request-a-quote'
     | '/search'
@@ -137,6 +149,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BusinessAccountRoute: typeof BusinessAccountRoute
   CartRoute: typeof CartRoute
   RequestAQuoteRoute: typeof RequestAQuoteRoute
   SearchRoute: typeof SearchRoute
@@ -184,6 +197,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/business-account': {
+      id: '/business-account'
+      path: '/business-account'
+      fullPath: '/business-account'
+      preLoaderRoute: typeof BusinessAccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -217,6 +237,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BusinessAccountRoute: BusinessAccountRoute,
   CartRoute: CartRoute,
   RequestAQuoteRoute: RequestAQuoteRoute,
   SearchRoute: SearchRoute,
