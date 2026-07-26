@@ -30,7 +30,10 @@ function AccountOrders() {
         application references you have submitted are shown on their confirmation screens.
       </NoticeBlock>
 
-      <form className="max-w-md space-y-3 rounded-lg border border-border bg-card p-6" onSubmit={handleTrack}>
+      <form
+        className="max-w-md space-y-3 rounded-lg border border-border bg-card p-6"
+        onSubmit={handleTrack}
+      >
         <h2 className="font-display text-lg font-semibold">Track an order or reference</h2>
         <div className="space-y-2">
           <Label htmlFor="reference">Reference number</Label>

@@ -50,9 +50,9 @@ export async function listOrders(): Promise<CustomerOrder[]> {
   return [];
 }
 
-export async function trackOrder(_reference: string): Promise<
-  { found: false; reason: "not_connected" }
-> {
+export async function trackOrder(
+  _reference: string,
+): Promise<{ found: false; reason: "not_connected" }> {
   await new Promise((resolve) => setTimeout(resolve, 350));
   return { found: false, reason: "not_connected" };
 }

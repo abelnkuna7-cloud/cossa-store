@@ -20,8 +20,18 @@ function AccountOverview() {
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card title="Orders" description="Track order status and delivery updates." to="/account/orders" cta="View orders" />
-        <Card title="Wishlist" description="Products you have saved for later." to="/account/wishlist" cta="View wishlist" />
+        <Card
+          title="Orders"
+          description="Track order status and delivery updates."
+          to="/account/orders"
+          cta="View orders"
+        />
+        <Card
+          title="Wishlist"
+          description="Products you have saved for later."
+          to="/account/wishlist"
+          cta="View wishlist"
+        />
         <Card
           title="Business account"
           description="Apply for bulk pricing and contract supply terms."

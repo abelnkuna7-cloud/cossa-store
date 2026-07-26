@@ -18,7 +18,10 @@ export const Route = createFileRoute("/category/$slug")({
   head: ({ loaderData }) => {
     if (!loaderData) {
       return {
-        meta: [{ title: "Category unavailable | Cossa Store" }, { name: "robots", content: "noindex" }],
+        meta: [
+          { title: "Category unavailable | Cossa Store" },
+          { name: "robots", content: "noindex" },
+        ],
       };
     }
     const title = `${loaderData.category.name} | Cossa Store`;

@@ -92,7 +92,11 @@ function BusinessAccountPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="For business" title="Business account application" description={DESCRIPTION} />
+      <PageHeader
+        eyebrow="For business"
+        title="Business account application"
+        description={DESCRIPTION}
+      />
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
         <form className="space-y-8" onSubmit={handleSubmit} noValidate>
           <fieldset className="space-y-5">

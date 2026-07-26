@@ -7,6 +7,7 @@ import { ProductGrid } from "@/components/shop/ProductCard";
 import { Button } from "@/components/ui/button";
 import { getProject } from "@/data/categories";
 import { projectQuery } from "@/lib/queries";
+import { ServiceCrossSell } from "@/components/support/ServiceCrossSell";
 
 export const Route = createFileRoute("/project/$slug")({
   head: ({ params }) => {
@@ -81,6 +82,9 @@ function ProjectPage() {
         ) : (
           <ProductGrid products={products} />
         )}
+        <div className="mt-10">
+          <ServiceCrossSell categorySlug={project.categories[0]} />
+        </div>
       </div>
     </div>
   );

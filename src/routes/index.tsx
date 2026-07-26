@@ -18,6 +18,7 @@ import { ProductGrid } from "@/components/shop/ProductCard";
 import { CATEGORIES, PROJECTS } from "@/data/categories";
 import { SERVICE_ECOSYSTEM, SITE, whatsappLink } from "@/config/site";
 import { featuredProductsQuery } from "@/lib/queries";
+import { ContactStrip } from "@/components/support/ContactStrip";
 
 const TITLE = "Cossa Store | Building, facility and technology supplies";
 const DESCRIPTION =
@@ -44,38 +45,33 @@ function Home() {
   return (
     <div>
       {/* Hero */}
-      <section className="bg-primary text-primary-foreground">
+      <section className="bg-background">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8 lg:py-24">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
               Cossa Nexus Holdings
             </p>
             <h1 className="mt-4 text-4xl font-bold leading-tight sm:text-5xl">
               Products, services and intelligent solutions for building, maintaining and improving
               homes and businesses.
             </h1>
-            <p className="mt-5 max-w-xl text-sm text-primary-foreground/80 sm:text-base">
+            <p className="mt-5 max-w-xl text-sm text-muted-foreground sm:text-base">
               One South African supplier for construction and DIY, cleaning and facility supplies,
               and workplace technology — backed by the Cossa service network for installation,
               cleaning and technical support.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg" variant="secondary">
+              <Button asChild size="lg">
                 <Link to="/shop">
                   Shop products <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="border-primary-foreground/40 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-              >
+              <Button asChild size="lg" variant="outline">
                 <Link to="/request-a-quote">Request a quote</Link>
               </Button>
             </div>
           </div>
-          <dl className="grid grid-cols-2 gap-4 rounded-lg border border-primary-foreground/15 bg-primary-foreground/5 p-6">
+          <dl className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-card p-6">
             {[
               ["Trade & business buying", "Bulk orders, quotations and VAT invoices"],
               ["Three core ranges", "Construction, facility supplies and technology"],
@@ -84,12 +80,14 @@ function Home() {
             ].map(([term, detail]) => (
               <div key={term}>
                 <dt className="text-sm font-semibold">{term}</dt>
-                <dd className="mt-1 text-xs text-primary-foreground/70">{detail}</dd>
+                <dd className="mt-1 text-xs text-muted-foreground">{detail}</dd>
               </div>
             ))}
           </dl>
         </div>
       </section>
+
+      <ContactStrip />
 
       {/* Categories */}
       <Section
@@ -174,11 +172,31 @@ function Home() {
       >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {[
-            { icon: Building2, title: "Bulk orders", body: "Volume pricing on request for repeat and high-quantity lines." },
-            { icon: FileText, title: "Quotations", body: "Formal quotations for procurement and tender processes." },
-            { icon: Receipt, title: "VAT invoices", body: "Tax invoices issued with full business and VAT details." },
-            { icon: RefreshCw, title: "Repeat purchasing", body: "Reorder standard consumables on a predictable schedule." },
-            { icon: Landmark, title: "Business support", body: "A named contact for account, delivery and product queries." },
+            {
+              icon: Building2,
+              title: "Bulk orders",
+              body: "Volume pricing on request for repeat and high-quantity lines.",
+            },
+            {
+              icon: FileText,
+              title: "Quotations",
+              body: "Formal quotations for procurement and tender processes.",
+            },
+            {
+              icon: Receipt,
+              title: "VAT invoices",
+              body: "Tax invoices issued with full business and VAT details.",
+            },
+            {
+              icon: RefreshCw,
+              title: "Repeat purchasing",
+              body: "Reorder standard consumables on a predictable schedule.",
+            },
+            {
+              icon: Landmark,
+              title: "Business support",
+              body: "A named contact for account, delivery and product queries.",
+            },
           ].map(({ icon: Icon, title, body }) => (
             <div key={title} className="rounded-lg border border-border bg-card p-5">
               <Icon className="h-5 w-5 text-accent" aria-hidden />
@@ -215,17 +233,17 @@ function Home() {
       </Section>
 
       {/* Suppliers */}
-      <section className="bg-primary text-primary-foreground">
+      <section className="border-y border-border bg-card">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-14 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div className="max-w-2xl">
             <h2 className="font-display text-2xl font-semibold">Supply Cossa Store</h2>
-            <p className="mt-3 text-sm text-primary-foreground/80">
+            <p className="mt-3 text-sm text-muted-foreground">
               We are building a supplier network across construction, facility supplies and
               technology. If you offer wholesale, dropshipping or local distribution, apply to be
               listed.
             </p>
           </div>
-          <Button asChild size="lg" variant="secondary">
+          <Button asChild size="lg">
             <Link to="/supplier-application">Apply as a supplier</Link>
           </Button>
         </div>
@@ -235,11 +253,31 @@ function Home() {
       <Section title="Buying with confidence" muted>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {[
-            { icon: Landmark, title: "South African business", body: "Operated locally under Cossa Nexus Holdings." },
-            { icon: ShieldCheck, title: "Secure checkout", body: "Checkout is being finalised; payment processing is not live yet." },
-            { icon: MessageCircle, title: "Local support", body: "Reach a South African team by email or WhatsApp." },
-            { icon: Truck, title: "Clear delivery information", body: "Delivery expectations shown per product and range." },
-            { icon: Undo2, title: "Transparent returns", body: "Published returns and refunds terms before you buy." },
+            {
+              icon: Landmark,
+              title: "South African business",
+              body: "Operated locally under Cossa Nexus Holdings.",
+            },
+            {
+              icon: ShieldCheck,
+              title: "Secure checkout",
+              body: "Checkout is being finalised; payment processing is not live yet.",
+            },
+            {
+              icon: MessageCircle,
+              title: "Talk to a real person",
+              body: `Call or WhatsApp the Cossa team on ${SITE.phoneDisplay}.`,
+            },
+            {
+              icon: Truck,
+              title: "Clear delivery information",
+              body: "Delivery expectations shown per product and range.",
+            },
+            {
+              icon: Undo2,
+              title: "Transparent returns",
+              body: "Published returns and refunds terms before you buy.",
+            },
           ].map(({ icon: Icon, title, body }) => (
             <div key={title} className="rounded-lg border border-border bg-card p-5">
               <Icon className="h-5 w-5 text-accent" aria-hidden />

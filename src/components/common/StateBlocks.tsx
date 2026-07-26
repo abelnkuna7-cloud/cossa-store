@@ -62,9 +62,7 @@ export function NoticeBlock({
   children?: ReactNode;
 }) {
   const toneClass =
-    tone === "pending"
-      ? "border-accent/50 bg-accent/10"
-      : "border-border bg-secondary";
+    tone === "pending" ? "border-accent/50 bg-accent/10" : "border-border bg-secondary";
   return (
     <div className={`rounded-lg border px-4 py-4 text-sm ${toneClass}`}>
       <p className="font-semibold">{title}</p>
