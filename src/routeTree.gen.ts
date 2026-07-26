@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ShopByProjectRouteImport } from './routes/shop-by-project'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as CategorySlugRouteImport } from './routes/category.$slug'
 
+const ShopByProjectRoute = ShopByProjectRouteImport.update({
+  id: '/shop-by-project',
+  path: '/shop-by-project',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShopRoute = ShopRouteImport.update({
   id: '/shop',
   path: '/shop',
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
+  '/shop-by-project': typeof ShopByProjectRoute
   '/category/$slug': typeof CategorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
+  '/shop-by-project': typeof ShopByProjectRoute
   '/category/$slug': typeof CategorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
 }
@@ -60,19 +68,33 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
+  '/shop-by-project': typeof ShopByProjectRoute
   '/category/$slug': typeof CategorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/search' | '/shop' | '/category/$slug' | '/product/$slug'
+  fullPaths:
+    | '/'
+    | '/search'
+    | '/shop'
+    | '/shop-by-project'
+    | '/category/$slug'
+    | '/product/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/search' | '/shop' | '/category/$slug' | '/product/$slug'
+  to:
+    | '/'
+    | '/search'
+    | '/shop'
+    | '/shop-by-project'
+    | '/category/$slug'
+    | '/product/$slug'
   id:
     | '__root__'
     | '/'
     | '/search'
     | '/shop'
+    | '/shop-by-project'
     | '/category/$slug'
     | '/product/$slug'
   fileRoutesById: FileRoutesById
@@ -81,12 +103,20 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SearchRoute: typeof SearchRoute
   ShopRoute: typeof ShopRoute
+  ShopByProjectRoute: typeof ShopByProjectRoute
   CategorySlugRoute: typeof CategorySlugRoute
   ProductSlugRoute: typeof ProductSlugRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/shop-by-project': {
+      id: '/shop-by-project'
+      path: '/shop-by-project'
+      fullPath: '/shop-by-project'
+      preLoaderRoute: typeof ShopByProjectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/shop': {
       id: '/shop'
       path: '/shop'
@@ -129,6 +159,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SearchRoute: SearchRoute,
   ShopRoute: ShopRoute,
+  ShopByProjectRoute: ShopByProjectRoute,
   CategorySlugRoute: CategorySlugRoute,
   ProductSlugRoute: ProductSlugRoute,
 }
