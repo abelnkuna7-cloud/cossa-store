@@ -46,6 +46,7 @@ function ContactPage() {
       const result = await submitContactMessage({
         name: get("name"),
         email: get("email"),
+        phone: get("phone"),
         subject: get("subject"),
         message: get("message"),
       });
@@ -80,9 +81,13 @@ function ContactPage() {
                   <Label htmlFor="name">Your name</Label>
                   <Input id="name" name="name" required />
                 </div>
-                <div className="space-y-2">
+      <div className="space-y-2">
                   <Label htmlFor="email">Email address</Label>
                   <Input id="email" name="email" type="email" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone number</Label>
+                  <Input id="phone" name="phone" type="tel" />
                 </div>
               </div>
               <div className="space-y-2">
@@ -107,7 +112,7 @@ function ContactPage() {
 
         <aside className="h-fit space-y-4 rounded-lg border border-border bg-card p-6 text-sm">
           <h2 className="font-display text-lg font-semibold">Direct contact</h2>
-          <p className="text-muted-foreground">{SITE.company}</p>
+          <p className="text-muted-foreground">{SITE.parent}</p>
           <p>
             <a href={`mailto:${SITE.email}`} className="underline">
               {SITE.email}
@@ -118,7 +123,9 @@ function ContactPage() {
               Chat on WhatsApp
             </a>
           </p>
-          <p className="text-muted-foreground">{SITE.hours}</p>
+          <p className="text-muted-foreground">
+            Support hours are confirmed with each enquiry while we finalise our service desk.
+          </p>
         </aside>
       </div>
     </div>
