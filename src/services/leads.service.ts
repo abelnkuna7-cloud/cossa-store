@@ -66,9 +66,7 @@ export interface QuickQuoteInput {
   additional_information: string;
 }
 
-export type LeadResult =
-  | { status: "pending_backend" }
-  | { status: "submitted"; reference: string };
+export type LeadResult = { status: "pending_backend" } | { status: "submitted"; reference: string };
 
 const STORAGE_KEY = "cossa.support-leads.v1";
 

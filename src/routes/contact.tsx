@@ -81,7 +81,7 @@ function ContactPage() {
                   <Label htmlFor="name">Your name</Label>
                   <Input id="name" name="name" required />
                 </div>
-      <div className="space-y-2">
+                <div className="space-y-2">
                   <Label htmlFor="email">Email address</Label>
                   <Input id="email" name="email" type="email" required />
                 </div>

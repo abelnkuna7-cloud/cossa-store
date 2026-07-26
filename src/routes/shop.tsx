@@ -119,7 +119,9 @@ function Shop() {
         <div>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              {query.data ? `${query.data.length} product${query.data.length === 1 ? "" : "s"}` : ""}
+              {query.data
+                ? `${query.data.length} product${query.data.length === 1 ? "" : "s"}`
+                : ""}
             </p>
             <label className="flex items-center gap-2 text-sm">
               <span className="text-muted-foreground">Sort</span>

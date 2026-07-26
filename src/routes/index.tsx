@@ -172,11 +172,31 @@ function Home() {
       >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {[
-            { icon: Building2, title: "Bulk orders", body: "Volume pricing on request for repeat and high-quantity lines." },
-            { icon: FileText, title: "Quotations", body: "Formal quotations for procurement and tender processes." },
-            { icon: Receipt, title: "VAT invoices", body: "Tax invoices issued with full business and VAT details." },
-            { icon: RefreshCw, title: "Repeat purchasing", body: "Reorder standard consumables on a predictable schedule." },
-            { icon: Landmark, title: "Business support", body: "A named contact for account, delivery and product queries." },
+            {
+              icon: Building2,
+              title: "Bulk orders",
+              body: "Volume pricing on request for repeat and high-quantity lines.",
+            },
+            {
+              icon: FileText,
+              title: "Quotations",
+              body: "Formal quotations for procurement and tender processes.",
+            },
+            {
+              icon: Receipt,
+              title: "VAT invoices",
+              body: "Tax invoices issued with full business and VAT details.",
+            },
+            {
+              icon: RefreshCw,
+              title: "Repeat purchasing",
+              body: "Reorder standard consumables on a predictable schedule.",
+            },
+            {
+              icon: Landmark,
+              title: "Business support",
+              body: "A named contact for account, delivery and product queries.",
+            },
           ].map(({ icon: Icon, title, body }) => (
             <div key={title} className="rounded-lg border border-border bg-card p-5">
               <Icon className="h-5 w-5 text-accent" aria-hidden />
@@ -233,11 +253,31 @@ function Home() {
       <Section title="Buying with confidence" muted>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {[
-            { icon: Landmark, title: "South African business", body: "Operated locally under Cossa Nexus Holdings." },
-            { icon: ShieldCheck, title: "Secure checkout", body: "Checkout is being finalised; payment processing is not live yet." },
-            { icon: MessageCircle, title: "Talk to a real person", body: `Call or WhatsApp the Cossa team on ${SITE.phoneDisplay}.` },
-            { icon: Truck, title: "Clear delivery information", body: "Delivery expectations shown per product and range." },
-            { icon: Undo2, title: "Transparent returns", body: "Published returns and refunds terms before you buy." },
+            {
+              icon: Landmark,
+              title: "South African business",
+              body: "Operated locally under Cossa Nexus Holdings.",
+            },
+            {
+              icon: ShieldCheck,
+              title: "Secure checkout",
+              body: "Checkout is being finalised; payment processing is not live yet.",
+            },
+            {
+              icon: MessageCircle,
+              title: "Talk to a real person",
+              body: `Call or WhatsApp the Cossa team on ${SITE.phoneDisplay}.`,
+            },
+            {
+              icon: Truck,
+              title: "Clear delivery information",
+              body: "Delivery expectations shown per product and range.",
+            },
+            {
+              icon: Undo2,
+              title: "Transparent returns",
+              body: "Published returns and refunds terms before you buy.",
+            },
           ].map(({ icon: Icon, title, body }) => (
             <div key={title} className="rounded-lg border border-border bg-card p-5">
               <Icon className="h-5 w-5 text-accent" aria-hidden />

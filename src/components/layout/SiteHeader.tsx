@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { FileText, Heart, Menu, MessageCircle, Phone, Search, ShoppingCart, User, X } from "lucide-react";
+import {
+  FileText,
+  Heart,
+  Menu,
+  MessageCircle,
+  Phone,
+  Search,
+  ShoppingCart,
+  User,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -178,7 +188,12 @@ export function SiteHeader() {
             </form>
             <div className="flex flex-col">
               {NAV.slice(0, 2).map((item) => (
-                <MobileLink key={item.to} to={item.to} label={item.label} onDone={() => setOpen(false)} />
+                <MobileLink
+                  key={item.to}
+                  to={item.to}
+                  label={item.label}
+                  onDone={() => setOpen(false)}
+                />
               ))}
               {CATEGORIES.map((category) => (
                 <Link
@@ -192,7 +207,12 @@ export function SiteHeader() {
                 </Link>
               ))}
               {NAV.slice(2).map((item) => (
-                <MobileLink key={item.to} to={item.to} label={item.label} onDone={() => setOpen(false)} />
+                <MobileLink
+                  key={item.to}
+                  to={item.to}
+                  label={item.label}
+                  onDone={() => setOpen(false)}
+                />
               ))}
             </div>
           </div>

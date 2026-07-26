@@ -25,7 +25,10 @@ export const Route = createFileRoute("/product/$slug")({
   head: ({ loaderData }) => {
     if (!loaderData) {
       return {
-        meta: [{ title: "Product unavailable | Cossa Store" }, { name: "robots", content: "noindex" }],
+        meta: [
+          { title: "Product unavailable | Cossa Store" },
+          { name: "robots", content: "noindex" },
+        ],
       };
     }
     const p = loaderData.product;
@@ -126,9 +129,7 @@ function ProductDetail({ product }: { product: Product }) {
               </span>
             ) : null}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Price includes VAT · SKU {product.sku}
-          </p>
+          <p className="text-xs text-muted-foreground">Price includes VAT · SKU {product.sku}</p>
 
           <div className="mt-4 flex flex-wrap gap-2">
             <StockBadge status={product.stock_status} />
@@ -245,9 +246,7 @@ function ProductDetail({ product }: { product: Product }) {
         <h2 className="text-2xl font-semibold tracking-tight">Related products</h2>
         <div className="mt-6">
           {related.isPending ? <LoadingBlock /> : null}
-          {related.data && related.data.length > 0 ? (
-            <ProductGrid products={related.data} />
-          ) : null}
+          {related.data && related.data.length > 0 ? <ProductGrid products={related.data} /> : null}
           {related.data && related.data.length === 0 ? (
             <EmptyBlock title="No related products yet" />
           ) : null}

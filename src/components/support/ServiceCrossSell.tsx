@@ -56,7 +56,10 @@ export function ServiceCrossSell({ categorySlug }: { categorySlug: string }) {
           size="sm"
           variant="outline"
           onClick={() => {
-            trackEvent("service_cross_sell_clicked", { category: categorySlug, action: "callback" });
+            trackEvent("service_cross_sell_clicked", {
+              category: categorySlug,
+              action: "callback",
+            });
             open("callback");
           }}
         >

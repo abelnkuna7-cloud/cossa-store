@@ -42,7 +42,12 @@ export function createConversation(): Conversation {
     id: id("conv"),
     created_at: new Date().toISOString(),
     messages: [
-      { id: id("msg"), role: "assistant", text: OPENING_MESSAGE, created_at: new Date().toISOString() },
+      {
+        id: id("msg"),
+        role: "assistant",
+        text: OPENING_MESSAGE,
+        created_at: new Date().toISOString(),
+      },
     ],
   };
 }

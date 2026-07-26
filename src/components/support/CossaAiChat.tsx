@@ -128,8 +128,7 @@ export function CossaAiChat() {
             ) : null}
             {status === "error" ? (
               <p className="text-sm text-destructive" role="alert">
-                The assistant is unavailable right now. Please WhatsApp or call{" "}
-                {SITE.phoneDisplay}.
+                The assistant is unavailable right now. Please WhatsApp or call {SITE.phoneDisplay}.
               </p>
             ) : null}
           </div>
@@ -162,7 +161,12 @@ export function CossaAiChat() {
               placeholder="Type your question…"
               aria-label="Message Cossa AI"
             />
-            <Button type="submit" size="icon" aria-label="Send message" disabled={status === "typing"}>
+            <Button
+              type="submit"
+              size="icon"
+              aria-label="Send message"
+              disabled={status === "typing"}
+            >
               <Send className="h-4 w-4" />
             </Button>
           </form>

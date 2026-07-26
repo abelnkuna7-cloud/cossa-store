@@ -15,7 +15,10 @@ export const Route = createFileRoute("/search")({
   head: () => ({
     meta: [
       { title: "Search products | Cossa Store" },
-      { name: "description", content: "Search the Cossa Store catalogue by product, brand or SKU." },
+      {
+        name: "description",
+        content: "Search the Cossa Store catalogue by product, brand or SKU.",
+      },
       { property: "og:title", content: "Search products | Cossa Store" },
       { property: "og:description", content: "Search the Cossa Store catalogue." },
       { name: "robots", content: "noindex" },
