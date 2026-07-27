@@ -24,7 +24,7 @@ const NAV = [
   { label: "Home", to: "/" as const },
   { label: "Shop", to: "/shop" as const },
   { label: "Shop by Project", to: "/shop-by-project" as const },
-  { label: "Business Buying", to: "/business-buying" as const },
+  { label: "Business Buying", to: "/business-account" as const },
   { label: "Request a Quote", to: "/request-a-quote" as const },
   { label: "Support", to: "/contact" as const },
 ];
