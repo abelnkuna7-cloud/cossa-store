@@ -165,7 +165,7 @@ function Home() {
               <Link to="/business-account">Apply for a business account</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link to="/business-buying">How business buying works</Link>
+              <Link to="/business-account">How business buying works</Link>
             </Button>
           </div>
         }

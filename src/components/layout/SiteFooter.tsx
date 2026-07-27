@@ -75,7 +75,7 @@ export function SiteFooter() {
           <p className="text-sm font-semibold">Business & partners</p>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
             <li>
-              <Link to="/business-buying" className="hover:underline">
+              <Link to="/business-account" className="hover:underline">
                 Business buying
               </Link>
             </li>
@@ -121,7 +121,7 @@ export function SiteFooter() {
               </button>
             </li>
             <li>
-              <Link to="/track-order" className="hover:underline">
+              <Link to="/account/orders" className="hover:underline">
                 Track order
               </Link>
             </li>
