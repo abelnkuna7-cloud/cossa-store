@@ -5,6 +5,7 @@ import {
   campaignSource,
   currentPage,
   failure,
+  rpcArgs,
   type SubmissionResult,
 } from "@/services/service-result";
 
@@ -23,7 +24,7 @@ export async function submitHumanSupportRequest(
   input: HumanSupportRequestInput,
 ): Promise<SubmissionResult> {
   try {
-    const { data, error } = await supabase.rpc("submit_human_support_request", {
+    const { data, error } = await supabase.rpc("submit_human_support_request", rpcArgs({
       p_name: input.name ?? null,
       p_phone: input.phone ?? null,
       p_email: input.email ?? null,
@@ -32,7 +33,7 @@ export async function submitHumanSupportRequest(
       p_conversation_id: input.conversation_id ?? null,
       p_source_page: currentPage(),
       p_campaign_source: campaignSource(),
-    });
+    }));
     if (error) return failure(error);
     const row = data?.[0];
     if (!row?.reference) return failure("missing reference");

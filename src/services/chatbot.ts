@@ -7,7 +7,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
-import { anonymousSessionId, currentPage, failure } from "@/services/service-result";
+import { anonymousSessionId, currentPage, failure, rpcArgs } from "@/services/service-result";
 
 export type ChatRole = "user" | "assistant" | "system";
 
@@ -50,10 +50,10 @@ export async function ensureConversation(): Promise<ConversationHandle | null> {
 
   inFlight = (async () => {
     try {
-      const { data, error } = await supabase.rpc("start_chatbot_conversation", {
+      const { data, error } = await supabase.rpc("start_chatbot_conversation", rpcArgs({
         p_visitor_token: anonymousSessionId(),
         p_source_page: currentPage(),
-      });
+      }));
       if (error) return null;
       const row = data?.[0];
       if (!row?.id || !row.reference) return null;
@@ -78,11 +78,11 @@ export async function saveChatMessage(
   content: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase.rpc("add_chatbot_message", {
+    const { error } = await supabase.rpc("add_chatbot_message", rpcArgs({
       p_conversation_id: conversationId,
       p_role: role,
       p_content: content,
-    });
+    }));
     if (error) return { success: false, error: failure(error).error };
     trackEvent("chatbot_message_saved", { role });
     return { success: true };

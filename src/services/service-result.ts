@@ -102,3 +102,12 @@ export function isValidSaPhone(value: string): boolean {
   const digits = value.replace(/[\s()-]/g, "");
   return /^(\+?27|0)[1-8][0-9]{8}$/.test(digits);
 }
+
+/**
+ * The generated Supabase types declare every RPC argument as non-nullable,
+ * while the underlying SQL functions accept NULL for optional inputs. This
+ * keeps call sites readable without weakening the return-type inference.
+ */
+export function rpcArgs<T extends Record<string, unknown>>(args: T): never {
+  return args as unknown as never;
+}

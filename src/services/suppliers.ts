@@ -5,6 +5,7 @@ import {
   campaignSource,
   currentPage,
   failure,
+  rpcArgs,
   type SubmissionResult,
 } from "@/services/service-result";
 
@@ -30,7 +31,7 @@ export async function submitSupplierApplication(
   input: SupplierApplicationInput,
 ): Promise<SubmissionResult> {
   try {
-    const { data, error } = await supabase.rpc("submit_supplier_application", {
+    const { data, error } = await supabase.rpc("submit_supplier_application", rpcArgs({
       p_company_name: input.company_name,
       p_registration_details: input.registration_details,
       p_contact_person: input.contact_person,
@@ -48,7 +49,7 @@ export async function submitSupplierApplication(
       p_feed_capability: input.feed_capability,
       p_source_page: currentPage(),
       p_campaign_source: campaignSource(),
-    });
+    }));
     if (error) return failure(error);
     const row = data?.[0];
     if (!row?.reference) return failure("missing reference");

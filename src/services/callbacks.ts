@@ -5,6 +5,7 @@ import {
   campaignSource,
   currentPage,
   failure,
+  rpcArgs,
   type SubmissionResult,
 } from "@/services/service-result";
 
@@ -23,7 +24,7 @@ export async function submitCallbackRequest(
   input: CallbackRequestInput,
 ): Promise<SubmissionResult> {
   try {
-    const { data, error } = await supabase.rpc("submit_callback_request", {
+    const { data, error } = await supabase.rpc("submit_callback_request", rpcArgs({
       p_full_name: input.full_name,
       p_phone: input.phone,
       p_email: input.email,
@@ -34,7 +35,7 @@ export async function submitCallbackRequest(
       p_consent: input.consent,
       p_source_page: currentPage(),
       p_campaign_source: campaignSource(),
-    });
+    }));
     if (error) return failure(error);
     const row = data?.[0];
     if (!row?.reference) return failure("missing reference");

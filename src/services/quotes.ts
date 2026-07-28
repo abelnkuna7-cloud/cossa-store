@@ -5,6 +5,7 @@ import {
   campaignSource,
   currentPage,
   failure,
+  rpcArgs,
   type SubmissionResult,
 } from "@/services/service-result";
 import type { QuoteLine } from "@/types/catalog";
@@ -33,7 +34,7 @@ export interface QuoteRequestInput {
 
 export async function submitQuoteRequest(input: QuoteRequestInput): Promise<SubmissionResult> {
   try {
-    const { data, error } = await supabase.rpc("submit_quote_request", {
+    const { data, error } = await supabase.rpc("submit_quote_request", rpcArgs({
       p_contact_name: input.contact_name,
       p_company: input.company,
       p_email: input.email,
@@ -48,7 +49,7 @@ export async function submitQuoteRequest(input: QuoteRequestInput): Promise<Subm
       p_items: (input.items ?? []) as unknown as never,
       p_source_page: currentPage(),
       p_campaign_source: campaignSource(),
-    });
+    }));
     if (error) return failure(error);
     const row = data?.[0];
     if (!row?.reference) return failure("missing reference");
