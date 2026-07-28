@@ -10,8 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCommerce } from "@/lib/commerce-store";
 import { productsByIdsQuery } from "@/lib/queries";
-import { submitQuoteRequest } from "@/services/submissions.service";
-import type { QuoteScope, SubmissionState } from "@/types/catalog";
+import { submitQuoteRequest, type QuoteScope } from "@/services/quotes";
+import type { SubmissionState } from "@/types/catalog";
 
 const TITLE = "Request a quote | Cossa Store";
 const DESCRIPTION =
@@ -51,38 +51,38 @@ function QuotePage() {
 
     setState("submitting");
     setError(null);
-    try {
-      const result = await submitQuoteRequest({
-        contact_name: get("contact_name"),
-        company: get("company") || null,
-        email: get("email"),
-        phone: get("phone"),
-        location: get("location"),
-        scope: get("scope") as QuoteScope,
-        project_description: get("project_description"),
-        items: quoteBasket,
-      });
-      setReference(result.reference);
+    const result = await submitQuoteRequest({
+      contact_name: get("contact_name"),
+      company: get("company") || null,
+      email: get("email"),
+      phone: get("phone"),
+      location: get("location") || null,
+      scope: (get("scope") || "products_only") as QuoteScope,
+      requirements: get("project_description"),
+      items: quoteBasket,
+    });
+    if (result.success) {
+      setReference(result.referenceNumber);
       setState("pending");
       clearQuote();
-    } catch {
+    } else {
       setState("error");
-      setError("We could not record your request. Please try again or contact us on WhatsApp.");
+      setError(result.error);
     }
   }
 
   if (state === "pending" && reference) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16">
-        <h1 className="font-display text-3xl font-semibold">Quote request recorded</h1>
+        <h1 className="font-display text-3xl font-semibold">Quote request received</h1>
         <p className="mt-3 text-muted-foreground">
           Your reference is <span className="font-medium text-foreground">{reference}</span>. Keep
           it for follow-up.
         </p>
         <div className="mt-6">
-          <NoticeBlock tone="pending" title="Awaiting backend connection">
-            Your request has been saved on this device only. Automated quotation emails are not yet
-            live, so please also reach out via the contact page so our team can action it.
+          <NoticeBlock tone="pending" title="Quotations are prepared manually">
+            Our team reviews every scope before pricing it. We will be in touch using the contact
+            details you provided.
           </NoticeBlock>
         </div>
         <div className="mt-6 flex gap-3">
