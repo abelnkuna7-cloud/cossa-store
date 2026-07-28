@@ -14,18 +14,20 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CALLBACK_REASONS, SA_PROVINCES, SITE } from "@/config/site";
 import { CATEGORIES } from "@/data/categories";
-import { trackEvent } from "@/lib/analytics";
-import { isValidSaPhone, requestCallback } from "@/services/leads.service";
+import { submitCallbackRequest } from "@/services/callbacks";
+import { isValidSaPhone } from "@/services/service-result";
 import { useSupport } from "@/components/support/support-context";
 import { CallButton, WhatsAppButton } from "@/components/support/ContactActions";
 
-type State = "idle" | "submitting" | "pending" | "error";
+type State = "idle" | "submitting" | "success" | "error";
 
 export function CallbackDialog() {
   const { panel, close } = useSupport();
   const [state, setState] = useState<State>("idle");
   const [errors, setErrors] = useState<string[]>([]);
   const [consent, setConsent] = useState(false);
+  const [reference, setReference] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -41,20 +43,22 @@ export function CallbackDialog() {
     if (found.length > 0) return;
 
     setState("submitting");
-    try {
-      const result = await requestCallback({
-        full_name: get("full_name"),
-        phone: get("phone"),
-        email: get("email") || null,
-        preferred_time: get("preferred_time"),
-        reason: get("reason"),
-        product_category: get("product_category"),
-        location: get("location"),
-        consent,
-      });
-      trackEvent("callback_submitted", { backend: result.status });
-      setState("pending");
-    } catch {
+    setSubmitError(null);
+    const result = await submitCallbackRequest({
+      full_name: get("full_name"),
+      phone: get("phone"),
+      email: get("email") || null,
+      preferred_time: get("preferred_time") || null,
+      reason: get("reason"),
+      product_category: get("product_category") || null,
+      location: get("location") || null,
+      consent,
+    });
+    if (result.success) {
+      setReference(result.referenceNumber);
+      setState("success");
+    } else {
+      setSubmitError(result.error);
       setState("error");
     }
   }
@@ -71,12 +75,17 @@ export function CallbackDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        {state === "pending" ? (
+        {state === "success" ? (
           <div className="space-y-4">
             <div className="rounded-md border border-primary/40 bg-primary/10 p-4 text-sm">
-              <p className="font-semibold">Callback request system is being connected.</p>
+              <p className="font-semibold">Callback request received.</p>
+              <p className="mt-1">
+                Your reference number is{" "}
+                <span className="font-mono font-semibold text-primary">{reference}</span>.
+              </p>
               <p className="mt-1 text-muted-foreground">
-                Please contact us directly on {SITE.phoneDisplay} or WhatsApp us.
+                A Cossa team member will call you back. For anything urgent, call{" "}
+                {SITE.phoneDisplay} or WhatsApp us.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -101,7 +110,7 @@ export function CallbackDialog() {
             ) : null}
             {state === "error" ? (
               <p className="text-sm text-destructive" role="alert">
-                We could not record your request. Please call or WhatsApp {SITE.phoneDisplay}.
+                {submitError}
               </p>
             ) : null}
 
