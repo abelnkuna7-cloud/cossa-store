@@ -14,12 +14,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SA_PROVINCES, SITE } from "@/config/site";
-import { trackEvent } from "@/lib/analytics";
-import { isValidSaPhone, requestQuote, type QuickQuoteScope } from "@/services/leads.service";
+import { submitQuoteRequest, type QuoteScope } from "@/services/quotes";
+import { isValidSaPhone } from "@/services/service-result";
 import { useSupport } from "@/components/support/support-context";
 import { CallButton, WhatsAppButton } from "@/components/support/ContactActions";
 
-const SCOPES: { value: QuickQuoteScope; label: string }[] = [
+const SCOPES: { value: QuoteScope; label: string }[] = [
   { value: "products_only", label: "Products only" },
   { value: "services_only", label: "Services only" },
   { value: "products_and_services", label: "Products plus services" },
@@ -27,12 +27,14 @@ const SCOPES: { value: QuickQuoteScope; label: string }[] = [
   { value: "product_sourcing", label: "Product sourcing request" },
 ];
 
-type State = "idle" | "submitting" | "pending" | "error";
+type State = "idle" | "submitting" | "success" | "error";
 
 export function QuickQuoteDialog() {
   const { panel, close } = useSupport();
   const [state, setState] = useState<State>("idle");
   const [errors, setErrors] = useState<string[]>([]);
+  const [reference, setReference] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,23 +49,25 @@ export function QuickQuoteDialog() {
     if (found.length > 0) return;
 
     setState("submitting");
-    try {
-      const result = await requestQuote({
-        name: get("name"),
-        company: get("company") || null,
-        phone: get("phone"),
-        email: get("email"),
-        location: get("location"),
-        scope: (get("scope") || "products_only") as QuickQuoteScope,
-        requirements: get("requirements"),
-        estimated_quantity: get("estimated_quantity"),
-        required_date: get("required_date"),
-        budget: get("budget") || null,
-        additional_information: get("additional_information"),
-      });
-      trackEvent("quote_submitted", { backend: result.status });
-      setState("pending");
-    } catch {
+    setSubmitError(null);
+    const result = await submitQuoteRequest({
+      contact_name: get("name"),
+      company: get("company") || null,
+      phone: get("phone"),
+      email: get("email"),
+      location: get("location") || null,
+      scope: (get("scope") || "products_only") as QuoteScope,
+      requirements: get("requirements"),
+      estimated_quantity: get("estimated_quantity") || null,
+      required_date: get("required_date") || null,
+      budget: get("budget") || null,
+      additional_information: get("additional_information") || null,
+    });
+    if (result.success) {
+      setReference(result.referenceNumber);
+      setState("success");
+    } else {
+      setSubmitError(result.error);
       setState("error");
     }
   }
@@ -80,13 +84,17 @@ export function QuickQuoteDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        {state === "pending" ? (
+        {state === "success" ? (
           <div className="space-y-4">
             <div className="rounded-md border border-primary/40 bg-primary/10 p-4 text-sm">
-              <p className="font-semibold">Quote submission is being connected.</p>
+              <p className="font-semibold">Quotation request received.</p>
+              <p className="mt-1">
+                Your reference number is{" "}
+                <span className="font-mono font-semibold text-primary">{reference}</span>.
+              </p>
               <p className="mt-1 text-muted-foreground">
-                Your requirements were not sent yet. Please contact us on {SITE.phoneDisplay} or
-                WhatsApp so the team can prepare your quotation.
+                The Cossa team will prepare your quotation. To follow up, call {SITE.phoneDisplay}{" "}
+                or WhatsApp us with your reference.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -111,7 +119,7 @@ export function QuickQuoteDialog() {
             ) : null}
             {state === "error" ? (
               <p className="text-sm text-destructive" role="alert">
-                We could not record your request. Please WhatsApp or call {SITE.phoneDisplay}.
+                {submitError}
               </p>
             ) : null}
 
