@@ -17,6 +17,7 @@ import {
   buildMessage,
   createConversation,
   requestHumanSupport,
+  saveIntent,
   saveMessage,
   sendMessage,
   type ChatMessage,
@@ -41,24 +42,37 @@ export function CossaAiChat() {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [status, setStatus] = useState<"idle" | "typing" | "error">("idle");
   const [input, setInput] = useState("");
+  const [supportReference, setSupportReference] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isOpen = panel === "chat";
 
   useEffect(() => {
-    if (isOpen && !conversation) setConversation(createConversation());
+    if (!isOpen || conversation) return;
+    let cancelled = false;
+    void createConversation().then((next) => {
+      if (!cancelled) setConversation(next);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, conversation]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [conversation, status]);
 
-  async function submit(text: string) {
+  async function submit(text: string, isQuickAction = false) {
     const value = text.trim();
     if (!value || !conversation || status === "typing") return;
 
+    if (isQuickAction) void saveIntent(conversation.id, value);
+
     if (value === "Speak to a person") {
-      trackEvent("human_support_requested");
-      await requestHumanSupport("Requested a human from Cossa AI chat");
+      const handoff = await requestHumanSupport(
+        "Requested a human from Cossa AI chat",
+        conversation.id,
+      );
+      if (handoff.success) setSupportReference(handoff.referenceNumber);
     }
 
     const userMessage = buildMessage("user", value);
@@ -131,6 +145,12 @@ export function CossaAiChat() {
                 The assistant is unavailable right now. Please WhatsApp or call {SITE.phoneDisplay}.
               </p>
             ) : null}
+            {supportReference ? (
+              <p className="text-sm text-muted-foreground">
+                A Cossa team member has been notified. Your reference is{" "}
+                <span className="font-mono font-semibold text-primary">{supportReference}</span>.
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -140,7 +160,7 @@ export function CossaAiChat() {
               <button
                 key={action}
                 type="button"
-                onClick={() => void submit(action)}
+                onClick={() => void submit(action, true)}
                 className="rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary hover:text-primary"
               >
                 {action}

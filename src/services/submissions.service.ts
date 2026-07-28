@@ -1,17 +1,11 @@
 /**
- * Submission data-access layer (quotes, applications, contact, newsletter).
+ * Contact-message and newsletter submissions.
  *
- * NO BACKEND IS CONNECTED IN PHASE 1. These functions deliberately do not
- * pretend a submission was processed: they record the payload locally and
- * return a `pending` reference so the UI can show an honest pending state.
- * Phase 2 replaces the bodies with Supabase inserts.
+ * These two surfaces have no dedicated backend table yet, so they still record
+ * locally and report an honest pending state. Quotations, business-account and
+ * supplier applications are handled by the connected services in
+ * `@/services/quotes`, `@/services/businessAccounts` and `@/services/suppliers`.
  */
-import type {
-  BusinessAccountApplicationInput,
-  QuoteRequestInput,
-  SupplierApplicationInput,
-} from "@/types/catalog";
-
 export const BACKEND_CONNECTED = false;
 
 export interface PendingSubmission {
@@ -42,21 +36,8 @@ function persist(kind: string, reference: string, payload: unknown) {
 async function submit(kind: string, prefix: string, payload: unknown): Promise<PendingSubmission> {
   const ref = reference(prefix);
   persist(kind, ref, payload);
-  // Simulated latency only; no network call is made because no backend exists yet.
   await new Promise((resolve) => setTimeout(resolve, 400));
   return { reference: ref, status: "pending_backend", received_at: new Date().toISOString() };
-}
-
-export function submitQuoteRequest(input: QuoteRequestInput) {
-  return submit("quote_request", "QR", input);
-}
-
-export function submitBusinessAccountApplication(input: BusinessAccountApplicationInput) {
-  return submit("business_account_application", "BA", input);
-}
-
-export function submitSupplierApplication(input: SupplierApplicationInput) {
-  return submit("supplier_application", "SA", input);
 }
 
 export function submitContactMessage(input: {

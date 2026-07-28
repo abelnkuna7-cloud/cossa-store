@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CATEGORIES } from "@/data/categories";
-import { submitSupplierApplication } from "@/services/submissions.service";
+import { submitSupplierApplication } from "@/services/suppliers";
 import type { SubmissionState } from "@/types/catalog";
 
 const TITLE = "Become a supplier | Cossa Store";
@@ -44,43 +44,44 @@ function SupplierPage() {
 
     setState("submitting");
     setError(null);
-    try {
-      const result = await submitSupplierApplication({
-        company_name: get("company_name"),
-        registration_details: get("registration_details"),
-        contact_person: get("contact_person"),
-        email: get("email"),
-        phone: get("phone"),
-        website: get("website") || null,
-        product_categories: form.getAll("product_categories").map(String),
-        brands_supplied: get("brands_supplied"),
-        wholesale_available: form.get("wholesale_available") === "on",
-        dropshipping_available: form.get("dropshipping_available") === "on",
-        minimum_order: get("minimum_order"),
-        delivery_areas: get("delivery_areas"),
-        lead_times: get("lead_times"),
-        catalogue_upload_available: form.get("catalogue_upload_available") === "on",
-        feed_capability: get("feed_capability"),
-      });
-      setReference(result.reference);
+    const result = await submitSupplierApplication({
+      company_name: get("company_name"),
+      registration_details: get("registration_details") || null,
+      contact_person: get("contact_person"),
+      email: get("email"),
+      phone: get("phone") || null,
+      website: get("website") || null,
+      product_categories: form.getAll("product_categories").map(String),
+      brands_supplied: get("brands_supplied") || null,
+      wholesale_available: form.get("wholesale_available") === "on",
+      dropshipping_available: form.get("dropshipping_available") === "on",
+      minimum_order: get("minimum_order") || null,
+      delivery_areas: get("delivery_areas") || null,
+      lead_times: get("lead_times") || null,
+      catalogue_upload_available: form.get("catalogue_upload_available") === "on",
+      feed_capability: get("feed_capability") || null,
+    });
+    if (result.success) {
+      setReference(result.referenceNumber);
       setState("pending");
-    } catch {
+    } else {
       setState("error");
-      setError("We could not record your application. Please try again.");
+      setError(result.error);
     }
   }
 
   if (state === "pending" && reference) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16">
-        <h1 className="font-display text-3xl font-semibold">Supplier application recorded</h1>
+        <h1 className="font-display text-3xl font-semibold">Supplier application received</h1>
         <p className="mt-3 text-muted-foreground">
           Reference <span className="font-medium text-foreground">{reference}</span>. Our sourcing
           team reviews every supplier before onboarding.
         </p>
         <div className="mt-6">
-          <NoticeBlock tone="pending" title="Awaiting backend connection">
-            Supplier applications are stored on this device until the supplier portal is connected.
+          <NoticeBlock tone="pending" title="Review in progress">
+            Our sourcing team verifies pricing, stock reliability and delivery capability before
+            onboarding. Quote your reference number when following up.
           </NoticeBlock>
         </div>
         <Button asChild className="mt-6">

@@ -17,7 +17,11 @@ export type AnalyticsEvent =
   | "quote_submitted"
   | "chatbot_opened"
   | "chatbot_message_sent"
+  | "chatbot_message_saved"
+  | "chatbot_conversation_started"
   | "human_support_requested"
+  | "business_account_submitted"
+  | "supplier_application_submitted"
   | "phone_call_clicked"
   | "website_link_clicked"
   | "service_cross_sell_clicked";
