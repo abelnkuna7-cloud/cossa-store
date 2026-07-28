@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CATEGORIES } from "@/data/categories";
-import { submitBusinessAccountApplication } from "@/services/submissions.service";
+import { submitBusinessAccountApplication } from "@/services/businessAccounts";
 import type { SubmissionState } from "@/types/catalog";
 
 const TITLE = "Business account application | Cossa Store";
@@ -44,43 +44,43 @@ function BusinessAccountPage() {
 
     setState("submitting");
     setError(null);
-    try {
-      const result = await submitBusinessAccountApplication({
-        registered_name: get("registered_name"),
-        trading_name: get("trading_name") || null,
-        registration_number: get("registration_number"),
-        vat_number: get("vat_number") || null,
-        contact_person: get("contact_person"),
-        email: get("email"),
-        phone: get("phone"),
-        billing_address: get("billing_address"),
-        delivery_address: get("delivery_address"),
-        industry: get("industry"),
-        estimated_monthly_spend: get("estimated_monthly_spend"),
-        required_categories: form.getAll("required_categories").map(String),
-        bulk_requirements: get("bulk_requirements"),
-        preferred_payment_method: get("preferred_payment_method"),
-      });
-      setReference(result.reference);
+    const result = await submitBusinessAccountApplication({
+      registered_name: get("registered_name"),
+      trading_name: get("trading_name") || null,
+      registration_number: get("registration_number"),
+      vat_number: get("vat_number") || null,
+      contact_person: get("contact_person"),
+      email: get("email"),
+      phone: get("phone") || null,
+      billing_address: get("billing_address") || null,
+      delivery_address: get("delivery_address") || null,
+      industry: get("industry") || null,
+      estimated_monthly_spend: get("estimated_monthly_spend") || null,
+      required_categories: form.getAll("required_categories").map(String),
+      bulk_requirements: get("bulk_requirements") || null,
+      preferred_payment_method: get("preferred_payment_method") || null,
+    });
+    if (result.success) {
+      setReference(result.referenceNumber);
       setState("pending");
-    } catch {
+    } else {
       setState("error");
-      setError("We could not record your application. Please try again.");
+      setError(result.error);
     }
   }
 
   if (state === "pending" && reference) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16">
-        <h1 className="font-display text-3xl font-semibold">Application recorded</h1>
+        <h1 className="font-display text-3xl font-semibold">Application received</h1>
         <p className="mt-3 text-muted-foreground">
           Reference <span className="font-medium text-foreground">{reference}</span>. Our accounts
           team reviews applications and verifies company details before approval.
         </p>
         <div className="mt-6">
-          <NoticeBlock tone="pending" title="Awaiting backend connection">
-            Applications are stored on this device until our account system is connected. Please
-            also contact us so we can begin verification.
+          <NoticeBlock tone="pending" title="Verification in progress">
+            Business accounts are approved manually after company details are verified. Quote your
+            reference number when you follow up.
           </NoticeBlock>
         </div>
         <Button asChild className="mt-6">
