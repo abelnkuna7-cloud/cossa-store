@@ -1,14 +1,22 @@
 /**
  * Cossa AI chatbot service boundary.
  *
- * THE AI BRAIN IS NOT CONNECTED. These functions describe the interface a
- * future server-side Cossa AI integration will implement. Until then
- * `sendMessage` returns a clearly labelled assisted-support reply and never
- * fabricates products, prices, stock or delivery information.
+ * THE AI BRAIN IS NOT CONNECTED. `sendMessage` returns a clearly labelled
+ * assisted-support reply and never fabricates products, prices, stock or
+ * delivery information.
  *
- * No API keys are referenced here — model calls will live server-side.
+ * Conversations and messages ARE persisted to the Cossa backend so the team
+ * can follow up. No API keys are referenced here — model calls will live
+ * server-side.
  */
-import { buildLead, createLead, type LeadResult } from "@/services/leads.service";
+import {
+  ensureConversation,
+  saveChatMessage,
+  saveQuickActionIntent,
+  type ConversationHandle,
+} from "@/services/chatbot";
+import { submitHumanSupportRequest } from "@/services/support";
+import type { SubmissionResult } from "@/services/service-result";
 
 export const COSSA_AI_CONNECTED = false;
 
@@ -22,7 +30,8 @@ export interface ChatMessage {
 }
 
 export interface Conversation {
-  id: string;
+  id: string | null;
+  reference: string | null;
   created_at: string;
   messages: ChatMessage[];
 }
@@ -37,31 +46,46 @@ function id(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function createConversation(): Conversation {
-  return {
-    id: id("conv"),
-    created_at: new Date().toISOString(),
-    messages: [
-      {
-        id: id("msg"),
-        role: "assistant",
-        text: OPENING_MESSAGE,
-        created_at: new Date().toISOString(),
-      },
-    ],
-  };
-}
-
 export function buildMessage(role: ChatRole, text: string): ChatMessage {
   return { id: id("msg"), role, text, created_at: new Date().toISOString() };
 }
 
 /**
- * Persistence hook for a future backend. Currently a no-op so no customer
- * conversation data is stored or transmitted.
+ * Starts (or resumes) the session conversation in the backend. The chat UI
+ * stays usable even when the backend is unreachable — `id` is then null and
+ * messages are simply not persisted.
  */
-export async function saveMessage(_conversationId: string, _message: ChatMessage): Promise<void> {
-  return;
+export async function createConversation(): Promise<Conversation> {
+  let handle: ConversationHandle | null = null;
+  try {
+    handle = await ensureConversation();
+  } catch {
+    handle = null;
+  }
+  return {
+    id: handle?.id ?? null,
+    reference: handle?.reference ?? null,
+    created_at: new Date().toISOString(),
+    messages: [buildMessage("assistant", OPENING_MESSAGE)],
+  };
+}
+
+/** Persists a message. Silently ignored when no conversation is available. */
+export async function saveMessage(
+  conversationId: string | null,
+  message: ChatMessage,
+): Promise<void> {
+  if (!conversationId) return;
+  await saveChatMessage(conversationId, message.role, message.text);
+}
+
+/** Records the quick-action a visitor tapped, when one was used. */
+export async function saveIntent(
+  conversationId: string | null,
+  intent: string,
+): Promise<void> {
+  if (!conversationId) return;
+  await saveQuickActionIntent(conversationId, intent);
 }
 
 export interface AssistantReply {
@@ -69,23 +93,29 @@ export interface AssistantReply {
   mode: "assisted_support" | "ai";
 }
 
-export async function sendMessage(_conversationId: string, _text: string): Promise<AssistantReply> {
+export async function sendMessage(
+  conversationId: string | null,
+  _text: string,
+): Promise<AssistantReply> {
   if (!COSSA_AI_CONNECTED) {
     await new Promise((resolve) => setTimeout(resolve, 600));
-    return { message: buildMessage("assistant", ASSISTED_SUPPORT_REPLY), mode: "assisted_support" };
+    const message = buildMessage("assistant", ASSISTED_SUPPORT_REPLY);
+    await saveMessage(conversationId, message);
+    return { message, mode: "assisted_support" };
   }
   // Future: call a server function that proxies Cossa AI.
   throw new Error("Cossa AI transport not implemented");
 }
 
-export function requestHumanSupport(context: string): Promise<LeadResult> {
-  return createLead(
-    buildLead(
-      "human_support",
-      { name: "Chat visitor", phone: "", interest: context, preferred_contact_method: "whatsapp" },
-      { channel: "cossa_ai_chat" },
-    ),
-  );
+export function requestHumanSupport(
+  context: string,
+  conversationId: string | null = null,
+): Promise<SubmissionResult> {
+  return submitHumanSupportRequest({
+    channel: "cossa_ai_chat",
+    reason: context,
+    conversation_id: conversationId,
+  });
 }
 
 /** Catalogue search hook for the future AI tool-calling layer. */
