@@ -36,6 +36,40 @@ export type CategorySlug =
   | "cleaning-facility-supplies"
   | "technology-smart-solutions";
 
+export type PublicationState =
+  | "draft"
+  | "pending_review"
+  | "approved"
+  | "published"
+  | "unpublished"
+  | "archived";
+
+export interface ProductVariantPublic {
+  id: string;
+  name: string;
+  sku: string;
+  colour: string | null;
+  size: string | null;
+  finish: string | null;
+  phone_model: string | null;
+  material: string | null;
+  retail_price: number | null;
+  compare_at_price: number | null;
+  shipping_estimate: string | null;
+  is_active: boolean;
+}
+
+export interface Collection {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  hero_image_url: string | null;
+  campaign_name: string | null;
+  status: "draft" | "active" | "inactive" | "archived";
+  sort_order: number;
+}
+
 export interface ProductImage {
   url: string | null;
   alt: string;
@@ -53,7 +87,7 @@ export interface Product {
   slug: string;
   short_description: string;
   full_description: string;
-  category: CategorySlug;
+  category: string;
   subcategory: string;
   brand: string | null;
   supplier_id: string | null;
@@ -76,6 +110,14 @@ export interface Product {
   seo_description: string;
   created_at: string;
   updated_at: string;
+  /* Phase 2.1 catalogue fields */
+  collection: { name: string; slug: string } | null;
+  item_type: string | null;
+  product_story: string | null;
+  care_instructions: string | null;
+  requires_quote: boolean;
+  made_to_order: boolean;
+  variants: ProductVariantPublic[];
 }
 
 export interface Subcategory {
