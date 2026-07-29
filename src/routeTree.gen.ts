@@ -23,8 +23,10 @@ import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as CartRouteImport } from './routes/cart'
 import { Route as BusinessAccountRouteImport } from './routes/business-account'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AboutRouteImport } from './routes/about'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountIndexRouteImport } from './routes/account.index'
 import { Route as ProjectSlugRouteImport } from './routes/project.$slug'
@@ -32,6 +34,9 @@ import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as CategorySlugRouteImport } from './routes/category.$slug'
 import { Route as AccountWishlistRouteImport } from './routes/account.wishlist'
 import { Route as AccountOrdersRouteImport } from './routes/account.orders'
+import { Route as AuthenticatedAdminCatalogueIndexRouteImport } from './routes/_authenticated/admin.catalogue.index'
+import { Route as AuthenticatedAdminCatalogueNewRouteImport } from './routes/_authenticated/admin.catalogue.new'
+import { Route as AuthenticatedAdminCatalogueIdRouteImport } from './routes/_authenticated/admin.catalogue.$id'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -103,6 +108,11 @@ const BusinessAccountRoute = BusinessAccountRouteImport.update({
   path: '/business-account',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AccountRoute = AccountRouteImport.update({
   id: '/account',
   path: '/account',
@@ -111,6 +121,10 @@ const AccountRoute = AccountRouteImport.update({
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -148,11 +162,30 @@ const AccountOrdersRoute = AccountOrdersRouteImport.update({
   path: '/orders',
   getParentRoute: () => AccountRoute,
 } as any)
+const AuthenticatedAdminCatalogueIndexRoute =
+  AuthenticatedAdminCatalogueIndexRouteImport.update({
+    id: '/admin/catalogue/',
+    path: '/admin/catalogue/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminCatalogueNewRoute =
+  AuthenticatedAdminCatalogueNewRouteImport.update({
+    id: '/admin/catalogue/new',
+    path: '/admin/catalogue/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminCatalogueIdRoute =
+  AuthenticatedAdminCatalogueIdRouteImport.update({
+    id: '/admin/catalogue/$id',
+    path: '/admin/catalogue/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/account': typeof AccountRouteWithChildren
+  '/auth': typeof AuthRoute
   '/business-account': typeof BusinessAccountRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
@@ -173,10 +206,14 @@ export interface FileRoutesByFullPath {
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
   '/account/': typeof AccountIndexRoute
+  '/admin/catalogue/$id': typeof AuthenticatedAdminCatalogueIdRoute
+  '/admin/catalogue/new': typeof AuthenticatedAdminCatalogueNewRoute
+  '/admin/catalogue/': typeof AuthenticatedAdminCatalogueIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/auth': typeof AuthRoute
   '/business-account': typeof BusinessAccountRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
@@ -197,12 +234,17 @@ export interface FileRoutesByTo {
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
   '/account': typeof AccountIndexRoute
+  '/admin/catalogue/$id': typeof AuthenticatedAdminCatalogueIdRoute
+  '/admin/catalogue/new': typeof AuthenticatedAdminCatalogueNewRoute
+  '/admin/catalogue': typeof AuthenticatedAdminCatalogueIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/about': typeof AboutRoute
   '/account': typeof AccountRouteWithChildren
+  '/auth': typeof AuthRoute
   '/business-account': typeof BusinessAccountRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
@@ -223,6 +265,9 @@ export interface FileRoutesById {
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
   '/account/': typeof AccountIndexRoute
+  '/_authenticated/admin/catalogue/$id': typeof AuthenticatedAdminCatalogueIdRoute
+  '/_authenticated/admin/catalogue/new': typeof AuthenticatedAdminCatalogueNewRoute
+  '/_authenticated/admin/catalogue/': typeof AuthenticatedAdminCatalogueIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -230,6 +275,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/account'
+    | '/auth'
     | '/business-account'
     | '/cart'
     | '/checkout'
@@ -250,10 +296,14 @@ export interface FileRouteTypes {
     | '/product/$slug'
     | '/project/$slug'
     | '/account/'
+    | '/admin/catalogue/$id'
+    | '/admin/catalogue/new'
+    | '/admin/catalogue/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/about'
+    | '/auth'
     | '/business-account'
     | '/cart'
     | '/checkout'
@@ -274,11 +324,16 @@ export interface FileRouteTypes {
     | '/product/$slug'
     | '/project/$slug'
     | '/account'
+    | '/admin/catalogue/$id'
+    | '/admin/catalogue/new'
+    | '/admin/catalogue'
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
     | '/about'
     | '/account'
+    | '/auth'
     | '/business-account'
     | '/cart'
     | '/checkout'
@@ -299,12 +354,17 @@ export interface FileRouteTypes {
     | '/product/$slug'
     | '/project/$slug'
     | '/account/'
+    | '/_authenticated/admin/catalogue/$id'
+    | '/_authenticated/admin/catalogue/new'
+    | '/_authenticated/admin/catalogue/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AboutRoute: typeof AboutRoute
   AccountRoute: typeof AccountRouteWithChildren
+  AuthRoute: typeof AuthRoute
   BusinessAccountRoute: typeof BusinessAccountRoute
   CartRoute: typeof CartRoute
   CheckoutRoute: typeof CheckoutRoute
@@ -424,6 +484,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BusinessAccountRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/account': {
       id: '/account'
       path: '/account'
@@ -436,6 +503,13 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -487,8 +561,44 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountOrdersRouteImport
       parentRoute: typeof AccountRoute
     }
+    '/_authenticated/admin/catalogue/': {
+      id: '/_authenticated/admin/catalogue/'
+      path: '/admin/catalogue'
+      fullPath: '/admin/catalogue/'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogueIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/catalogue/new': {
+      id: '/_authenticated/admin/catalogue/new'
+      path: '/admin/catalogue/new'
+      fullPath: '/admin/catalogue/new'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogueNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/catalogue/$id': {
+      id: '/_authenticated/admin/catalogue/$id'
+      path: '/admin/catalogue/$id'
+      fullPath: '/admin/catalogue/$id'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogueIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
+
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminCatalogueIdRoute: typeof AuthenticatedAdminCatalogueIdRoute
+  AuthenticatedAdminCatalogueNewRoute: typeof AuthenticatedAdminCatalogueNewRoute
+  AuthenticatedAdminCatalogueIndexRoute: typeof AuthenticatedAdminCatalogueIndexRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminCatalogueIdRoute: AuthenticatedAdminCatalogueIdRoute,
+  AuthenticatedAdminCatalogueNewRoute: AuthenticatedAdminCatalogueNewRoute,
+  AuthenticatedAdminCatalogueIndexRoute: AuthenticatedAdminCatalogueIndexRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
 interface AccountRouteChildren {
   AccountOrdersRoute: typeof AccountOrdersRoute
@@ -507,8 +617,10 @@ const AccountRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AboutRoute: AboutRoute,
   AccountRoute: AccountRouteWithChildren,
+  AuthRoute: AuthRoute,
   BusinessAccountRoute: BusinessAccountRoute,
   CartRoute: CartRoute,
   CheckoutRoute: CheckoutRoute,
