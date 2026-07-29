@@ -357,6 +357,48 @@ export type Database = {
           },
         ]
       }
+      commerce_collections: {
+        Row: {
+          campaign_name: string | null
+          created_at: string
+          description: string | null
+          hero_image_url: string | null
+          id: string
+          metadata: Json
+          name: string
+          slug: string
+          sort_order: number
+          status: Database["public"]["Enums"]["collection_status"]
+          updated_at: string
+        }
+        Insert: {
+          campaign_name?: string | null
+          created_at?: string
+          description?: string | null
+          hero_image_url?: string | null
+          id?: string
+          metadata?: Json
+          name: string
+          slug: string
+          sort_order?: number
+          status?: Database["public"]["Enums"]["collection_status"]
+          updated_at?: string
+        }
+        Update: {
+          campaign_name?: string | null
+          created_at?: string
+          description?: string | null
+          hero_image_url?: string | null
+          id?: string
+          metadata?: Json
+          name?: string
+          slug?: string
+          sort_order?: number
+          status?: Database["public"]["Enums"]["collection_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       digital_assets: {
         Row: {
           created_at: string
@@ -713,6 +755,7 @@ export type Database = {
           display_order: number
           id: string
           is_primary: boolean
+          is_public: boolean
           media_type: Database["public"]["Enums"]["media_type"]
           product_id: string
           updated_at: string
@@ -725,6 +768,7 @@ export type Database = {
           display_order?: number
           id?: string
           is_primary?: boolean
+          is_public?: boolean
           media_type?: Database["public"]["Enums"]["media_type"]
           product_id: string
           updated_at?: string
@@ -737,6 +781,7 @@ export type Database = {
           display_order?: number
           id?: string
           is_primary?: boolean
+          is_public?: boolean
           media_type?: Database["public"]["Enums"]["media_type"]
           product_id?: string
           updated_at?: string
@@ -756,6 +801,74 @@ export type Database = {
             columns: ["variant_id"]
             isOneToOne: false
             referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_pod_details: {
+        Row: {
+          api_integration_status: string
+          created_at: string
+          external_blueprint_id: string | null
+          external_print_provider_id: string | null
+          external_product_id: string | null
+          fulfilment_notes: string | null
+          id: string
+          last_reviewed_at: string | null
+          manual_fulfilment_required: boolean
+          product_id: string
+          production_region: string | null
+          production_time_estimate: string | null
+          provider: Database["public"]["Enums"]["pod_provider"]
+          provider_dashboard_url: string | null
+          provider_product_url: string | null
+          shipping_estimate: string | null
+          updated_at: string
+        }
+        Insert: {
+          api_integration_status?: string
+          created_at?: string
+          external_blueprint_id?: string | null
+          external_print_provider_id?: string | null
+          external_product_id?: string | null
+          fulfilment_notes?: string | null
+          id?: string
+          last_reviewed_at?: string | null
+          manual_fulfilment_required?: boolean
+          product_id: string
+          production_region?: string | null
+          production_time_estimate?: string | null
+          provider?: Database["public"]["Enums"]["pod_provider"]
+          provider_dashboard_url?: string | null
+          provider_product_url?: string | null
+          shipping_estimate?: string | null
+          updated_at?: string
+        }
+        Update: {
+          api_integration_status?: string
+          created_at?: string
+          external_blueprint_id?: string | null
+          external_print_provider_id?: string | null
+          external_product_id?: string | null
+          fulfilment_notes?: string | null
+          id?: string
+          last_reviewed_at?: string | null
+          manual_fulfilment_required?: boolean
+          product_id?: string
+          production_region?: string | null
+          production_time_estimate?: string | null
+          provider?: Database["public"]["Enums"]["pod_provider"]
+          provider_dashboard_url?: string | null
+          provider_product_url?: string | null
+          shipping_estimate?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_pod_details_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -823,19 +936,88 @@ export type Database = {
           },
         ]
       }
+      product_variant_provider_details: {
+        Row: {
+          created_at: string
+          external_variant_id: string | null
+          id: string
+          last_verified_at: string | null
+          manual_order_instructions: string | null
+          product_id: string
+          production_cost: number | null
+          provider: Database["public"]["Enums"]["pod_provider"]
+          provider_currency: string
+          provider_sku: string | null
+          updated_at: string
+          variant_id: string
+        }
+        Insert: {
+          created_at?: string
+          external_variant_id?: string | null
+          id?: string
+          last_verified_at?: string | null
+          manual_order_instructions?: string | null
+          product_id: string
+          production_cost?: number | null
+          provider?: Database["public"]["Enums"]["pod_provider"]
+          provider_currency?: string
+          provider_sku?: string | null
+          updated_at?: string
+          variant_id: string
+        }
+        Update: {
+          created_at?: string
+          external_variant_id?: string | null
+          id?: string
+          last_verified_at?: string | null
+          manual_order_instructions?: string | null
+          product_id?: string
+          production_cost?: number | null
+          provider?: Database["public"]["Enums"]["pod_provider"]
+          provider_currency?: string
+          provider_sku?: string | null
+          updated_at?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_variant_provider_details_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_variant_provider_details_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: true
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_variants: {
         Row: {
           barcode: string | null
+          colour: string | null
+          compare_at_price: number | null
           created_at: string
+          currency: string
+          finish: string | null
           height_cm: number | null
           id: string
           is_active: boolean
           is_default: boolean
           length_cm: number | null
           low_stock_threshold: number
+          material: string | null
           name: string
           options: Json
+          phone_model: string | null
           product_id: string
+          retail_price: number | null
+          shipping_estimate: string | null
+          size: string | null
           stock_quantity: number
           updated_at: string
           variant_sku: string
@@ -844,16 +1026,25 @@ export type Database = {
         }
         Insert: {
           barcode?: string | null
+          colour?: string | null
+          compare_at_price?: number | null
           created_at?: string
+          currency?: string
+          finish?: string | null
           height_cm?: number | null
           id?: string
           is_active?: boolean
           is_default?: boolean
           length_cm?: number | null
           low_stock_threshold?: number
+          material?: string | null
           name: string
           options?: Json
+          phone_model?: string | null
           product_id: string
+          retail_price?: number | null
+          shipping_estimate?: string | null
+          size?: string | null
           stock_quantity?: number
           updated_at?: string
           variant_sku: string
@@ -862,16 +1053,25 @@ export type Database = {
         }
         Update: {
           barcode?: string | null
+          colour?: string | null
+          compare_at_price?: number | null
           created_at?: string
+          currency?: string
+          finish?: string | null
           height_cm?: number | null
           id?: string
           is_active?: boolean
           is_default?: boolean
           length_cm?: number | null
           low_stock_threshold?: number
+          material?: string | null
           name?: string
           options?: Json
+          phone_model?: string | null
           product_id?: string
+          retail_price?: number | null
+          shipping_estimate?: string | null
+          size?: string | null
           stock_quantity?: number
           updated_at?: string
           variant_sku?: string
@@ -890,69 +1090,126 @@ export type Database = {
       }
       products: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
+          audience: string | null
           brand_id: string | null
+          campaign_name: string | null
+          care_instructions: string | null
           category_id: string | null
+          collection_id: string | null
           created_at: string
+          created_by: string | null
+          design_name: string | null
+          features: string[]
           full_description: string | null
           id: string
+          is_customisable: boolean
+          is_featured: boolean
+          item_type: string | null
           name: string
+          product_story: string | null
           product_type: Database["public"]["Enums"]["product_type"]
+          publication_state: Database["public"]["Enums"]["product_publication_state"]
           published_at: string | null
+          requires_quote: boolean
+          requires_shipping: boolean
           return_policy: string | null
           search_keywords: string[]
           seo_description: string | null
           seo_title: string | null
           short_description: string | null
           sku: string
+          slogan: string | null
           slug: string
+          sourcing_enabled: boolean
           sourcing_model: Database["public"]["Enums"]["sourcing_model"]
           status: Database["public"]["Enums"]["catalogue_status"]
+          tags: string[]
           tax_class: Database["public"]["Enums"]["tax_class"]
           updated_at: string
           visibility: Database["public"]["Enums"]["product_visibility"]
           warranty: string | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          audience?: string | null
           brand_id?: string | null
+          campaign_name?: string | null
+          care_instructions?: string | null
           category_id?: string | null
+          collection_id?: string | null
           created_at?: string
+          created_by?: string | null
+          design_name?: string | null
+          features?: string[]
           full_description?: string | null
           id?: string
+          is_customisable?: boolean
+          is_featured?: boolean
+          item_type?: string | null
           name: string
+          product_story?: string | null
           product_type?: Database["public"]["Enums"]["product_type"]
+          publication_state?: Database["public"]["Enums"]["product_publication_state"]
           published_at?: string | null
+          requires_quote?: boolean
+          requires_shipping?: boolean
           return_policy?: string | null
           search_keywords?: string[]
           seo_description?: string | null
           seo_title?: string | null
           short_description?: string | null
           sku: string
+          slogan?: string | null
           slug: string
+          sourcing_enabled?: boolean
           sourcing_model?: Database["public"]["Enums"]["sourcing_model"]
           status?: Database["public"]["Enums"]["catalogue_status"]
+          tags?: string[]
           tax_class?: Database["public"]["Enums"]["tax_class"]
           updated_at?: string
           visibility?: Database["public"]["Enums"]["product_visibility"]
           warranty?: string | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          audience?: string | null
           brand_id?: string | null
+          campaign_name?: string | null
+          care_instructions?: string | null
           category_id?: string | null
+          collection_id?: string | null
           created_at?: string
+          created_by?: string | null
+          design_name?: string | null
+          features?: string[]
           full_description?: string | null
           id?: string
+          is_customisable?: boolean
+          is_featured?: boolean
+          item_type?: string | null
           name?: string
+          product_story?: string | null
           product_type?: Database["public"]["Enums"]["product_type"]
+          publication_state?: Database["public"]["Enums"]["product_publication_state"]
           published_at?: string | null
+          requires_quote?: boolean
+          requires_shipping?: boolean
           return_policy?: string | null
           search_keywords?: string[]
           seo_description?: string | null
           seo_title?: string | null
           short_description?: string | null
           sku?: string
+          slogan?: string | null
           slug?: string
+          sourcing_enabled?: boolean
           sourcing_model?: Database["public"]["Enums"]["sourcing_model"]
           status?: Database["public"]["Enums"]["catalogue_status"]
+          tags?: string[]
           tax_class?: Database["public"]["Enums"]["tax_class"]
           updated_at?: string
           visibility?: Database["public"]["Enums"]["product_visibility"]
@@ -971,6 +1228,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "commerce_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_collections"
             referencedColumns: ["id"]
           },
         ]
@@ -1528,6 +1792,7 @@ export type Database = {
       booking_type: "quote_only" | "fixed_booking" | "consultation"
       catalogue_status: "draft" | "active" | "archived"
       chat_role: "user" | "assistant" | "system"
+      collection_status: "draft" | "active" | "inactive" | "archived"
       contact_method: "phone" | "whatsapp" | "email"
       enquiry_type:
         | "callback"
@@ -1540,7 +1805,15 @@ export type Database = {
         | "chatbot"
       lead_status: "new" | "contacted" | "qualified" | "converted" | "closed"
       media_type: "image" | "video" | "document" | "model_3d"
+      pod_provider: "printify" | "gelato" | "printful" | "other"
       price_type: "cost" | "retail" | "business" | "promotional"
+      product_publication_state:
+        | "draft"
+        | "pending_review"
+        | "approved"
+        | "published"
+        | "unpublished"
+        | "archived"
       product_type: "physical" | "digital" | "service" | "bundle" | "affiliate"
       product_visibility: "public" | "business_only" | "hidden"
       service_pricing_model:
@@ -1691,6 +1964,7 @@ export const Constants = {
       booking_type: ["quote_only", "fixed_booking", "consultation"],
       catalogue_status: ["draft", "active", "archived"],
       chat_role: ["user", "assistant", "system"],
+      collection_status: ["draft", "active", "inactive", "archived"],
       contact_method: ["phone", "whatsapp", "email"],
       enquiry_type: [
         "callback",
@@ -1704,7 +1978,16 @@ export const Constants = {
       ],
       lead_status: ["new", "contacted", "qualified", "converted", "closed"],
       media_type: ["image", "video", "document", "model_3d"],
+      pod_provider: ["printify", "gelato", "printful", "other"],
       price_type: ["cost", "retail", "business", "promotional"],
+      product_publication_state: [
+        "draft",
+        "pending_review",
+        "approved",
+        "published",
+        "unpublished",
+        "archived",
+      ],
       product_type: ["physical", "digital", "service", "bundle", "affiliate"],
       product_visibility: ["public", "business_only", "hidden"],
       service_pricing_model: [
