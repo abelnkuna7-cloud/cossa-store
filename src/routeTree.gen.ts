@@ -35,6 +35,8 @@ import { Route as CategorySlugRouteImport } from './routes/category.$slug'
 import { Route as AccountWishlistRouteImport } from './routes/account.wishlist'
 import { Route as AccountOrdersRouteImport } from './routes/account.orders'
 import { Route as AuthenticatedAdminCatalogueIndexRouteImport } from './routes/_authenticated/admin.catalogue.index'
+import { Route as AuthenticatedAdminCatalogueNewRouteImport } from './routes/_authenticated/admin.catalogue.new'
+import { Route as AuthenticatedAdminCatalogueIdRouteImport } from './routes/_authenticated/admin.catalogue.$id'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -166,6 +168,18 @@ const AuthenticatedAdminCatalogueIndexRoute =
     path: '/admin/catalogue/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminCatalogueNewRoute =
+  AuthenticatedAdminCatalogueNewRouteImport.update({
+    id: '/admin/catalogue/new',
+    path: '/admin/catalogue/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminCatalogueIdRoute =
+  AuthenticatedAdminCatalogueIdRouteImport.update({
+    id: '/admin/catalogue/$id',
+    path: '/admin/catalogue/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -192,6 +206,8 @@ export interface FileRoutesByFullPath {
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
   '/account/': typeof AccountIndexRoute
+  '/admin/catalogue/$id': typeof AuthenticatedAdminCatalogueIdRoute
+  '/admin/catalogue/new': typeof AuthenticatedAdminCatalogueNewRoute
   '/admin/catalogue/': typeof AuthenticatedAdminCatalogueIndexRoute
 }
 export interface FileRoutesByTo {
@@ -218,6 +234,8 @@ export interface FileRoutesByTo {
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
   '/account': typeof AccountIndexRoute
+  '/admin/catalogue/$id': typeof AuthenticatedAdminCatalogueIdRoute
+  '/admin/catalogue/new': typeof AuthenticatedAdminCatalogueNewRoute
   '/admin/catalogue': typeof AuthenticatedAdminCatalogueIndexRoute
 }
 export interface FileRoutesById {
@@ -247,6 +265,8 @@ export interface FileRoutesById {
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
   '/account/': typeof AccountIndexRoute
+  '/_authenticated/admin/catalogue/$id': typeof AuthenticatedAdminCatalogueIdRoute
+  '/_authenticated/admin/catalogue/new': typeof AuthenticatedAdminCatalogueNewRoute
   '/_authenticated/admin/catalogue/': typeof AuthenticatedAdminCatalogueIndexRoute
 }
 export interface FileRouteTypes {
@@ -276,6 +296,8 @@ export interface FileRouteTypes {
     | '/product/$slug'
     | '/project/$slug'
     | '/account/'
+    | '/admin/catalogue/$id'
+    | '/admin/catalogue/new'
     | '/admin/catalogue/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -302,6 +324,8 @@ export interface FileRouteTypes {
     | '/product/$slug'
     | '/project/$slug'
     | '/account'
+    | '/admin/catalogue/$id'
+    | '/admin/catalogue/new'
     | '/admin/catalogue'
   id:
     | '__root__'
@@ -330,6 +354,8 @@ export interface FileRouteTypes {
     | '/product/$slug'
     | '/project/$slug'
     | '/account/'
+    | '/_authenticated/admin/catalogue/$id'
+    | '/_authenticated/admin/catalogue/new'
     | '/_authenticated/admin/catalogue/'
   fileRoutesById: FileRoutesById
 }
@@ -542,14 +568,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminCatalogueIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/catalogue/new': {
+      id: '/_authenticated/admin/catalogue/new'
+      path: '/admin/catalogue/new'
+      fullPath: '/admin/catalogue/new'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogueNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/catalogue/$id': {
+      id: '/_authenticated/admin/catalogue/$id'
+      path: '/admin/catalogue/$id'
+      fullPath: '/admin/catalogue/$id'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogueIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminCatalogueIdRoute: typeof AuthenticatedAdminCatalogueIdRoute
+  AuthenticatedAdminCatalogueNewRoute: typeof AuthenticatedAdminCatalogueNewRoute
   AuthenticatedAdminCatalogueIndexRoute: typeof AuthenticatedAdminCatalogueIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminCatalogueIdRoute: AuthenticatedAdminCatalogueIdRoute,
+  AuthenticatedAdminCatalogueNewRoute: AuthenticatedAdminCatalogueNewRoute,
   AuthenticatedAdminCatalogueIndexRoute: AuthenticatedAdminCatalogueIndexRoute,
 }
 
