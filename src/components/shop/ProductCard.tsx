@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { ExternalLink, Heart } from "lucide-react";
 import { toast } from "sonner";
@@ -39,13 +40,37 @@ export function ProductCard({
   const badges = productBadges(product);
   const image = product.images[0];
 
+  /* product_card_view fires only when the card is genuinely on screen. */
+  const cardRef = useRef<HTMLElement | null>(null);
+  const viewed = useRef(false);
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && !viewed.current) {
+            viewed.current = true;
+            trackEvent("product_card_view", { product_id: product.id });
+          }
+        }
+      },
+      { threshold: 0.5 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [product.id]);
+
   const open = () => {
     trackEvent("product_card_click", { product_id: product.id });
     onOpen?.();
   };
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary/50">
+    <article
+      ref={cardRef}
+      className="group flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary/50"
+    >
       <Link
         to="/product/$slug"
         params={{ slug: product.slug }}
