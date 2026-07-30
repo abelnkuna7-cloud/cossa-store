@@ -29,13 +29,15 @@ const SELECT = `
   id, sku, name, slug, short_description, full_description, item_type,
   product_story, care_instructions, requires_quote, sourcing_model, warranty,
   return_policy, seo_title, seo_description, created_at, updated_at, features,
+  product_type, is_featured, tags, published_at,
   commerce_categories:category_id ( slug, name ),
   brands:brand_id ( name ),
   commerce_collections:collection_id ( name, slug ),
   product_media ( id, url, alt_text, display_order, is_primary, media_type, is_public ),
   product_variants ( id, name, variant_sku, colour, size, finish, phone_model, material, retail_price, compare_at_price, shipping_estimate, is_active, stock_quantity ),
   product_prices ( amount, price_type, is_active, minimum_quantity ),
-  product_attributes ( label, value, display_order )
+  product_attributes ( label, value, display_order ),
+  affiliate_offers ( partner_name, tracking_url, disclosure_text, is_active )
 `;
 
 const FULFILMENT_MAP: Record<string, FulfilmentType> = {
@@ -45,6 +47,8 @@ const FULFILMENT_MAP: Record<string, FulfilmentType> = {
   international_dropshipping: "international_dropshipping",
   print_on_demand: "print_on_demand",
   affiliate: "affiliate",
+  digital: "digital",
+  service: "service",
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -80,18 +84,22 @@ function mapProduct(row: any): Product {
   const compareAt = variants.map((v) => v.compare_at_price).find((n) => typeof n === "number" && n > 0);
 
   const sourcing = String(row.sourcing_model ?? "own_stock");
+  const productType = (row.product_type ?? "physical") as Product["product_type"];
   const madeToOrder = sourcing === "print_on_demand";
   const stockQty = (row.product_variants ?? []).reduce(
     (total: number, v: any) => total + (v.is_active ? Number(v.stock_quantity ?? 0) : 0),
     0,
   );
+  const physicalStocked = sourcing === "own_stock" && productType === "physical";
   const stockStatus: StockStatus = madeToOrder
     ? "made_to_order"
-    : stockQty > 0
-      ? "in_stock"
-      : variants.length === 0
-        ? "made_to_order"
+    : !physicalStocked
+      ? "made_to_order"
+      : stockQty > 0
+        ? "in_stock"
         : "out_of_stock";
+
+  const affiliateRow = (row.affiliate_offers ?? []).find((o: any) => o.is_active) ?? null;
 
   const media = (row.product_media ?? [])
     .filter((m: any) => m.is_public && m.media_type === "image")
@@ -142,6 +150,18 @@ function mapProduct(row: any): Product {
     requires_quote: Boolean(row.requires_quote),
     made_to_order: madeToOrder,
     variants,
+    product_type: productType,
+    is_featured: Boolean(row.is_featured),
+    tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
+    published_at: row.published_at ?? null,
+    stock_available: physicalStocked && stockQty > 0,
+    affiliate: affiliateRow
+      ? {
+          partner_name: affiliateRow.partner_name,
+          tracking_url: affiliateRow.tracking_url,
+          disclosure_text: affiliateRow.disclosure_text ?? null,
+        }
+      : null,
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
