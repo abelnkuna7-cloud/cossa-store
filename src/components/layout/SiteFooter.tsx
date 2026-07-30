@@ -4,6 +4,7 @@ import { Globe, MessageCircle, Phone } from "lucide-react";
 import { CATEGORIES } from "@/data/categories";
 import { SITE, whatsappLink } from "@/config/site";
 import { NewsletterForm } from "@/components/common/NewsletterForm";
+import { StaffCatalogueLink } from "@/components/admin/StaffCatalogueLink";
 import { trackEvent } from "@/lib/analytics";
 import { useSupport } from "@/components/support/support-context";
 
@@ -158,7 +159,10 @@ export function SiteFooter() {
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <p>© {new Date().getFullYear()} Cossa Nexus Holdings. All rights reserved.</p>
-          <p>{SITE.domain}</p>
+          <div className="flex items-center gap-3">
+            <StaffCatalogueLink variant="link" />
+            <p>{SITE.domain}</p>
+          </div>
         </div>
       </div>
     </footer>

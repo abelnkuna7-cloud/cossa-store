@@ -66,6 +66,9 @@
   --color-yellow: var(--yellow);
   --color-yellow-hover: var(--yellow-hover);
   --color-yellow-muted: var(--yellow-muted);
+  --color-gold: var(--yellow);
+  --color-gold-soft: var(--yellow-hover);
+  --color-gold-deep: var(--yellow-muted);
   --color-success: var(--success);
   --color-warning: var(--warning);
 }
@@ -73,47 +76,47 @@
 :root {
   --radius: 0.375rem;
 
-  /* Cossa Store identity: black, yellow, charcoal, grey */
+  /* Cossa Nexus Holdings enterprise identity: black, luxury gold, white */
   --surface: oklch(0.178 0 0); /* #111111 */
-  --surface-strong: oklch(0.209 0 0); /* #181818 */
-  --yellow: oklch(0.842 0.168 90.4); /* #F5C518 */
-  --yellow-hover: oklch(0.883 0.165 92.2); /* #FFD43B */
-  --yellow-muted: oklch(0.767 0.153 90.8); /* #D8AE14 */
+  --surface-strong: oklch(0.218 0 0); /* #1A1A1A dark charcoal */
+  --yellow: oklch(0.767 0.139 91.1); /* #D4AF37 luxury gold */
+  --yellow-hover: oklch(0.869 0.127 91.7); /* #F2D16B soft gold */
+  --yellow-muted: oklch(0.544 0.104 84.4); /* #8C6A16 deep gold */
   --success: oklch(0.723 0.192 149.6); /* #22C55E */
-  --warning: oklch(0.842 0.168 90.4);
+  --warning: oklch(0.767 0.139 91.1);
 
-  --background: oklch(0.134 0 0); /* #080808 */
-  --foreground: oklch(0.976 0 0); /* #F7F7F7 */
-  --card: oklch(0.209 0 0); /* #181818 */
+  --background: oklch(0.09 0 0); /* near-black */
+  --foreground: oklch(1 0 0); /* #FFFFFF */
+  --card: oklch(0.218 0 0); /* #1A1A1A */
   --card-foreground: oklch(0.976 0 0);
   --popover: oklch(0.178 0 0);
   --popover-foreground: oklch(0.976 0 0);
-  --primary: oklch(0.842 0.168 90.4); /* yellow CTA */
-  --primary-foreground: oklch(0.196 0 0); /* #151515 */
-  --secondary: oklch(0.209 0 0);
+  --primary: oklch(0.767 0.139 91.1); /* gold CTA */
+  --primary-foreground: oklch(0.09 0 0);
+  --secondary: oklch(0.218 0 0);
   --secondary-foreground: oklch(0.976 0 0);
-  --muted: oklch(0.209 0 0);
-  --muted-foreground: oklch(0.754 0 0); /* #AFAFAF */
-  --accent: oklch(0.842 0.168 90.4);
-  --accent-foreground: oklch(0.196 0 0);
+  --muted: oklch(0.218 0 0);
+  --muted-foreground: oklch(0.783 0 0); /* #B8B8B8 */
+  --accent: oklch(0.767 0.139 91.1);
+  --accent-foreground: oklch(0.09 0 0);
   --destructive: oklch(0.637 0.208 25.3); /* #EF4444 */
   --destructive-foreground: oklch(0.976 0 0);
-  --border: oklch(0.309 0 0); /* #303030 */
-  --input: oklch(0.309 0 0);
-  --ring: oklch(0.842 0.168 90.4);
-  --chart-1: oklch(0.842 0.168 90.4);
-  --chart-2: oklch(0.767 0.153 90.8);
+  --border: oklch(0.285 0 0); /* #2A2A2A */
+  --input: oklch(0.285 0 0);
+  --ring: oklch(0.767 0.139 91.1);
+  --chart-1: oklch(0.767 0.139 91.1);
+  --chart-2: oklch(0.869 0.127 91.7);
   --chart-3: oklch(0.633 0 0);
   --chart-4: oklch(0.723 0.192 149.6);
   --chart-5: oklch(0.637 0.208 25.3);
   --sidebar: oklch(0.178 0 0);
   --sidebar-foreground: oklch(0.976 0 0);
-  --sidebar-primary: oklch(0.842 0.168 90.4);
-  --sidebar-primary-foreground: oklch(0.196 0 0);
-  --sidebar-accent: oklch(0.209 0 0);
+  --sidebar-primary: oklch(0.767 0.139 91.1);
+  --sidebar-primary-foreground: oklch(0.09 0 0);
+  --sidebar-accent: oklch(0.218 0 0);
   --sidebar-accent-foreground: oklch(0.976 0 0);
-  --sidebar-border: oklch(0.309 0 0);
-  --sidebar-ring: oklch(0.842 0.168 90.4);
+  --sidebar-border: oklch(0.285 0 0);
+  --sidebar-ring: oklch(0.767 0.139 91.1);
 }
 
 .dark {
@@ -142,5 +145,13 @@
   :focus-visible {
     outline: 2px solid var(--yellow);
     outline-offset: 2px;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
   }
 }

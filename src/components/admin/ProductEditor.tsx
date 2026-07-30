@@ -304,6 +304,42 @@ export function ProductEditor({ productId }: { productId?: string }) {
       </Section>
 
       <Section title="3 · Collections and merchandising">
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Toggle
+            label="Featured on storefront"
+            value={form.is_featured}
+            onChange={(v) => set("is_featured", v)}
+          />
+          <Toggle
+            label="Trending now"
+            value={form.tags.includes("trending")}
+            onChange={(v) =>
+              set(
+                "tags",
+                v
+                  ? Array.from(new Set([...form.tags, "trending"]))
+                  : form.tags.filter((t) => t !== "trending"),
+              )
+            }
+          />
+          <Toggle
+            label="Business buying deal"
+            value={form.tags.includes("business-deal")}
+            onChange={(v) =>
+              set(
+                "tags",
+                v
+                  ? Array.from(new Set([...form.tags, "business-deal"]))
+                  : form.tags.filter((t) => t !== "business-deal"),
+              )
+            }
+          />
+        </div>
+        <p className="mb-4 text-xs text-muted-foreground">
+          “New arrival” is derived automatically from the real publication date (
+          {30}-day window) and cannot be set manually. Trending is a deliberate staff selection —
+          never an invented popularity claim.
+        </p>
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Campaign name">
             <Input value={form.campaign_name ?? ""} onChange={(e) => set("campaign_name", e.target.value || null)} />

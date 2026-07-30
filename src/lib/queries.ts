@@ -5,9 +5,11 @@ import {
   fetchProductBySlug,
   fetchProject,
   listFeaturedProducts,
+  listPublicCollections,
   listProducts,
   listProjectProducts,
   listRelatedProducts,
+  listStorefrontProducts,
   type ProductQuery,
 } from "@/services/catalog.service";
 import { fetchProductsByIds } from "@/services/catalog.service";
@@ -17,6 +19,18 @@ export const featuredProductsQuery = (limit = 8) =>
   queryOptions({
     queryKey: ["products", "featured", limit],
     queryFn: () => listFeaturedProducts(limit),
+  });
+
+export const storefrontProductsQuery = () =>
+  queryOptions({
+    queryKey: ["products", "storefront"],
+    queryFn: () => listStorefrontProducts(),
+  });
+
+export const publicCollectionsQuery = () =>
+  queryOptions({
+    queryKey: ["collections", "public"],
+    queryFn: () => listPublicCollections(),
   });
 
 export const productsQuery = (query: ProductQuery) =>

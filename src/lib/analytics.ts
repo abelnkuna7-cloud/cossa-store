@@ -24,7 +24,14 @@ export type AnalyticsEvent =
   | "supplier_application_submitted"
   | "phone_call_clicked"
   | "website_link_clicked"
-  | "service_cross_sell_clicked";
+  | "service_cross_sell_clicked"
+  | "product_card_view"
+  | "product_card_click"
+  | "carousel_view"
+  | "carousel_product_click"
+  | "affiliate_link_click"
+  | "quote_request_click"
+  | "availability_request_click";
 
 export interface TrackedEvent {
   name: AnalyticsEvent;

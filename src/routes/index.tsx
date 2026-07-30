@@ -14,10 +14,12 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { ProductGrid } from "@/components/shop/ProductCard";
+import { ProductCarousel } from "@/components/shop/ProductCarousel";
+import { ProductImage } from "@/components/shop/ProductImage";
 import { CATEGORIES, PROJECTS } from "@/data/categories";
 import { SERVICE_ECOSYSTEM, SITE, whatsappLink } from "@/config/site";
-import { featuredProductsQuery } from "@/lib/queries";
+import { publicCollectionsQuery, storefrontProductsQuery } from "@/lib/queries";
+import { buildSections } from "@/lib/merchandising";
 import { ContactStrip } from "@/components/support/ContactStrip";
 
 const TITLE = "Cossa Store | Building, facility and technology supplies";
@@ -34,13 +36,17 @@ export const Route = createFileRoute("/")({
     ],
   }),
   loader: ({ context }) => {
-    context.queryClient.ensureQueryData(featuredProductsQuery());
+    context.queryClient.ensureQueryData(storefrontProductsQuery());
+    context.queryClient.ensureQueryData(publicCollectionsQuery());
   },
   component: Home,
 });
 
 function Home() {
-  const { data: featured } = useSuspenseQuery(featuredProductsQuery());
+  const { data: products } = useSuspenseQuery(storefrontProductsQuery());
+  const { data: collections } = useSuspenseQuery(publicCollectionsQuery());
+  const sections = buildSections(products);
+  const featuredCollections = (collections ?? []).filter((c) => c.status === "active");
 
   return (
     <div>
@@ -88,6 +94,60 @@ function Home() {
       </section>
 
       <ContactStrip />
+
+      {/* Merchandising rails — a section only renders when it has real products */}
+      {sections.map((section) => (
+        <ProductCarousel
+          key={section.id}
+          sectionId={section.id}
+          title={section.title}
+          description={section.description}
+          products={section.products}
+          action={
+            <Button asChild variant="outline" size="sm">
+              <Link to="/shop">Shop all</Link>
+            </Button>
+          }
+        />
+      ))}
+
+      {featuredCollections.length > 0 ? (
+        <Section
+          muted
+          title="Featured collections"
+          description="Curated Cossa ranges and campaigns."
+        >
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {featuredCollections.map((collection) => (
+              <Link
+                key={collection.id}
+                to="/shop"
+                search={{ collection: collection.slug }}
+                className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary/50"
+              >
+                <ProductImage
+                  url={collection.hero_image_url}
+                  alt={collection.name}
+                  className="h-40 w-full"
+                />
+                <div className="p-5">
+                  {collection.campaign_name ? (
+                    <p className="text-[11px] uppercase tracking-wide text-primary">
+                      {collection.campaign_name}
+                    </p>
+                  ) : null}
+                  <h3 className="mt-1 font-display text-lg font-semibold">{collection.name}</h3>
+                  {collection.description ? (
+                    <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                      {collection.description}
+                    </p>
+                  ) : null}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </Section>
+      ) : null}
 
       {/* Categories */}
       <Section
@@ -139,19 +199,6 @@ function Home() {
             </Link>
           ))}
         </div>
-      </Section>
-
-      {/* Featured */}
-      <Section
-        title="Featured products"
-        description="A selection from the current catalogue."
-        action={
-          <Button asChild variant="outline">
-            <Link to="/shop">Shop all</Link>
-          </Button>
-        }
-      >
-        <ProductGrid products={featured} />
       </Section>
 
       {/* Business buying */}
