@@ -196,7 +196,7 @@ function Row({
           </Button>
           {row.publication_state === "published" ? (
             <Button asChild size="sm" variant="ghost">
-              <Link to="/products/$slug" params={{ slug: row.slug }} target="_blank">
+              <Link to="/product/$slug" params={{ slug: row.slug }} target="_blank">
                 Preview
               </Link>
             </Button>

@@ -37,6 +37,7 @@ export const Route = createFileRoute("/")({
   }),
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(storefrontProductsQuery());
+    context.queryClient.ensureQueryData(publicCollectionsQuery());
   },
   component: Home,
 });

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { StaffCatalogueLink } from "@/components/admin/StaffCatalogueLink";
 import { Input } from "@/components/ui/input";
 import { CATEGORIES } from "@/data/categories";
 import { SITE, whatsappLink } from "@/config/site";
@@ -125,6 +126,7 @@ export function SiteHeader() {
               <User className="h-5 w-5" />
             </Link>
           </Button>
+          <StaffCatalogueLink className="hidden lg:inline-flex" />
           <Button asChild variant="ghost" size="icon" aria-label="Wishlist">
             <Link to="/account/wishlist" className="relative">
               <Heart className="h-5 w-5" />
