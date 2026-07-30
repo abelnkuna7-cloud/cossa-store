@@ -4,6 +4,7 @@ import { Globe, MessageCircle, Phone } from "lucide-react";
 import { CATEGORIES } from "@/data/categories";
 import { SITE, whatsappLink } from "@/config/site";
 import { NewsletterForm } from "@/components/common/NewsletterForm";
+import { StaffCatalogueLink } from "@/components/admin/StaffCatalogueLink";
 import { trackEvent } from "@/lib/analytics";
 import { useSupport } from "@/components/support/support-context";
 
