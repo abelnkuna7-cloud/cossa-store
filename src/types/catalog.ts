@@ -9,15 +9,19 @@ export type FulfilmentType =
   | "local_dropshipping"
   | "international_dropshipping"
   | "print_on_demand"
-  | "affiliate";
+  | "affiliate"
+  | "digital"
+  | "service";
 
 export const FULFILMENT_LABELS: Record<FulfilmentType, string> = {
-  cossa_stock: "Cossa stock",
-  local_supplier: "Local supplier",
-  local_dropshipping: "Local dropshipping",
-  international_dropshipping: "International dropshipping",
-  print_on_demand: "Print on demand",
-  affiliate: "Affiliate product",
+  cossa_stock: "In stock",
+  local_supplier: "Ships from local supplier",
+  local_dropshipping: "Ships from local supplier",
+  international_dropshipping: "International fulfilment",
+  print_on_demand: "Made to order",
+  affiliate: "Partner offer",
+  digital: "Instant digital delivery",
+  service: "Service available",
 };
 
 export type VatStatus = "vat_inclusive" | "vat_exclusive" | "zero_rated" | "exempt";
@@ -80,6 +84,12 @@ export interface ProductSpecification {
   value: string;
 }
 
+export interface AffiliateOfferPublic {
+  partner_name: string;
+  tracking_url: string;
+  disclosure_text: string | null;
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -118,6 +128,14 @@ export interface Product {
   requires_quote: boolean;
   made_to_order: boolean;
   variants: ProductVariantPublic[];
+  /* Phase 2.2 merchandising */
+  product_type: "physical" | "digital" | "service" | "bundle" | "affiliate";
+  is_featured: boolean;
+  tags: string[];
+  published_at: string | null;
+  /** True only when real counted stock is available. */
+  stock_available: boolean;
+  affiliate: AffiliateOfferPublic | null;
 }
 
 export interface Subcategory {
