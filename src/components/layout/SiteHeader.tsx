@@ -216,6 +216,9 @@ export function SiteHeader() {
                   onDone={() => setOpen(false)}
                 />
               ))}
+              <div className="pt-3">
+                <StaffCatalogueLink className="w-full" />
+              </div>
             </div>
           </div>
         </div>
