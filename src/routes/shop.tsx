@@ -8,6 +8,13 @@ import { ProductGrid } from "@/components/shop/ProductCard";
 import { Button } from "@/components/ui/button";
 import { CATEGORIES } from "@/data/categories";
 import { productsQuery } from "@/lib/queries";
+import {
+  isAffiliate,
+  isDigital,
+  isNewArrival,
+  isService,
+  isTrending,
+} from "@/lib/merchandising";
 
 const searchSchema = z.object({
   category: z.string().optional(),
