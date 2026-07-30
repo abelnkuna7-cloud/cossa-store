@@ -278,3 +278,18 @@ export async function listPublicCollections() {
   if (error) throw error;
   return data ?? [];
 }
+
+/**
+ * Single storefront read used to build the homepage merchandising sections.
+ * Row-level security already limits this to published, public products.
+ */
+export async function listStorefrontProducts(limit = 120): Promise<Product[]> {
+  const { data, error } = await supabase
+    .from("products")
+    .select(SELECT)
+    .order("published_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map(mapProduct);
+}
