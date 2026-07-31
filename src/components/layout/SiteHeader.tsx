@@ -18,6 +18,8 @@ import { Input } from "@/components/ui/input";
 import { CATEGORIES } from "@/data/categories";
 import { SITE, whatsappLink } from "@/config/site";
 import { useCommerce } from "@/lib/commerce-store";
+import { useSession } from "@/lib/auth";
+import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
 import { useSupport } from "@/components/support/support-context";
 
@@ -36,6 +38,12 @@ export function SiteHeader() {
   const navigate = useNavigate();
   const { cartCount, wishlistCount, hydrated } = useCommerce();
   const { open: openSupport } = useSupport();
+  const { user } = useSession();
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    navigate({ to: "/", replace: true });
+  }
 
   function runSearch(event: React.FormEvent) {
     event.preventDefault();
@@ -127,6 +135,20 @@ export function SiteHeader() {
             </Link>
           </Button>
           <StaffCatalogueLink className="hidden lg:inline-flex" />
+          {user ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hidden lg:inline-flex"
+              onClick={signOut}
+            >
+              Sign out
+            </Button>
+          ) : (
+            <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
+              <Link to="/auth">Sign in</Link>
+            </Button>
+          )}
           <Button asChild variant="ghost" size="icon" aria-label="Wishlist">
             <Link to="/account/wishlist" className="relative">
               <Heart className="h-5 w-5" />
@@ -218,6 +240,17 @@ export function SiteHeader() {
               ))}
               <div className="pt-3">
                 <StaffCatalogueLink className="w-full" />
+                {user ? (
+                  <Button variant="outline" className="mt-2 w-full" onClick={signOut}>
+                    Sign out
+                  </Button>
+                ) : (
+                  <Button asChild variant="outline" className="mt-2 w-full">
+                    <Link to="/auth" onClick={() => setOpen(false)}>
+                      Sign in / Sign up
+                    </Link>
+                  </Button>
+                )}
               </div>
             </div>
           </div>
