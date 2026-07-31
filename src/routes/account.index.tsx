@@ -3,19 +3,47 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { NoticeBlock } from "@/components/common/StateBlocks";
 import { Button } from "@/components/ui/button";
 import { AUTH_CONNECTED } from "@/services/account.service";
+import { useProfile, useSession } from "@/lib/auth";
 
 export const Route = createFileRoute("/account/")({
   component: AccountOverview,
 });
 
 function AccountOverview() {
+  const { user, loading } = useSession();
+  const profile = useProfile(user?.id);
+
   return (
     <div className="space-y-6">
+      {!loading && user ? (
+        <div className="rounded-lg border border-border bg-card p-6">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">Signed in as</p>
+          <p className="mt-1 font-display text-lg font-semibold">
+            {profile.data?.full_name ?? user.email}
+          </p>
+          {profile.data?.business_name ? (
+            <p className="text-sm text-muted-foreground">{profile.data.business_name}</p>
+          ) : null}
+          <Button asChild className="mt-4">
+            <Link to="/admin/catalogue">Manage my products</Link>
+          </Button>
+        </div>
+      ) : !loading ? (
+        <div className="rounded-lg border border-border bg-card p-6">
+          <h2 className="font-display text-lg font-semibold">Sign in to your member account</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Members can list and manage their own products on Cossa Store.
+          </p>
+          <Button asChild className="mt-4">
+            <Link to="/auth">Sign in or sign up</Link>
+          </Button>
+        </div>
+      ) : null}
+
       {!AUTH_CONNECTED ? (
         <NoticeBlock tone="pending" title="Customer accounts are not live yet">
-          Sign-in, order history and saved addresses become available once the Cossa Store account
-          system is connected. Your cart, wishlist and quote basket are stored on this device in the
-          meantime.
+          Customer order history and saved addresses are not connected yet. Your cart, wishlist and
+          quote basket are stored on this device in the meantime.
         </NoticeBlock>
       ) : null}
 

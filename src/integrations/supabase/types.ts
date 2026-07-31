@@ -1239,6 +1239,33 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          business_name: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          business_name?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          business_name?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       quote_requests: {
         Row: {
           additional_information: string | null
@@ -1659,6 +1686,7 @@ export type Database = {
       }
       is_public_product: { Args: { _product_id: string }; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      owns_product: { Args: { _product_id: string }; Returns: boolean }
       record_lead: {
         Args: {
           p_campaign_source: string
