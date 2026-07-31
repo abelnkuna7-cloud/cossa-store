@@ -14,6 +14,7 @@ export function useCatalogueAccess() {
     loading: loading || roles.isPending,
     isStaff: list.includes("staff") || list.includes("admin"),
     isAdmin: list.includes("admin"),
+    isMember: Boolean(user),
     email: user?.email ?? null,
   };
 }
@@ -62,18 +63,26 @@ export function CatalogueShell({
 
       {access.loading ? (
         <LoadingBlock label="Checking your access…" />
-      ) : !access.isStaff ? (
+      ) : !access.isMember ? (
         <EmptyBlock
-          title="No catalogue access"
-          description="Your account does not have the Cossa staff or admin role. Ask an administrator to grant access."
+          title="Sign in to manage listings"
+          description="Sign in with your Cossa Store member account to add and manage your own products."
           action={
             <Button asChild variant="outline">
-              <Link to="/">Back to the store</Link>
+              <Link to="/auth">Sign in</Link>
             </Button>
           }
         />
       ) : (
-        children
+        <>
+          {!access.isStaff ? (
+            <p className="mb-6 rounded-md border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+              You are managing your own listings. New products are saved as drafts and go live on
+              the storefront once a Cossa administrator approves them.
+            </p>
+          ) : null}
+          {children}
+        </>
       )}
     </div>
   );

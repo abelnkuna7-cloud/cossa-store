@@ -31,6 +31,29 @@ export function useSession() {
 
 export type CossaRole = "admin" | "staff";
 
+export interface MemberProfile {
+  id: string;
+  full_name: string | null;
+  business_name: string | null;
+  phone: string | null;
+}
+
+export function useProfile(userId: string | undefined) {
+  return useQuery({
+    queryKey: ["profile", userId],
+    enabled: Boolean(userId),
+    queryFn: async (): Promise<MemberProfile | null> => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, business_name, phone")
+        .eq("id", userId as string)
+        .maybeSingle();
+      if (error) throw error;
+      return data ?? null;
+    },
+  });
+}
+
 export function useRoles(userId: string | undefined) {
   return useQuery({
     queryKey: ["user-roles", userId],
