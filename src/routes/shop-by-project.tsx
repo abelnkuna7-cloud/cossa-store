@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { SITE_URL } from "@/config/seo";
 
 import { PageHeader } from "@/components/common/PageHeader";
 import { PROJECTS } from "@/data/categories";
@@ -14,7 +15,9 @@ export const Route = createFileRoute("/shop-by-project")({
       { name: "description", content: DESCRIPTION },
       { property: "og:title", content: TITLE },
       { property: "og:description", content: DESCRIPTION },
+      { property: "og:url", content: `${SITE_URL}/shop-by-project` },
     ],
+    links: [{ rel: "canonical", href: `${SITE_URL}/shop-by-project` }],
   }),
   component: ShopByProject,
 });

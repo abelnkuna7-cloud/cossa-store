@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { SITE_URL } from "@/config/seo";
 
 import { PageHeader } from "@/components/common/PageHeader";
 import { NoticeBlock } from "@/components/common/StateBlocks";
@@ -22,7 +23,9 @@ export const Route = createFileRoute("/contact")({
       { name: "description", content: DESCRIPTION },
       { property: "og:title", content: TITLE },
       { property: "og:description", content: DESCRIPTION },
+      { property: "og:url", content: `${SITE_URL}/contact` },
     ],
+    links: [{ rel: "canonical", href: `${SITE_URL}/contact` }],
   }),
   component: ContactPage,
 });

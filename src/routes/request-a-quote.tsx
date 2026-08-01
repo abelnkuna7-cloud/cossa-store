@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { SITE_URL } from "@/config/seo";
 import { useQuery } from "@tanstack/react-query";
 
 import { PageHeader } from "@/components/common/PageHeader";
@@ -24,7 +25,9 @@ export const Route = createFileRoute("/request-a-quote")({
       { name: "description", content: DESCRIPTION },
       { property: "og:title", content: TITLE },
       { property: "og:description", content: DESCRIPTION },
+      { property: "og:url", content: `${SITE_URL}/request-a-quote` },
     ],
+    links: [{ rel: "canonical", href: `${SITE_URL}/request-a-quote` }],
   }),
   component: QuotePage,
 });
