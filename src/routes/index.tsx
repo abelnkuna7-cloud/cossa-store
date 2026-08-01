@@ -23,7 +23,7 @@ import { publicCollectionsQuery, storefrontProductsQuery } from "@/lib/queries";
 import { buildSections } from "@/lib/merchandising";
 import { ContactStrip } from "@/components/support/ContactStrip";
 
-const TITLE = "Cossa Store | Building, facility and technology supplies";
+const TITLE = "Cossa Store | Building, Facility & Tech Supplies";
 const DESCRIPTION =
   "Products, services and intelligent solutions for building, maintaining and improving homes and businesses. Supplied in South Africa by Cossa Nexus Holdings.";
 
@@ -37,6 +37,22 @@ export const Route = createFileRoute("/")({
       { property: "og:url", content: `${SITE_URL}/` },
     ],
     links: [{ rel: "canonical", href: `${SITE_URL}/` }],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "Cossa Store",
+          url: SITE_URL,
+          potentialAction: {
+            "@type": "SearchAction",
+            target: `${SITE_URL}/search?q={search_term_string}`,
+            "query-input": "required name=search_term_string",
+          },
+        }),
+      },
+    ],
   }),
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(storefrontProductsQuery());
