@@ -394,7 +394,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
       {productId ? (
         <>
           <PodSection productId={productId} />
-          <MediaSection productId={productId} />
+          <MediaSection productId={productId} productName={form.name} itemType={form.item_type} />
           <VariantSection productId={productId} isAdmin={access.isAdmin} />
           <PricingSection productId={productId} />
           <Section title="7 · Publication">

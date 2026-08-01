@@ -17,6 +17,7 @@ import { CommerceProvider } from "@/lib/commerce-store";
 import { Toaster } from "@/components/ui/sonner";
 import { SupportProvider } from "@/components/support/support-context";
 import { FloatingSupport } from "@/components/support/FloatingSupport";
+import { SalesTrendPopups } from "@/components/shop/SalesTrendPopups";
 
 function NotFoundComponent() {
   return (
@@ -166,6 +167,7 @@ function RootComponent() {
             <SiteFooter />
           </div>
           <FloatingSupport />
+          <SalesTrendPopups />
           <Toaster position="top-right" />
         </SupportProvider>
       </CommerceProvider>
