@@ -3,18 +3,24 @@ import { Link } from "@tanstack/react-router";
 
 import { EmptyBlock, LoadingBlock } from "@/components/common/StateBlocks";
 import { Button } from "@/components/ui/button";
-import { useRoles, useSession } from "@/lib/auth";
+import { useProfile, useRoles, useSession } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 
 export function useCatalogueAccess() {
   const { user, loading } = useSession();
   const roles = useRoles(user?.id);
+  const profile = useProfile(user?.id);
   const list = roles.data ?? [];
+  const isStaff = list.includes("staff") || list.includes("admin");
+  const status = profile.data?.catalogue_status ?? "pending";
   return {
-    loading: loading || roles.isPending,
-    isStaff: list.includes("staff") || list.includes("admin"),
+    loading: loading || roles.isPending || profile.isPending,
+    isStaff,
     isAdmin: list.includes("admin"),
     isMember: Boolean(user),
+    catalogueStatus: isStaff ? "approved" : status,
+    canManageCatalogue: isStaff || status === "approved",
+    reviewNotes: profile.data?.catalogue_review_notes ?? null,
     email: user?.email ?? null,
   };
 }
@@ -46,6 +52,11 @@ export function CatalogueShell({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {actions}
+          {access.isAdmin ? (
+            <Button asChild size="sm" variant="outline">
+              <Link to="/admin/approvals">Approvals</Link>
+            </Button>
+          ) : null}
           {access.email ? (
             <Button
               variant="ghost"
@@ -70,6 +81,25 @@ export function CatalogueShell({
           action={
             <Button asChild variant="outline">
               <Link to="/auth">Sign in</Link>
+            </Button>
+          }
+        />
+      ) : !access.canManageCatalogue ? (
+        <EmptyBlock
+          title={
+            access.catalogueStatus === "rejected"
+              ? "Catalogue access was declined"
+              : "Your catalogue access is awaiting approval"
+          }
+          description={
+            access.reviewNotes ??
+            "Only subscribed catalogue managers approved by cossa@cossanexusholdings.co.za can create and submit listings. We will email you as soon as your access is approved."
+          }
+          action={
+            <Button asChild variant="outline">
+              <a href="mailto:cossa@cossanexusholdings.co.za?subject=Catalogue%20manager%20access">
+                Request access
+              </a>
             </Button>
           }
         />
