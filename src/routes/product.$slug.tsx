@@ -52,11 +52,11 @@ export const Route = createFileRoute("/product/$slug")({
             "@type": "Product",
             name: p.name,
             description: p.seo_description,
-            sku: p.sku ?? p.slug,
+            sku: p.sku,
             url,
             offers: {
               "@type": "Offer",
-              price: p.price,
+              price: p.selling_price,
               priceCurrency: "ZAR",
               availability:
                 p.stock_status === "out_of_stock"
