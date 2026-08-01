@@ -4,3 +4,5 @@ Disallow: /cart
 Disallow: /checkout
 Disallow: /account
 Disallow: /search
+
+Sitemap: https://cossa-store.lovable.app/sitemap.xml

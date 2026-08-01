@@ -8,18 +8,34 @@ import { Button } from "@/components/ui/button";
 import { getProject } from "@/data/categories";
 import { projectQuery } from "@/lib/queries";
 import { ServiceCrossSell } from "@/components/support/ServiceCrossSell";
+import { SITE_URL } from "@/config/seo";
 
 export const Route = createFileRoute("/project/$slug")({
   head: ({ params }) => {
     const project = getProject(params.slug);
     const title = project ? `${project.name} | Cossa Store` : "Project | Cossa Store";
     const description = project?.description ?? "Project supply lists from Cossa Store.";
+    const url = `${SITE_URL}/project/${params.slug}`;
     return {
       meta: [
         { title },
         { name: "description", content: description },
         { property: "og:title", content: title },
         { property: "og:description", content: description },
+        { property: "og:url", content: url },
+      ],
+      links: [{ rel: "canonical", href: url }],
+      scripts: [
+        {
+          type: "application/ld+json",
+          children: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            name: title,
+            description,
+            url,
+          }),
+        },
       ],
     };
   },

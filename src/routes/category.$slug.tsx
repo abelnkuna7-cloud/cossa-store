@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { getCategory } from "@/data/categories";
 import { productsQuery } from "@/lib/queries";
 import type { Category } from "@/types/catalog";
+import { SITE_URL } from "@/config/seo";
 
 export const Route = createFileRoute("/category/$slug")({
   loader: ({ params }): { category: Category } => {
@@ -25,12 +26,27 @@ export const Route = createFileRoute("/category/$slug")({
       };
     }
     const title = `${loaderData.category.name} | Cossa Store`;
+    const url = `${SITE_URL}/category/${loaderData.category.slug}`;
     return {
       meta: [
         { title },
         { name: "description", content: loaderData.category.description },
         { property: "og:title", content: title },
         { property: "og:description", content: loaderData.category.description },
+        { property: "og:url", content: url },
+      ],
+      links: [{ rel: "canonical", href: url }],
+      scripts: [
+        {
+          type: "application/ld+json",
+          children: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            name: loaderData.category.name,
+            description: loaderData.category.description,
+            url,
+          }),
+        },
       ],
     };
   },
