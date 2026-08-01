@@ -31,6 +31,7 @@ import {
   listProductPrices,
   listVariants,
   removeProductMedia,
+  updateProductMediaAlt,
   removeProductPrice,
   setPublicationState,
   updateProduct,
