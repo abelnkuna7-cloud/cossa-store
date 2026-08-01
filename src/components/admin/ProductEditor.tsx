@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { formatZar } from "@/lib/format";
+import { formatBytes, optimiseImage, suggestAltText } from "@/lib/image-optimize";
 import { uploadProductMedia } from "@/lib/media";
 import { parsePastedProduct } from "@/lib/printify-paste";
 import {
