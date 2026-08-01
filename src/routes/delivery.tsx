@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SITE_URL } from "@/config/seo";
 
 import { PolicyPage } from "@/components/common/PolicyPage";
 
@@ -13,7 +14,9 @@ export const Route = createFileRoute("/delivery")({
       { name: "description", content: DESCRIPTION },
       { property: "og:title", content: TITLE },
       { property: "og:description", content: DESCRIPTION },
+      { property: "og:url", content: `${SITE_URL}/delivery` },
     ],
+    links: [{ rel: "canonical", href: `${SITE_URL}/delivery` }],
   }),
   component: () => (
     <PolicyPage

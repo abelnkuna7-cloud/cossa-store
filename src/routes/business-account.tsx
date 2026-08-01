@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { SITE_URL } from "@/config/seo";
 
 import { PageHeader } from "@/components/common/PageHeader";
 import { NoticeBlock } from "@/components/common/StateBlocks";
@@ -22,7 +23,9 @@ export const Route = createFileRoute("/business-account")({
       { name: "description", content: DESCRIPTION },
       { property: "og:title", content: TITLE },
       { property: "og:description", content: DESCRIPTION },
+      { property: "og:url", content: `${SITE_URL}/business-account` },
     ],
+    links: [{ rel: "canonical", href: `${SITE_URL}/business-account` }],
   }),
   component: BusinessAccountPage,
 });
