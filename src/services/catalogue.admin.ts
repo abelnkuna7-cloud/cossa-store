@@ -354,6 +354,11 @@ export async function removeProductMedia(id: string) {
   if (error) throw error;
 }
 
+export async function updateProductMediaAlt(id: string, altText: string | null) {
+  const { error } = await supabase.from("product_media").update({ alt_text: altText }).eq("id", id);
+  if (error) throw error;
+}
+
 /* ---------------- prices ---------------- */
 
 export async function listProductPrices(productId: string) {
