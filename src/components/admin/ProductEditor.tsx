@@ -818,7 +818,7 @@ function MediaRow({
         </Button>
       </div>
       {!altText ? (
-        <p className="text-[11px] text-warning-foreground text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           Missing alt text weakens SEO — add a short description.
         </p>
       ) : null}
