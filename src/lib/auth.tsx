@@ -36,6 +36,8 @@ export interface MemberProfile {
   full_name: string | null;
   business_name: string | null;
   phone: string | null;
+  catalogue_status: "pending" | "approved" | "rejected";
+  catalogue_review_notes: string | null;
 }
 
 export function useProfile(userId: string | undefined) {
@@ -45,11 +47,11 @@ export function useProfile(userId: string | undefined) {
     queryFn: async (): Promise<MemberProfile | null> => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, business_name, phone")
+        .select("id, full_name, business_name, phone, catalogue_status, catalogue_review_notes")
         .eq("id", userId as string)
         .maybeSingle();
       if (error) throw error;
-      return data ?? null;
+      return (data as unknown as MemberProfile) ?? null;
     },
   });
 }

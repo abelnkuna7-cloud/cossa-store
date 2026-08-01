@@ -1115,6 +1115,9 @@ export type Database = {
           requires_quote: boolean
           requires_shipping: boolean
           return_policy: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           search_keywords: string[]
           seo_description: string | null
           seo_title: string | null
@@ -1157,6 +1160,9 @@ export type Database = {
           requires_quote?: boolean
           requires_shipping?: boolean
           return_policy?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           search_keywords?: string[]
           seo_description?: string | null
           seo_title?: string | null
@@ -1199,6 +1205,9 @@ export type Database = {
           requires_quote?: boolean
           requires_shipping?: boolean
           return_policy?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           search_keywords?: string[]
           seo_description?: string | null
           seo_title?: string | null
@@ -1242,6 +1251,10 @@ export type Database = {
       profiles: {
         Row: {
           business_name: string | null
+          catalogue_review_notes: string | null
+          catalogue_reviewed_at: string | null
+          catalogue_reviewed_by: string | null
+          catalogue_status: string
           created_at: string
           full_name: string | null
           id: string
@@ -1250,6 +1263,10 @@ export type Database = {
         }
         Insert: {
           business_name?: string | null
+          catalogue_review_notes?: string | null
+          catalogue_reviewed_at?: string | null
+          catalogue_reviewed_by?: string | null
+          catalogue_status?: string
           created_at?: string
           full_name?: string | null
           id: string
@@ -1258,6 +1275,10 @@ export type Database = {
         }
         Update: {
           business_name?: string | null
+          catalogue_review_notes?: string | null
+          catalogue_reviewed_at?: string | null
+          catalogue_reviewed_by?: string | null
+          catalogue_status?: string
           created_at?: string
           full_name?: string | null
           id?: string
@@ -1676,6 +1697,7 @@ export type Database = {
         }
         Returns: string
       }
+      can_manage_catalogue: { Args: { _user_id: string }; Returns: boolean }
       generate_reference: { Args: { p_prefix: string }; Returns: string }
       has_role: {
         Args: {

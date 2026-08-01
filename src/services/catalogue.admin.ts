@@ -120,10 +120,16 @@ export interface ProductDraftInput {
 }
 
 export async function createProduct(input: ProductDraftInput) {
+  const { data: auth } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from("products")
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .insert({ ...(input as any), publication_state: "draft", status: "draft" })
+    .insert({
+      ...(input as any),
+      created_by: auth.user?.id ?? null,
+      publication_state: "draft",
+      status: "draft",
+    })
     .select("id")
     .single();
   if (error) throw error;
@@ -162,6 +168,11 @@ export async function duplicateProduct(id: string) {
   delete copy.approved_at;
   delete copy.approved_by;
   delete copy.product_pod_details;
+  delete copy.reviewed_at;
+  delete copy.reviewed_by;
+  copy.review_notes = null;
+  const { data: auth } = await supabase.auth.getUser();
+  copy.created_by = auth.user?.id ?? row.created_by ?? null;
   copy.sku = `${row.sku}-C${suffix}`;
   copy.slug = `${row.slug}-copy-${suffix.toLowerCase()}`;
   copy.name = `${row.name} (copy)`;
@@ -340,6 +351,11 @@ export async function addProductMedia(input: {
 
 export async function removeProductMedia(id: string) {
   const { error } = await supabase.from("product_media").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateProductMediaAlt(id: string, altText: string | null) {
+  const { error } = await supabase.from("product_media").update({ alt_text: altText }).eq("id", id);
   if (error) throw error;
 }
 

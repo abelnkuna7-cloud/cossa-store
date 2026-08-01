@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { formatZar } from "@/lib/format";
+import { formatBytes, optimiseImage, suggestAltText } from "@/lib/image-optimize";
 import { uploadProductMedia } from "@/lib/media";
 import { parsePastedProduct } from "@/lib/printify-paste";
 import {
@@ -30,6 +31,7 @@ import {
   listProductPrices,
   listVariants,
   removeProductMedia,
+  updateProductMediaAlt,
   removeProductPrice,
   setPublicationState,
   updateProduct,
@@ -394,7 +396,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
       {productId ? (
         <>
           <PodSection productId={productId} />
-          <MediaSection productId={productId} />
+          <MediaSection productId={productId} productName={form.name} itemType={form.item_type} />
           <VariantSection productId={productId} isAdmin={access.isAdmin} />
           <PricingSection productId={productId} />
           <Section title="7 · Publication">
@@ -605,7 +607,15 @@ function PodSection({ productId }: { productId: string }) {
 
 /* ---------------- media ---------------- */
 
-function MediaSection({ productId }: { productId: string }) {
+function MediaSection({
+  productId,
+  productName,
+  itemType,
+}: {
+  productId: string;
+  productName?: string;
+  itemType?: string;
+}) {
   const queryClient = useQueryClient();
   const media = useQuery({ queryKey: ["admin", "media", productId], queryFn: () => listProductMedia(productId) });
   const [alt, setAlt] = useState("");
@@ -614,6 +624,9 @@ function MediaSection({ productId }: { productId: string }) {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["admin", "media", productId] });
   const rows = media.data ?? [];
+
+  const suggestion = (fileName?: string) =>
+    suggestAltText({ productName, itemType, index: rows.length, fileName });
 
   async function addExternal() {
     if (!/^https?:\/\//i.test(url)) {
@@ -625,7 +638,7 @@ function MediaSection({ productId }: { productId: string }) {
       await addProductMedia({
         product_id: productId,
         url,
-        alt_text: alt || null,
+        alt_text: alt.trim() || suggestion() || null,
         display_order: rows.length,
         is_primary: rows.length === 0,
         is_public: true,
@@ -643,18 +656,23 @@ function MediaSection({ productId }: { productId: string }) {
   async function upload(file: File) {
     setBusy(true);
     try {
-      const path = await uploadProductMedia(file, productId);
+      const optimised = await optimiseImage(file);
+      const path = await uploadProductMedia(optimised.file, productId);
       await addProductMedia({
         product_id: productId,
         url: path,
-        alt_text: alt || null,
+        alt_text: alt.trim() || suggestion(file.name) || null,
         display_order: rows.length,
         is_primary: rows.length === 0,
         is_public: true,
       });
       setAlt("");
       refresh();
-      toast.success("Image uploaded");
+      toast.success(
+        optimised.bytes < optimised.originalBytes
+          ? `Image uploaded and optimised (${formatBytes(optimised.originalBytes)} → ${formatBytes(optimised.bytes)})`
+          : "Image uploaded",
+      );
     } catch {
       toast.error("That image could not be uploaded.");
     } finally {
@@ -664,9 +682,27 @@ function MediaSection({ productId }: { productId: string }) {
 
   return (
     <Section title="4 · Media">
+      <p className="text-xs text-muted-foreground">
+        Uploads are automatically resized to 1600px and re-encoded to WebP for fast storefront
+        loading. Every image needs descriptive alt text for SEO and accessibility.
+      </p>
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Alt text (applied to the next image added)">
-          <Input value={alt} onChange={(e) => setAlt(e.target.value)} />
+        <Field
+          label="Alt text (applied to the next image added)"
+          hint={suggestion() ? `Suggested: ${suggestion()}` : undefined}
+        >
+          <div className="flex gap-2">
+            <Input value={alt} onChange={(e) => setAlt(e.target.value)} />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={!suggestion()}
+              onClick={() => setAlt(suggestion())}
+            >
+              Suggest
+            </Button>
+          </div>
         </Field>
         <Field label="Upload image file">
           <Input
@@ -694,29 +730,99 @@ function MediaSection({ productId }: { productId: string }) {
       ) : (
         <ul className="space-y-2 text-sm">
           {rows.map((m) => (
-            <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
-              <span className="truncate">
-                {m.is_primary ? "★ " : ""}
-                {m.url}
-              </span>
-              <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                {m.is_public ? "public" : "private"}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={async () => {
-                    await removeProductMedia(m.id);
-                    refresh();
-                  }}
-                >
-                  Remove
-                </Button>
-              </span>
-            </li>
+            <MediaRow
+              key={m.id}
+              id={m.id}
+              url={m.url}
+              altText={m.alt_text}
+              isPrimary={m.is_primary}
+              isPublic={m.is_public}
+              suggestion={suggestAltText({ productName, itemType, fileName: m.url })}
+              onChanged={refresh}
+            />
           ))}
         </ul>
       )}
     </Section>
+  );
+}
+
+function MediaRow({
+  id,
+  url,
+  altText,
+  isPrimary,
+  isPublic,
+  suggestion,
+  onChanged,
+}: {
+  id: string;
+  url: string;
+  altText: string | null;
+  isPrimary: boolean;
+  isPublic: boolean;
+  suggestion: string;
+  onChanged: () => void;
+}) {
+  const [value, setValue] = useState(altText ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function save(next: string) {
+    setSaving(true);
+    try {
+      await updateProductMediaAlt(id, next.trim() || null);
+      onChanged();
+      toast.success("Alt text saved");
+    } catch {
+      toast.error("Alt text could not be saved.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <li className="space-y-2 rounded-md border border-border px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="truncate text-xs">
+          {isPrimary ? "★ " : ""}
+          {url}
+        </span>
+        <span className="flex items-center gap-2 text-xs text-muted-foreground">
+          {isPublic ? "public" : "private"}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={async () => {
+              await removeProductMedia(id);
+              onChanged();
+            }}
+          >
+            Remove
+          </Button>
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Input
+          className="h-8 flex-1"
+          placeholder={suggestion || "Describe this image"}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        {suggestion && !value ? (
+          <Button size="sm" variant="outline" onClick={() => setValue(suggestion)}>
+            Suggest
+          </Button>
+        ) : null}
+        <Button size="sm" disabled={saving || value === (altText ?? "")} onClick={() => save(value)}>
+          Save alt text
+        </Button>
+      </div>
+      {!altText ? (
+        <p className="text-[11px] text-muted-foreground">
+          Missing alt text weakens SEO — add a short description.
+        </p>
+      ) : null}
+    </li>
   );
 }
 
