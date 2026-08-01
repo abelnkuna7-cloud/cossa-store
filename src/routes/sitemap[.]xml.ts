@@ -4,8 +4,9 @@ import type {} from "@tanstack/react-start";
 import { CATEGORIES, PROJECTS } from "@/data/categories";
 import { listProducts } from "@/services/catalog.service";
 
-// TODO: replace with your project URL once a project name or custom domain is set.
-const BASE_URL = "";
+import { SITE_URL } from "@/config/seo";
+
+const BASE_URL = SITE_URL;
 
 interface SitemapEntry {
   path: string;
@@ -17,7 +18,12 @@ export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
-        const products = await listProducts({});
+        let products: Awaited<ReturnType<typeof listProducts>> = [];
+        try {
+          products = await listProducts({});
+        } catch {
+          products = [];
+        }
 
         const entries: SitemapEntry[] = [
           { path: "/", changefreq: "weekly", priority: "1.0" },

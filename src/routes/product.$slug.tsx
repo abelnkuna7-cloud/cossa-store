@@ -15,6 +15,7 @@ import { productQuery, relatedProductsQuery } from "@/lib/queries";
 import { fetchProductBySlug } from "@/services/catalog.service";
 import type { Product } from "@/types/catalog";
 import { ServiceCrossSell } from "@/components/support/ServiceCrossSell";
+import { SITE_URL } from "@/config/seo";
 
 export const Route = createFileRoute("/product/$slug")({
   loader: async ({ params, context }): Promise<{ product: Product }> => {
@@ -32,12 +33,39 @@ export const Route = createFileRoute("/product/$slug")({
       };
     }
     const p = loaderData.product;
+    const url = `${SITE_URL}/product/${p.slug}`;
     return {
       meta: [
         { title: p.seo_title },
         { name: "description", content: p.seo_description },
         { property: "og:title", content: p.seo_title },
         { property: "og:description", content: p.seo_description },
+        { property: "og:url", content: url },
+        { property: "og:type", content: "product" },
+      ],
+      links: [{ rel: "canonical", href: url }],
+      scripts: [
+        {
+          type: "application/ld+json",
+          children: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Product",
+            name: p.name,
+            description: p.seo_description,
+            sku: p.sku ?? p.slug,
+            url,
+            offers: {
+              "@type": "Offer",
+              price: p.price,
+              priceCurrency: "ZAR",
+              availability:
+                p.stock_status === "out_of_stock"
+                  ? "https://schema.org/OutOfStock"
+                  : "https://schema.org/InStock",
+              url,
+            },
+          }),
+        },
       ],
     };
   },
