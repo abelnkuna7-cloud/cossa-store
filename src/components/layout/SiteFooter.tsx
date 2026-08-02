@@ -112,6 +112,11 @@ export function SiteFooter() {
               </Link>
             </li>
             <li>
+              <Link to="/how-it-works" className="hover:underline">
+                How Cossa works
+              </Link>
+            </li>
+            <li>
               <button type="button" onClick={() => open("callback")} className="hover:underline">
                 Request a callback
               </button>
