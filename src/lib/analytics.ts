@@ -1,11 +1,16 @@
 /**
- * Analytics event preparation.
+ * Analytics layer.
  *
- * NO ANALYTICS PROVIDER IS CONNECTED. `trackEvent` only buffers events in
- * memory (and logs them in development) so the event names are ready for a
- * future Cossa Marketing / Cossa CRM integration.
+ * Ships a GA4-compatible dataLayer/gtag bridge plus the Cossa support events.
+ * GA4 only initialises when a measurement ID is configured, so no third-party
+ * script is loaded (and no page weight is added) until Cossa supplies one.
+ *
+ * To go live: set VITE_GA_MEASUREMENT_ID (G-XXXXXXX) and the ecommerce events
+ * below start flowing automatically — no component changes required.
  */
-export const ANALYTICS_CONNECTED = false;
+const MEASUREMENT_ID = import.meta.env["VITE_GA_MEASUREMENT_ID"] as string | undefined;
+
+export const ANALYTICS_CONNECTED = Boolean(MEASUREMENT_ID);
 
 export type AnalyticsEvent =
   | "whatsapp_opened"
@@ -31,26 +36,107 @@ export type AnalyticsEvent =
   | "carousel_product_click"
   | "affiliate_link_click"
   | "quote_request_click"
-  | "availability_request_click";
+  | "availability_request_click"
+  /* GA4 recommended ecommerce events */
+  | "view_item"
+  | "view_item_list"
+  | "select_item"
+  | "add_to_cart"
+  | "remove_from_cart"
+  | "add_to_wishlist"
+  | "view_cart"
+  | "begin_checkout"
+  | "add_payment_info"
+  | "purchase"
+  | "search"
+  | "generate_lead"
+  | "view_project_kit"
+  | "add_project_kit_to_cart";
 
 export interface TrackedEvent {
   name: AnalyticsEvent;
-  payload?: Record<string, string | number | boolean | null>;
+  payload?: Record<string, unknown>;
   at: string;
 }
 
-const buffer: TrackedEvent[] = [];
+type GtagFn = (...args: unknown[]) => void;
 
-export function trackEvent(
-  name: AnalyticsEvent,
-  payload?: Record<string, string | number | boolean | null>,
-): void {
+declare global {
+  interface Window {
+    dataLayer?: unknown[];
+    gtag?: GtagFn;
+  }
+}
+
+const buffer: TrackedEvent[] = [];
+let initialised = false;
+
+/** Loads gtag.js once, only if a measurement ID exists. */
+export function initAnalytics(): void {
+  if (initialised || !MEASUREMENT_ID || typeof window === "undefined") return;
+  initialised = true;
+
+  const script = document.createElement("script");
+  script.async = true;
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`;
+  document.head.appendChild(script);
+
+  window.dataLayer = window.dataLayer || [];
+  const gtag: GtagFn = (...args: unknown[]) => {
+    window.dataLayer?.push(args);
+  };
+  window.gtag = gtag;
+  gtag("js", new Date());
+  gtag("config", MEASUREMENT_ID, { send_page_view: false, currency: "ZAR" });
+}
+
+/** SPA page view — call on route change. */
+export function trackPageView(path: string, title?: string): void {
+  if (!MEASUREMENT_ID || typeof window === "undefined") return;
+  window.gtag?.("event", "page_view", { page_path: path, page_title: title });
+}
+
+export function trackEvent(name: AnalyticsEvent, payload?: Record<string, unknown>): void {
   const event: TrackedEvent = { name, payload, at: new Date().toISOString() };
   buffer.push(event);
   if (buffer.length > 100) buffer.shift();
-  if (import.meta.env.DEV) {
+
+  if (typeof window !== "undefined" && window.gtag) {
+    window.gtag("event", name, payload ?? {});
+  } else if (import.meta.env.DEV) {
     console.debug("[analytics:pending]", event.name, event.payload ?? {});
   }
+}
+
+/** GA4 ecommerce item shape. */
+export interface EcommerceItem {
+  item_id: string;
+  item_name: string;
+  item_category?: string;
+  item_brand?: string;
+  price?: number;
+  quantity?: number;
+}
+
+export function trackEcommerce(
+  name: Extract<
+    AnalyticsEvent,
+    | "view_item"
+    | "view_item_list"
+    | "select_item"
+    | "add_to_cart"
+    | "remove_from_cart"
+    | "add_to_wishlist"
+    | "view_cart"
+    | "begin_checkout"
+    | "add_payment_info"
+    | "purchase"
+  >,
+  items: EcommerceItem[],
+  extra?: Record<string, unknown>,
+): void {
+  const value = items.reduce((sum, i) => sum + (i.price ?? 0) * (i.quantity ?? 1), 0);
+  trackEvent(name, { currency: "ZAR", value: Math.round(value * 100) / 100, items, ...extra });
 }
 
 export function bufferedEvents(): readonly TrackedEvent[] {
