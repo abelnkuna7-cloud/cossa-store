@@ -282,8 +282,26 @@ function Home() {
       </section>
 
       {/* Trust */}
-      <Section title="Buying with confidence" muted>
+      <Section
+        title="Buying with confidence"
+        description="Specific, honest commitments — not badges we cannot back up."
+        muted
+        action={
+          <Button asChild variant="outline">
+            <Link to="/how-it-works">How Cossa works</Link>
+          </Button>
+        }
+      >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {GUARANTEES.map((g) => (
+            <div key={g.title} className="rounded-lg border border-border bg-card p-5">
+              <CheckCircle2 className="h-5 w-5 text-accent" aria-hidden />
+              <h3 className="mt-3 font-sans text-sm font-semibold">{g.title}</h3>
+              <p className="mt-1.5 text-sm text-muted-foreground">{g.body}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
             {
               icon: Landmark,
@@ -292,23 +310,18 @@ function Home() {
             },
             {
               icon: ShieldCheck,
-              title: "Secure checkout",
-              body: "Checkout is being finalised; payment processing is not live yet.",
-            },
-            {
-              icon: MessageCircle,
-              title: "Talk to a real person",
-              body: `Call or WhatsApp the Cossa team on ${SITE.phoneDisplay}.`,
+              title: "Payments in verification",
+              body: "PayFast and Ozow are wired in and go live the moment merchant verification clears.",
             },
             {
               icon: Truck,
-              title: "Clear delivery information",
-              body: "Delivery expectations shown per product and range.",
+              title: "Provincial delivery windows",
+              body: "Published per province, plus Pargo click-and-collect.",
             },
             {
               icon: Undo2,
-              title: "Transparent returns",
-              body: "Published returns and refunds terms before you buy.",
+              title: "Type-specific returns",
+              body: "Different rules for physical, digital and made-to-order — all written down.",
             },
           ].map(({ icon: Icon, title, body }) => (
             <div key={title} className="rounded-lg border border-border bg-card p-5">
