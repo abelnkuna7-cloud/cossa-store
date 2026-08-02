@@ -383,3 +383,120 @@ function Section({
     </section>
   );
 }
+
+function Hero() {
+  return (
+    <section className="relative isolate overflow-hidden border-b border-primary/20">
+      <img
+        src={heroImage}
+        alt="Cossa site supervisor, facility technician and smart-security installer at work on a South African commercial site"
+        width={1600}
+        height={1200}
+        fetchPriority="high"
+        decoding="async"
+        className="absolute inset-0 h-full w-full object-cover object-center"
+      />
+      <div className="hero-veil absolute inset-0" aria-hidden />
+      <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-32">
+        <div className="max-w-2xl">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-primary sm:text-xs">
+            South African owned · Serving local and international clients
+          </p>
+          <div className="gold-rule mt-4 h-px w-24" aria-hidden />
+          <h1 className="mt-6 font-display text-[2.15rem] font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+            Built in South Africa.
+            <span className="block text-primary">Trusted worldwide.</span>
+          </h1>
+          <p className="mt-5 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+            Construction, facility and smart-technology supply — with the installation, cleaning and
+            technical teams to finish the job, not just ship the box.
+          </p>
+
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Button asChild size="lg" className="h-13 px-8 text-base font-semibold shadow-lg">
+              <Link to="/shop">
+                Shop products <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="h-11 border-primary/45 bg-transparent px-6 text-sm hover:bg-primary/10"
+            >
+              <Link to="/request-a-quote">Request a quote</Link>
+            </Button>
+          </div>
+
+          <p className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <PackageSearch className="h-3.5 w-3.5 text-primary" aria-hidden /> Retail & trade
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Wrench className="h-3.5 w-3.5 text-primary" aria-hidden /> Product + service
+            </span>
+            <span className="flex items-center gap-1.5">
+              <MessageCircle className="h-3.5 w-3.5 text-primary" aria-hidden />{" "}
+              {SITE.phoneDisplay}
+            </span>
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TrustStatsBar() {
+  return (
+    <section className="border-b border-border bg-surface-strong">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <dl className="grid grid-cols-2 gap-6 lg:grid-cols-4">
+          {TRUST_STATS.map((stat) => (
+            <div key={stat.id}>
+              <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                {stat.label}
+              </dt>
+              <dd
+                className={
+                  stat.value
+                    ? "mt-1.5 font-display text-lg font-bold text-primary sm:text-xl"
+                    : "mt-1.5 text-xs italic text-muted-foreground"
+                }
+              >
+                {stat.value ?? stat.pending}
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        <div className="mt-8 border-t border-border pt-6">
+          <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
+            Compliance & registration
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            {COMPLIANCE_BADGES.map((badge) => (
+              <div
+                key={badge.id}
+                className="flex min-w-[220px] flex-1 items-start gap-3 rounded-lg border border-border bg-card p-4"
+              >
+                <span className="rounded border border-primary/40 px-2 py-1 font-display text-xs font-bold text-primary">
+                  {badge.code}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold">{badge.name}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {badge.reference ?? badge.note}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            We publish registration and certificate numbers only once they are issued and verified.
+            Nothing on this page is a placeholder claim.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
