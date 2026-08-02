@@ -18,6 +18,7 @@ import { Route as SearchRouteImport } from './routes/search'
 import { Route as ReturnsRouteImport } from './routes/returns'
 import { Route as RequestAQuoteRouteImport } from './routes/request-a-quote'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as HowItWorksRouteImport } from './routes/how-it-works'
 import { Route as DeliveryRouteImport } from './routes/delivery'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CheckoutRouteImport } from './routes/checkout'
@@ -82,6 +83,11 @@ const RequestAQuoteRoute = RequestAQuoteRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HowItWorksRoute = HowItWorksRouteImport.update({
+  id: '/how-it-works',
+  path: '/how-it-works',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DeliveryRoute = DeliveryRouteImport.update({
@@ -198,6 +204,7 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
   '/delivery': typeof DeliveryRoute
+  '/how-it-works': typeof HowItWorksRoute
   '/privacy': typeof PrivacyRoute
   '/request-a-quote': typeof RequestAQuoteRoute
   '/returns': typeof ReturnsRoute
@@ -227,6 +234,7 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
   '/delivery': typeof DeliveryRoute
+  '/how-it-works': typeof HowItWorksRoute
   '/privacy': typeof PrivacyRoute
   '/request-a-quote': typeof RequestAQuoteRoute
   '/returns': typeof ReturnsRoute
@@ -259,6 +267,7 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
   '/delivery': typeof DeliveryRoute
+  '/how-it-works': typeof HowItWorksRoute
   '/privacy': typeof PrivacyRoute
   '/request-a-quote': typeof RequestAQuoteRoute
   '/returns': typeof ReturnsRoute
@@ -291,6 +300,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/contact'
     | '/delivery'
+    | '/how-it-works'
     | '/privacy'
     | '/request-a-quote'
     | '/returns'
@@ -320,6 +330,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/contact'
     | '/delivery'
+    | '/how-it-works'
     | '/privacy'
     | '/request-a-quote'
     | '/returns'
@@ -351,6 +362,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/contact'
     | '/delivery'
+    | '/how-it-works'
     | '/privacy'
     | '/request-a-quote'
     | '/returns'
@@ -383,6 +395,7 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRoute
   ContactRoute: typeof ContactRoute
   DeliveryRoute: typeof DeliveryRoute
+  HowItWorksRoute: typeof HowItWorksRoute
   PrivacyRoute: typeof PrivacyRoute
   RequestAQuoteRoute: typeof RequestAQuoteRoute
   ReturnsRoute: typeof ReturnsRoute
@@ -460,6 +473,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/how-it-works': {
+      id: '/how-it-works'
+      path: '/how-it-works'
+      fullPath: '/how-it-works'
+      preLoaderRoute: typeof HowItWorksRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/delivery': {
@@ -648,6 +668,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRoute,
   ContactRoute: ContactRoute,
   DeliveryRoute: DeliveryRoute,
+  HowItWorksRoute: HowItWorksRoute,
   PrivacyRoute: PrivacyRoute,
   RequestAQuoteRoute: RequestAQuoteRoute,
   ReturnsRoute: ReturnsRoute,
