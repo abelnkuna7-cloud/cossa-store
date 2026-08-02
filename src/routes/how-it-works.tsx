@@ -40,7 +40,7 @@ const TRADE_STEPS = [
 ];
 
 const FULFILMENT_EXPLAINED: { key: keyof typeof FULFILMENT_LABELS; body: string }[] = [
-  { key: "own_stock", body: "Held by Cossa in South Africa. Fastest dispatch and easiest returns." },
+  { key: "cossa_stock", body: "Held by Cossa in South Africa. Fastest dispatch and easiest returns." },
   { key: "local_supplier", body: "Shipped by a vetted South African supplier on their lead time. We manage the order." },
   { key: "local_dropshipping", body: "Sent directly to you from a local partner's warehouse — fewer handling delays." },
   { key: "international_dropshipping", body: "Sourced abroad. Longer transit and customs, clearly flagged before you buy." },
