@@ -75,48 +75,8 @@ function Home() {
 
   return (
     <div>
-      {/* Hero */}
-      <section className="bg-background">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8 lg:py-24">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              Cossa Nexus Holdings
-            </p>
-            <h1 className="mt-4 text-4xl font-bold leading-tight sm:text-5xl">
-              Products, services and intelligent solutions for building, maintaining and improving
-              homes and businesses.
-            </h1>
-            <p className="mt-5 max-w-xl text-sm text-muted-foreground sm:text-base">
-              One South African supplier for construction and DIY, cleaning and facility supplies,
-              and workplace technology — backed by the Cossa service network for installation,
-              cleaning and technical support.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg">
-                <Link to="/shop">
-                  Shop products <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link to="/request-a-quote">Request a quote</Link>
-              </Button>
-            </div>
-          </div>
-          <dl className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-card p-6">
-            {[
-              ["Trade & business buying", "Bulk orders, quotations and VAT invoices"],
-              ["Three core ranges", "Construction, facility supplies and technology"],
-              ["Local support", "South African based sales and support team"],
-              ["Service network", "Construction, facility and tech services on request"],
-            ].map(([term, detail]) => (
-              <div key={term}>
-                <dt className="text-sm font-semibold">{term}</dt>
-                <dd className="mt-1 text-xs text-muted-foreground">{detail}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </section>
+      <Hero />
+      <TrustStatsBar />
 
       <ContactStrip />
 
