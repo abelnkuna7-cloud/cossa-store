@@ -164,26 +164,41 @@ function Home() {
       <Section
         muted
         title="Shop by project"
-        description="Start from the job you need to do and we'll show the relevant products."
+        description="Start from the job, not the aisle. Every project has a quantity calculator, a full kit you can add to cart in one action, and a quote path for bigger scopes."
         action={
           <Button asChild variant="outline">
-            <Link to="/shop-by-project">All projects</Link>
+            <Link to="/shop-by-project">
+              <Calculator className="mr-2 h-4 w-4" /> Open the project hub
+            </Link>
           </Button>
         }
       >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {PROJECTS.map((project) => (
+          {PROJECTS.slice(0, 6).map((project) => (
             <Link
               key={project.slug}
               to="/project/$slug"
               params={{ slug: project.slug }}
-              className="rounded-lg border border-border bg-card p-5 transition-colors hover:border-accent"
+              className="group rounded-lg border border-border bg-card p-5 transition-colors hover:border-accent"
             >
               <h3 className="font-sans text-base font-semibold">{project.name}</h3>
               <p className="mt-2 text-sm text-muted-foreground">{project.description}</p>
+              {project.calculator ? (
+                <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-primary">
+                  <Calculator className="h-3.5 w-3.5" aria-hidden /> {project.calculator.label}{" "}
+                  calculator
+                </p>
+              ) : null}
             </Link>
           ))}
         </div>
+        <p className="mt-6 text-sm text-muted-foreground">
+          {PROJECTS.length} starter projects available —{" "}
+          <Link to="/shop-by-project" className="text-primary underline">
+            see them all
+          </Link>
+          .
+        </p>
       </Section>
 
       {/* Business buying */}
