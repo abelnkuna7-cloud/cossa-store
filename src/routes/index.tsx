@@ -4,14 +4,18 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   Building2,
+  Calculator,
+  CheckCircle2,
   FileText,
   Landmark,
   MessageCircle,
+  PackageSearch,
   Receipt,
   RefreshCw,
   ShieldCheck,
   Truck,
   Undo2,
+  Wrench,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,6 +26,8 @@ import { SERVICE_ECOSYSTEM, SITE, whatsappLink } from "@/config/site";
 import { publicCollectionsQuery, storefrontProductsQuery } from "@/lib/queries";
 import { buildSections } from "@/lib/merchandising";
 import { ContactStrip } from "@/components/support/ContactStrip";
+import { COMPLIANCE_BADGES, GUARANTEES, TRUST_STATS } from "@/config/trust";
+import heroImage from "@/assets/hero-projects.jpg";
 
 const TITLE = "Cossa Store | Building, Facility & Tech Supplies";
 const DESCRIPTION =
@@ -69,48 +75,8 @@ function Home() {
 
   return (
     <div>
-      {/* Hero */}
-      <section className="bg-background">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8 lg:py-24">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              Cossa Nexus Holdings
-            </p>
-            <h1 className="mt-4 text-4xl font-bold leading-tight sm:text-5xl">
-              Products, services and intelligent solutions for building, maintaining and improving
-              homes and businesses.
-            </h1>
-            <p className="mt-5 max-w-xl text-sm text-muted-foreground sm:text-base">
-              One South African supplier for construction and DIY, cleaning and facility supplies,
-              and workplace technology — backed by the Cossa service network for installation,
-              cleaning and technical support.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg">
-                <Link to="/shop">
-                  Shop products <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link to="/request-a-quote">Request a quote</Link>
-              </Button>
-            </div>
-          </div>
-          <dl className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-card p-6">
-            {[
-              ["Trade & business buying", "Bulk orders, quotations and VAT invoices"],
-              ["Three core ranges", "Construction, facility supplies and technology"],
-              ["Local support", "South African based sales and support team"],
-              ["Service network", "Construction, facility and tech services on request"],
-            ].map(([term, detail]) => (
-              <div key={term}>
-                <dt className="text-sm font-semibold">{term}</dt>
-                <dd className="mt-1 text-xs text-muted-foreground">{detail}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </section>
+      <Hero />
+      <TrustStatsBar />
 
       <ContactStrip />
 
@@ -198,26 +164,41 @@ function Home() {
       <Section
         muted
         title="Shop by project"
-        description="Start from the job you need to do and we'll show the relevant products."
+        description="Start from the job, not the aisle. Every project has a quantity calculator, a full kit you can add to cart in one action, and a quote path for bigger scopes."
         action={
           <Button asChild variant="outline">
-            <Link to="/shop-by-project">All projects</Link>
+            <Link to="/shop-by-project">
+              <Calculator className="mr-2 h-4 w-4" /> Open the project hub
+            </Link>
           </Button>
         }
       >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {PROJECTS.map((project) => (
+          {PROJECTS.slice(0, 6).map((project) => (
             <Link
               key={project.slug}
               to="/project/$slug"
               params={{ slug: project.slug }}
-              className="rounded-lg border border-border bg-card p-5 transition-colors hover:border-accent"
+              className="group rounded-lg border border-border bg-card p-5 transition-colors hover:border-accent"
             >
               <h3 className="font-sans text-base font-semibold">{project.name}</h3>
               <p className="mt-2 text-sm text-muted-foreground">{project.description}</p>
+              {project.calculator ? (
+                <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-primary">
+                  <Calculator className="h-3.5 w-3.5" aria-hidden /> {project.calculator.label}{" "}
+                  calculator
+                </p>
+              ) : null}
             </Link>
           ))}
         </div>
+        <p className="mt-6 text-sm text-muted-foreground">
+          {PROJECTS.length} starter projects available —{" "}
+          <Link to="/shop-by-project" className="text-primary underline">
+            see them all
+          </Link>
+          .
+        </p>
       </Section>
 
       {/* Business buying */}
@@ -316,8 +297,26 @@ function Home() {
       </section>
 
       {/* Trust */}
-      <Section title="Buying with confidence" muted>
+      <Section
+        title="Buying with confidence"
+        description="Specific, honest commitments — not badges we cannot back up."
+        muted
+        action={
+          <Button asChild variant="outline">
+            <Link to="/how-it-works">How Cossa works</Link>
+          </Button>
+        }
+      >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {GUARANTEES.map((g) => (
+            <div key={g.title} className="rounded-lg border border-border bg-card p-5">
+              <CheckCircle2 className="h-5 w-5 text-accent" aria-hidden />
+              <h3 className="mt-3 font-sans text-sm font-semibold">{g.title}</h3>
+              <p className="mt-1.5 text-sm text-muted-foreground">{g.body}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
             {
               icon: Landmark,
@@ -326,23 +325,18 @@ function Home() {
             },
             {
               icon: ShieldCheck,
-              title: "Secure checkout",
-              body: "Checkout is being finalised; payment processing is not live yet.",
-            },
-            {
-              icon: MessageCircle,
-              title: "Talk to a real person",
-              body: `Call or WhatsApp the Cossa team on ${SITE.phoneDisplay}.`,
+              title: "Payments in verification",
+              body: "PayFast and Ozow are wired in and go live the moment merchant verification clears.",
             },
             {
               icon: Truck,
-              title: "Clear delivery information",
-              body: "Delivery expectations shown per product and range.",
+              title: "Provincial delivery windows",
+              body: "Published per province, plus Pargo click-and-collect.",
             },
             {
               icon: Undo2,
-              title: "Transparent returns",
-              body: "Published returns and refunds terms before you buy.",
+              title: "Type-specific returns",
+              body: "Different rules for physical, digital and made-to-order — all written down.",
             },
           ].map(({ icon: Icon, title, body }) => (
             <div key={title} className="rounded-lg border border-border bg-card p-5">
@@ -400,6 +394,123 @@ function Section({
           {action}
         </div>
         {children}
+      </div>
+    </section>
+  );
+}
+
+function Hero() {
+  return (
+    <section className="relative isolate overflow-hidden border-b border-primary/20">
+      <img
+        src={heroImage}
+        alt="Cossa site supervisor, facility technician and smart-security installer at work on a South African commercial site"
+        width={1600}
+        height={1200}
+        fetchPriority="high"
+        decoding="async"
+        className="absolute inset-0 h-full w-full object-cover object-center"
+      />
+      <div className="hero-veil absolute inset-0" aria-hidden />
+      <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-32">
+        <div className="max-w-2xl">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-primary sm:text-xs">
+            South African owned · Serving local and international clients
+          </p>
+          <div className="gold-rule mt-4 h-px w-24" aria-hidden />
+          <h1 className="mt-6 font-display text-[2.15rem] font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+            Built in South Africa.
+            <span className="block text-primary">Trusted worldwide.</span>
+          </h1>
+          <p className="mt-5 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+            Construction, facility and smart-technology supply — with the installation, cleaning and
+            technical teams to finish the job, not just ship the box.
+          </p>
+
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Button asChild size="lg" className="h-13 px-8 text-base font-semibold shadow-lg">
+              <Link to="/shop">
+                Shop products <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="h-11 border-primary/45 bg-transparent px-6 text-sm hover:bg-primary/10"
+            >
+              <Link to="/request-a-quote">Request a quote</Link>
+            </Button>
+          </div>
+
+          <p className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <PackageSearch className="h-3.5 w-3.5 text-primary" aria-hidden /> Retail & trade
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Wrench className="h-3.5 w-3.5 text-primary" aria-hidden /> Product + service
+            </span>
+            <span className="flex items-center gap-1.5">
+              <MessageCircle className="h-3.5 w-3.5 text-primary" aria-hidden />{" "}
+              {SITE.phoneDisplay}
+            </span>
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TrustStatsBar() {
+  return (
+    <section className="border-b border-border bg-surface-strong">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <dl className="grid grid-cols-2 gap-6 lg:grid-cols-4">
+          {TRUST_STATS.map((stat) => (
+            <div key={stat.id}>
+              <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                {stat.label}
+              </dt>
+              <dd
+                className={
+                  stat.value
+                    ? "mt-1.5 font-display text-lg font-bold text-primary sm:text-xl"
+                    : "mt-1.5 text-xs italic text-muted-foreground"
+                }
+              >
+                {stat.value ?? stat.pending}
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        <div className="mt-8 border-t border-border pt-6">
+          <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
+            Compliance & registration
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            {COMPLIANCE_BADGES.map((badge) => (
+              <div
+                key={badge.id}
+                className="flex min-w-[220px] flex-1 items-start gap-3 rounded-lg border border-border bg-card p-4"
+              >
+                <span className="rounded border border-primary/40 px-2 py-1 font-display text-xs font-bold text-primary">
+                  {badge.code}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold">{badge.name}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {badge.reference ?? badge.note}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            We publish registration and certificate numbers only once they are issued and verified.
+            Nothing on this page is a placeholder claim.
+          </p>
+        </div>
       </div>
     </section>
   );

@@ -157,6 +157,34 @@ export interface ProjectBundle {
   description: string;
   categories: CategorySlug[];
   subcategories: string[];
+  /** Plain-language description of the job this kit covers. */
+  job?: string;
+  /** Drives the on-page project quantity/size calculator. */
+  calculator?: ProjectCalculator;
+}
+
+export interface ProjectCalculator {
+  /** e.g. "Room size", "Team size", "Floor area" */
+  label: string;
+  /** e.g. "m²", "people", "workstations" */
+  unit: string;
+  /** Sensible starting value shown in the input. */
+  defaultValue: number;
+  min: number;
+  max: number;
+  /** Line items derived from the input value. */
+  outputs: ProjectCalculatorOutput[];
+  note?: string;
+}
+
+export interface ProjectCalculatorOutput {
+  label: string;
+  /** Units required per one unit of input. */
+  perUnit: number;
+  /** Unit of the result, e.g. "litres", "sets", "rolls". */
+  resultUnit: string;
+  /** Round result up to whole units. */
+  roundUp?: boolean;
 }
 
 /* ---- Commerce ---- */
