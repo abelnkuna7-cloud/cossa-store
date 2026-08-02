@@ -4,14 +4,18 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   Building2,
+  Calculator,
+  CheckCircle2,
   FileText,
   Landmark,
   MessageCircle,
+  PackageSearch,
   Receipt,
   RefreshCw,
   ShieldCheck,
   Truck,
   Undo2,
+  Wrench,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,6 +26,8 @@ import { SERVICE_ECOSYSTEM, SITE, whatsappLink } from "@/config/site";
 import { publicCollectionsQuery, storefrontProductsQuery } from "@/lib/queries";
 import { buildSections } from "@/lib/merchandising";
 import { ContactStrip } from "@/components/support/ContactStrip";
+import { COMPLIANCE_BADGES, GUARANTEES, TRUST_STATS } from "@/config/trust";
+import heroImage from "@/assets/hero-projects.jpg";
 
 const TITLE = "Cossa Store | Building, Facility & Tech Supplies";
 const DESCRIPTION =
