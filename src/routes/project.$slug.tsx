@@ -9,6 +9,7 @@ import { getProject } from "@/data/categories";
 import { projectQuery } from "@/lib/queries";
 import { ServiceCrossSell } from "@/components/support/ServiceCrossSell";
 import { SITE_URL } from "@/config/seo";
+import { ProjectPlanner } from "@/components/project/ProjectPlanner";
 
 export const Route = createFileRoute("/project/$slug")({
   head: ({ params }) => {
@@ -93,8 +94,21 @@ function ProjectPage() {
         }
       />
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        {project.calculator ? (
+          <div className="mb-10">
+            <ProjectPlanner project={project} />
+          </div>
+        ) : null}
         {products.length === 0 ? (
-          <EmptyBlock title="No products listed for this project yet" />
+          <EmptyBlock
+            title="No products listed for this project yet"
+            description="The kit structure above is ready. Request a quote and our team will price every item for you."
+            action={
+              <Button asChild>
+                <Link to="/request-a-quote">Request a project quote</Link>
+              </Button>
+            }
+          />
         ) : (
           <ProductGrid products={products} />
         )}
