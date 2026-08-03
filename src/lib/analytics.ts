@@ -51,7 +51,19 @@ export type AnalyticsEvent =
   | "search"
   | "generate_lead"
   | "view_project_kit"
-  | "add_project_kit_to_cart";
+  | "add_project_kit_to_cart"
+  /* Project engine */
+  | "project_calculator_started"
+  | "project_calculator_completed"
+  | "project_saved"
+  | "project_shared"
+  | "project_kit_added"
+  | "project_quote_requested"
+  | "project_reset"
+  | "whatsapp_clicked"
+  | "service_add_on_selected"
+  | "empty_state_cta_clicked"
+  | "search_no_results";
 
 export interface TrackedEvent {
   name: AnalyticsEvent;
