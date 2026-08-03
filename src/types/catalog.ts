@@ -161,30 +161,103 @@ export interface ProjectBundle {
   job?: string;
   /** Drives the on-page project quantity/size calculator. */
   calculator?: ProjectCalculator;
+  /** Hub filter themes. */
+  themes: ProjectTheme[];
+  /** Who the project is for. */
+  audiences: ProjectAudience[];
+  /** Honest catalogue readiness for this project. */
+  availability: ProjectAvailability;
+  /** 1 = easiest to complete, 5 = most involved. */
+  effort: 1 | 2 | 3 | 4 | 5;
+  budgetBand: ProjectBudgetBand;
+  /** Relative interest used for "most popular" sorting only. */
+  popularity: number;
+  /** ISO date the project was published — drives "newest" sorting. */
+  addedAt: string;
+  /** Cossa services that genuinely apply to this project. */
+  services?: ProjectServiceOption[];
+  /** Accessories customers commonly need alongside the kit. */
+  accessories?: string[];
+}
+
+export type ProjectTheme = "construction" | "cleaning" | "technology" | "workplace";
+
+export type ProjectAudience =
+  | "home"
+  | "business"
+  | "personal"
+  | "women"
+  | "men"
+  | "kids"
+  | "toddlers";
+
+export type ProjectAvailability = "products_available" | "quote_required" | "coming_soon";
+
+export type ProjectBudgetBand = "low" | "medium" | "high";
+
+export type ProjectServiceProvider =
+  | "Cossa Nexus Construction"
+  | "Cossa Facility Services"
+  | "Cossa Tech";
+
+export interface ProjectServiceOption {
+  id: string;
+  name: string;
+  provider: ProjectServiceProvider;
+  description: string;
+}
+
+/** A single calculator input. */
+export interface ProjectField {
+  id: string;
+  label: string;
+  type: "number" | "select";
+  unit?: string;
+  defaultValue: number | string;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: { value: string; label: string }[];
+  help?: string;
+}
+
+export type ProjectFieldValues = Record<string, number | string>;
+
+/** A derived kit line. */
+export interface ProjectOutput {
+  id: string;
+  label: string;
+  resultUnit: string;
+  /** Pure function of the entered field values. */
+  compute: (values: ProjectFieldValues) => number;
+  roundUp?: boolean;
+  /** Extra allowance for cutting, spillage or breakage, e.g. 0.1 = 10%. */
+  wastePercent?: number;
+  /** Honest availability for this line item. */
+  availability?: "product" | "quote" | "coming_soon";
 }
 
 export interface ProjectCalculator {
-  /** e.g. "Room size", "Team size", "Floor area" */
+  /** Short name of the primary calculator, e.g. "Wall area". */
   label: string;
-  /** e.g. "m²", "people", "workstations" */
-  unit: string;
-  /** Sensible starting value shown in the input. */
-  defaultValue: number;
-  min: number;
-  max: number;
-  /** Line items derived from the input value. */
-  outputs: ProjectCalculatorOutput[];
+  fields: ProjectField[];
+  outputs: ProjectOutput[];
   note?: string;
 }
 
-export interface ProjectCalculatorOutput {
-  label: string;
-  /** Units required per one unit of input. */
-  perUnit: number;
-  /** Unit of the result, e.g. "litres", "sets", "rolls". */
-  resultUnit: string;
-  /** Round result up to whole units. */
-  roundUp?: boolean;
+/** A saved project stored on the customer's device (or account, once live). */
+export interface SavedProject {
+  id: string;
+  slug: string;
+  name: string;
+  values: ProjectFieldValues;
+  lines: { label: string; quantity: number; unit: string }[];
+  services: string[];
+  notes: string;
+  status: "planning" | "quote_requested" | "ordered" | "complete";
+  quoteReference: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /* ---- Commerce ---- */
