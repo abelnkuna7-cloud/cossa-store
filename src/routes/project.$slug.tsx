@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
@@ -10,8 +11,12 @@ import { projectQuery } from "@/lib/queries";
 import { ServiceCrossSell } from "@/components/support/ServiceCrossSell";
 import { SITE_URL } from "@/config/seo";
 import { ProjectPlanner } from "@/components/project/ProjectPlanner";
+import { savedProjects, useMarkRecentlyViewed } from "@/lib/saved-projects";
+import type { SavedProject } from "@/types/catalog";
 
 export const Route = createFileRoute("/project/$slug")({
+  validateSearch: (search: Record<string, unknown>) =>
+    search as Record<string, string | number | undefined> & { saved?: string },
   head: ({ params }) => {
     const project = getProject(params.slug);
     const title = project ? `${project.name} | Cossa Store` : "Project | Cossa Store";
@@ -47,6 +52,16 @@ function ProjectPage() {
   const { slug } = Route.useParams();
   const query = useQuery(projectQuery(slug));
   const project = query.data?.project ?? null;
+  const markRecent = useMarkRecentlyViewed();
+  const [saved, setSaved] = useState<SavedProject | undefined>();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    markRecent(slug);
+    const id = new URLSearchParams(window.location.search).get("saved");
+    setSaved(id ? savedProjects.get(id) : undefined);
+    setReady(true);
+  }, [slug, markRecent]);
 
   if (query.isPending) {
     return (
@@ -96,7 +111,13 @@ function ProjectPage() {
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         {project.calculator ? (
           <div className="mb-10">
-            <ProjectPlanner project={project} />
+            <ProjectPlanner
+              key={saved?.id ?? "new"}
+              project={project}
+              savedId={saved?.id}
+              initialValues={ready ? saved?.values : undefined}
+              initialServices={ready ? saved?.services : undefined}
+            />
           </div>
         ) : null}
         {products.length === 0 ? (

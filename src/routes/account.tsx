@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 const LINKS = [
   { to: "/account", label: "Overview" },
   { to: "/account/orders", label: "Orders" },
+  { to: "/account/projects", label: "Saved projects" },
   { to: "/account/wishlist", label: "Wishlist" },
 ] as const;
 
