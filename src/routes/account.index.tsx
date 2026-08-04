@@ -55,6 +55,12 @@ function AccountOverview() {
           cta="View orders"
         />
         <Card
+          title="Saved projects"
+          description="Reopen, rename and share the project kits you have planned."
+          to="/account/projects"
+          cta="View saved projects"
+        />
+        <Card
           title="Wishlist"
           description="Products you have saved for later."
           to="/account/wishlist"
