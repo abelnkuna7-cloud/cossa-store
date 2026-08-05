@@ -7,6 +7,8 @@
  * renders a clean "awaiting confirmation" state rather than a fake number.
  */
 
+import { companyConfig } from "@/config/company";
+
 export const TRUST_STRAPLINE =
   "South African owned & operated · Real people support · Transparent delivery & returns";
 
@@ -60,17 +62,17 @@ export const COMPLIANCE_BADGES: ComplianceBadge[] = [
     id: "cipc",
     code: "CIPC",
     name: "Companies and Intellectual Property Commission",
-    reference: null,
-    status: "in_progress",
-    note: "Registered South African company. Registration number published once confirmed.",
+    reference: companyConfig.parentCompany.registrationNumber,
+    status: "verified",
+    note: `${companyConfig.parentCompany.name} — registration ${companyConfig.parentCompany.registrationNumber}. Operating company ${companyConfig.construction.name} — registration ${companyConfig.construction.registrationNumber}.`,
   },
   {
     id: "bbbee",
     code: "B-BBEE",
     name: "Broad-Based Black Economic Empowerment",
-    reference: null,
-    status: "in_progress",
-    note: "B-BBEE certificate and level published once issued.",
+    reference: companyConfig.parentCompany.bbbee,
+    status: "verified",
+    note: `${companyConfig.parentCompany.bbbee} contributor across Cossa Nexus Holdings and Cossa Nexus Construction.`,
   },
   {
     id: "cidb",
