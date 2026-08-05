@@ -2,6 +2,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { PageHeader } from "@/components/common/PageHeader";
+import { ConstructionBadge } from "@/components/company/GroupBadge";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/common/StateBlocks";
 import { ProductGrid } from "@/components/shop/ProductCard";
 import { Button } from "@/components/ui/button";
@@ -90,6 +91,7 @@ function CategoryPage() {
       />
 
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        {category.slug.includes("construction") ? <ConstructionBadge className="mb-6" /> : null}
         <div className="mb-8 flex flex-wrap gap-2">
           {category.subcategories.map((sub) => (
             <Link
