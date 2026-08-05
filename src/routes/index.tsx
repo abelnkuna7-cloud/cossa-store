@@ -28,6 +28,8 @@ import { buildSections } from "@/lib/merchandising";
 import { ContactStrip } from "@/components/support/ContactStrip";
 import { COMPLIANCE_BADGES, GUARANTEES, TRUST_STATS } from "@/config/trust";
 import heroImage from "@/assets/hero-projects.jpg";
+import { companyConfig } from "@/config/company";
+import { GroupBadge } from "@/components/company/GroupBadge";
 
 const TITLE = "Cossa Store | Building, Facility & Tech Supplies";
 const DESCRIPTION =
@@ -412,11 +414,20 @@ function Hero() {
         className="absolute inset-0 h-full w-full object-cover object-center"
       />
       <div className="hero-veil absolute inset-0" aria-hidden />
+      <img
+        src={companyConfig.backgrounds.heroEagle}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        decoding="async"
+        className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-1/2 object-cover object-center opacity-[0.14] mix-blend-screen [mask-image:linear-gradient(to_left,black,transparent)] md:block"
+      />
       <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-32">
         <div className="max-w-2xl">
           <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-primary sm:text-xs">
             South African owned · Serving local and international clients
           </p>
+          <GroupBadge className="mt-4" />
           <div className="gold-rule mt-4 h-px w-24" aria-hidden />
           <h1 className="mt-6 font-display text-[2.15rem] font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
             Built in South Africa.
