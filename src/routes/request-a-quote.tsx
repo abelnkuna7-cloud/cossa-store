@@ -4,6 +4,7 @@ import { SITE_URL } from "@/config/seo";
 import { useQuery } from "@tanstack/react-query";
 
 import { PageHeader } from "@/components/common/PageHeader";
+import { ConstructionBadge } from "@/components/company/GroupBadge";
 import { NoticeBlock } from "@/components/common/StateBlocks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,6 +109,7 @@ function QuotePage() {
         description={DESCRIPTION}
       />
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+        <ConstructionBadge className="mb-8" />
         <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
           <form className="space-y-5" onSubmit={handleSubmit} noValidate>
             <div className="grid gap-5 sm:grid-cols-2">

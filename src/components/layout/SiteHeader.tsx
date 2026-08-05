@@ -17,6 +17,8 @@ import { StaffCatalogueLink } from "@/components/admin/StaffCatalogueLink";
 import { Input } from "@/components/ui/input";
 import { CATEGORIES } from "@/data/categories";
 import { SITE, whatsappLink } from "@/config/site";
+import { companyConfig } from "@/config/company";
+import { GroupBadge } from "@/components/company/GroupBadge";
 import { useCommerce } from "@/lib/commerce-store";
 import { useSession } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -93,12 +95,18 @@ export function SiteHeader() {
       </div>
 
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-        <Link to="/" className="flex shrink-0 flex-col leading-none">
-          <span className="font-display text-xl font-bold tracking-tight">Cossa Store</span>
-          <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            Cossa Nexus Holdings
-          </span>
+        <Link to="/" className="flex shrink-0 items-center gap-2" aria-label="Cossa Store home">
+          <img
+            src={companyConfig.store.logo}
+            alt={companyConfig.store.logoAlt}
+            width={170}
+            height={52}
+            fetchPriority="high"
+            decoding="async"
+            className="h-9 w-auto object-contain sm:h-11"
+          />
         </Link>
+        <GroupBadge className="hidden xl:inline-flex" />
 
         <form onSubmit={runSearch} className="ml-auto hidden flex-1 max-w-xl md:flex" role="search">
           <div className="relative w-full">
