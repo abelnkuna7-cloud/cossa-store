@@ -17,6 +17,8 @@ import { StaffCatalogueLink } from "@/components/admin/StaffCatalogueLink";
 import { Input } from "@/components/ui/input";
 import { CATEGORIES } from "@/data/categories";
 import { SITE, whatsappLink } from "@/config/site";
+import { companyConfig } from "@/config/company";
+import { GroupBadge } from "@/components/company/GroupBadge";
 import { useCommerce } from "@/lib/commerce-store";
 import { useSession } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
