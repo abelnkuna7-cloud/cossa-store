@@ -7,6 +7,7 @@ import { NewsletterForm } from "@/components/common/NewsletterForm";
 import { StaffCatalogueLink } from "@/components/admin/StaffCatalogueLink";
 import { trackEvent } from "@/lib/analytics";
 import { useSupport } from "@/components/support/support-context";
+import { companyConfig } from "@/config/company";
 
 export function SiteFooter() {
   const { open } = useSupport();
@@ -14,11 +15,52 @@ export function SiteFooter() {
     <footer className="mt-16 border-t border-border bg-secondary">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
         <div>
-          <p className="font-display text-lg font-bold">Cossa Store</p>
-          <p className="mt-2 text-sm text-muted-foreground">{SITE.positioning}</p>
-          <p className="mt-4 text-xs text-muted-foreground">
-            A division of {SITE.parent}. Trading in South Africa.
-          </p>
+          <img
+            src={companyConfig.store.logo}
+            alt={companyConfig.store.logoAlt}
+            width={200}
+            height={60}
+            loading="lazy"
+            decoding="async"
+            className="h-11 w-auto object-contain"
+          />
+          <p className="mt-3 text-sm text-muted-foreground">{SITE.positioning}</p>
+          <div className="mt-4 flex items-center gap-3">
+            <img
+              src={companyConfig.parentCompany.logo}
+              alt={companyConfig.parentCompany.logoAlt}
+              width={40}
+              height={40}
+              loading="lazy"
+              decoding="async"
+              className="h-10 w-10 object-contain"
+            />
+            <p className="text-xs text-muted-foreground">
+              {companyConfig.store.parentText}. Trading in South Africa.
+            </p>
+          </div>
+          <dl className="mt-4 space-y-1 text-xs text-muted-foreground">
+            <div>
+              <dt className="inline font-medium text-foreground">Parent company: </dt>
+              <dd className="inline">{companyConfig.parentCompany.name}</dd>
+            </div>
+            <div>
+              <dt className="inline font-medium text-foreground">Reg. no: </dt>
+              <dd className="inline">{companyConfig.parentCompany.registrationNumber}</dd>
+            </div>
+            <div>
+              <dt className="inline font-medium text-foreground">Construction company: </dt>
+              <dd className="inline">{companyConfig.construction.name}</dd>
+            </div>
+            <div>
+              <dt className="inline font-medium text-foreground">Reg. no: </dt>
+              <dd className="inline">{companyConfig.construction.registrationNumber}</dd>
+            </div>
+            <div>
+              <dt className="inline font-medium text-foreground">B-BBEE: </dt>
+              <dd className="inline">{companyConfig.parentCompany.bbbee}</dd>
+            </div>
+          </dl>
           <div className="mt-4 space-y-2 text-sm">
             <a
               href={SITE.website}
@@ -100,6 +142,16 @@ export function SiteFooter() {
                 About Cossa Store
               </Link>
             </li>
+            <li>
+              <a
+                href={companyConfig.parentCompany.website}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:underline"
+              >
+                Cossa Nexus Holdings group site
+              </a>
+            </li>
           </ul>
         </div>
 
@@ -163,10 +215,22 @@ export function SiteFooter() {
 
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-          <p>© {new Date().getFullYear()} Cossa Nexus Holdings. All rights reserved.</p>
-          <div className="flex items-center gap-3">
+          <p>
+            © {new Date().getFullYear()} {companyConfig.footer.copyright}
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
             <StaffCatalogueLink variant="link" />
-            <p>{SITE.domain}</p>
+            {companyConfig.social.map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:underline"
+              >
+                {item.label}
+              </a>
+            ))}
           </div>
         </div>
       </div>
