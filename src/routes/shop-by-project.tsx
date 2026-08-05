@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 
 import { SITE_URL } from "@/config/seo";
 import { PageHeader } from "@/components/common/PageHeader";
+import { ConstructionBadge } from "@/components/company/GroupBadge";
 import { EmptyBlock } from "@/components/common/StateBlocks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,6 +99,7 @@ function ShopByProject() {
     <div>
       <PageHeader eyebrow="Projects" title="Shop by project" description={DESCRIPTION} />
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <ConstructionBadge className="mb-8" />
         {hydrated && saved.length ? (
           <div className="mb-8 rounded-lg border border-border bg-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
