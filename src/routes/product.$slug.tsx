@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/common/StateBlocks";
 import { ProductGrid } from "@/components/shop/ProductCard";
+import { ProductImage } from "@/components/shop/ProductImage";
+import { FulfilmentDetails } from "@/components/shop/FulfilmentDetails";
 import { FulfilmentBadge, StockBadge } from "@/components/shop/ProductMeta";
 import { subcategoryName } from "@/data/categories";
 import { useCommerce } from "@/lib/commerce-store";
@@ -117,10 +119,17 @@ function ProductPage() {
 
 function ProductDetail({ product }: { product: Product }) {
   const [quantity, setQuantity] = useState(1);
+  const [variantId, setVariantId] = useState<string | null>(product.variants[0]?.id ?? null);
   const { addToCart, addToQuote, toggleWishlist, isWishlisted, hydrated } = useCommerce();
   const related = useQuery(relatedProductsQuery(product));
   const wishlisted = hydrated && isWishlisted(product.id);
-  const purchasable = product.stock_status !== "out_of_stock";
+  const affiliate = Boolean(product.affiliate);
+  const purchasable =
+    product.stock_status !== "out_of_stock" &&
+    !affiliate &&
+    !product.requires_quote &&
+    product.selling_price > 0;
+  const image = product.images[0];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -135,29 +144,68 @@ function ProductDetail({ product }: { product: Product }) {
       </nav>
 
       <div className="grid gap-10 lg:grid-cols-2">
-        <div className="flex aspect-4/3 items-center justify-center rounded-lg border border-border bg-secondary">
-          <div className="text-center">
-            <Package className="mx-auto h-12 w-12 text-muted-foreground" aria-hidden />
-            <p className="mt-3 text-xs uppercase tracking-wide text-muted-foreground">
-              Product image pending
-            </p>
+        <div>
+          <div className="relative aspect-4/3 overflow-hidden rounded-lg border border-border bg-secondary">
+            {image?.url ? (
+              <ProductImage url={image.url} alt={image.alt} className="h-full w-full" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-center">
+                <div>
+                  <Package className="mx-auto h-12 w-12 text-muted-foreground" aria-hidden />
+                  <p className="mt-3 text-xs uppercase tracking-wide text-muted-foreground">
+                    Product image pending
+                  </p>
+                </div>
+              </div>
+            )}
+            {product.is_demo ? (
+              <span className="absolute left-0 top-4 bg-warning px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-background">
+                Demo product — replace before launch
+              </span>
+            ) : null}
           </div>
+          {product.images.length > 1 ? (
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              {product.images.slice(0, 4).map((img, i) => (
+                <div key={i} className="aspect-square overflow-hidden rounded border border-border">
+                  <ProductImage url={img.url} alt={img.alt} className="h-full w-full" />
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div>
+          {product.is_demo ? (
+            <div className="mb-4 rounded-lg border border-warning/50 bg-warning/10 p-3 text-xs text-warning">
+              <strong className="font-semibold uppercase tracking-wide">
+                Demo product — replace before launch.
+              </strong>{" "}
+              This is a placeholder record used to build and test the store. It is not real stock,
+              real pricing or a real supplier commitment.
+            </div>
+          ) : null}
           <p className="text-xs uppercase tracking-wide text-muted-foreground">{product.brand}</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">{product.name}</h1>
           <p className="mt-3 text-sm text-muted-foreground">{product.short_description}</p>
 
-          <div className="mt-6 flex items-baseline gap-3">
-            <span className="text-3xl font-semibold">{formatZar(product.selling_price)}</span>
-            {product.compare_at_price ? (
-              <span className="text-sm text-muted-foreground line-through">
-                {formatZar(product.compare_at_price)}
-              </span>
-            ) : null}
-          </div>
-          <p className="text-xs text-muted-foreground">Price includes VAT · SKU {product.sku}</p>
+          {product.requires_quote || product.selling_price <= 0 ? (
+            <p className="mt-6 text-2xl font-semibold">Price on request</p>
+          ) : (
+            <>
+              <div className="mt-6 flex items-baseline gap-3">
+                <span className="text-3xl font-semibold">{formatZar(product.selling_price)}</span>
+                {product.compare_at_price ? (
+                  <span className="text-sm text-muted-foreground line-through">
+                    {formatZar(product.compare_at_price)}
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Price includes VAT · SKU {product.sku}
+              </p>
+            </>
+          )}
 
           <div className="mt-4 flex flex-wrap gap-2">
             <StockBadge status={product.stock_status} />
@@ -166,6 +214,30 @@ function ProductDetail({ product }: { product: Product }) {
           <p className="mt-3 text-sm text-muted-foreground">
             Estimated delivery: {product.estimated_delivery}
           </p>
+
+          {product.variants.length > 0 ? (
+            <div className="mt-6">
+              <label
+                htmlFor="variant"
+                className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+              >
+                Choose an option
+              </label>
+              <select
+                id="variant"
+                value={variantId ?? ""}
+                onChange={(e) => setVariantId(e.target.value)}
+                className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {product.variants.map((variant) => (
+                  <option key={variant.id} value={variant.id}>
+                    {variant.name}
+                    {variant.retail_price ? ` — ${formatZar(variant.retail_price)}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <div className="flex items-center rounded-md border border-input">
@@ -189,16 +261,37 @@ function ProductDetail({ product }: { product: Product }) {
                 +
               </button>
             </div>
-            <Button
-              size="lg"
-              disabled={!purchasable}
-              onClick={() => {
-                addToCart(product.id, quantity);
-                toast.success("Added to cart", { description: product.name });
-              }}
-            >
-              {purchasable ? "Add to cart" : "Currently unavailable"}
-            </Button>
+            {product.affiliate ? (
+              <Button asChild size="lg">
+                <a
+                  href={product.affiliate.tracking_url}
+                  target="_blank"
+                  rel="nofollow sponsored noreferrer"
+                >
+                  Buy from {product.affiliate.partner_name}
+                </a>
+              </Button>
+            ) : (
+              <Button
+                size="lg"
+                disabled={!purchasable}
+                onClick={() => {
+                  addToCart(product.id, quantity);
+                  toast.success(
+                    (product.kit_items?.length ?? 0) > 0 ? "Full kit added to cart" : "Added to cart",
+                    { description: product.name },
+                  );
+                }}
+              >
+                {purchasable
+                  ? (product.kit_items?.length ?? 0) > 0
+                    ? "Add full kit to cart"
+                    : "Add to cart"
+                  : product.requires_quote
+                    ? "Quote required"
+                    : "Currently unavailable"}
+              </Button>
+            )}
             <Button
               size="lg"
               variant="outline"
@@ -264,6 +357,8 @@ function ProductDetail({ product }: { product: Product }) {
                 </Link>
               </p>
             </section>
+
+            <FulfilmentDetails product={product} />
 
             <ServiceCrossSell categorySlug={product.category} />
           </div>
