@@ -32,6 +32,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountIndexRouteImport } from './routes/account.index'
 import { Route as ProjectSlugRouteImport } from './routes/project.$slug'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
+import { Route as DevCatalogueRouteImport } from './routes/dev.catalogue'
 import { Route as CategorySlugRouteImport } from './routes/category.$slug'
 import { Route as AccountWishlistRouteImport } from './routes/account.wishlist'
 import { Route as AccountProjectsRouteImport } from './routes/account.projects'
@@ -155,6 +156,11 @@ const ProductSlugRoute = ProductSlugRouteImport.update({
   path: '/product/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevCatalogueRoute = DevCatalogueRouteImport.update({
+  id: '/dev/catalogue',
+  path: '/dev/catalogue',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CategorySlugRoute = CategorySlugRouteImport.update({
   id: '/category/$slug',
   path: '/category/$slug',
@@ -224,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/account/projects': typeof AccountProjectsRoute
   '/account/wishlist': typeof AccountWishlistRoute
   '/category/$slug': typeof CategorySlugRoute
+  '/dev/catalogue': typeof DevCatalogueRoute
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
   '/account/': typeof AccountIndexRoute
@@ -255,6 +262,7 @@ export interface FileRoutesByTo {
   '/account/projects': typeof AccountProjectsRoute
   '/account/wishlist': typeof AccountWishlistRoute
   '/category/$slug': typeof CategorySlugRoute
+  '/dev/catalogue': typeof DevCatalogueRoute
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
   '/account': typeof AccountIndexRoute
@@ -289,6 +297,7 @@ export interface FileRoutesById {
   '/account/projects': typeof AccountProjectsRoute
   '/account/wishlist': typeof AccountWishlistRoute
   '/category/$slug': typeof CategorySlugRoute
+  '/dev/catalogue': typeof DevCatalogueRoute
   '/product/$slug': typeof ProductSlugRoute
   '/project/$slug': typeof ProjectSlugRoute
   '/account/': typeof AccountIndexRoute
@@ -323,6 +332,7 @@ export interface FileRouteTypes {
     | '/account/projects'
     | '/account/wishlist'
     | '/category/$slug'
+    | '/dev/catalogue'
     | '/product/$slug'
     | '/project/$slug'
     | '/account/'
@@ -354,6 +364,7 @@ export interface FileRouteTypes {
     | '/account/projects'
     | '/account/wishlist'
     | '/category/$slug'
+    | '/dev/catalogue'
     | '/product/$slug'
     | '/project/$slug'
     | '/account'
@@ -387,6 +398,7 @@ export interface FileRouteTypes {
     | '/account/projects'
     | '/account/wishlist'
     | '/category/$slug'
+    | '/dev/catalogue'
     | '/product/$slug'
     | '/project/$slug'
     | '/account/'
@@ -418,6 +430,7 @@ export interface RootRouteChildren {
   SupplierApplicationRoute: typeof SupplierApplicationRoute
   TermsRoute: typeof TermsRoute
   CategorySlugRoute: typeof CategorySlugRoute
+  DevCatalogueRoute: typeof DevCatalogueRoute
   ProductSlugRoute: typeof ProductSlugRoute
   ProjectSlugRoute: typeof ProjectSlugRoute
 }
@@ -585,6 +598,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dev/catalogue': {
+      id: '/dev/catalogue'
+      path: '/dev/catalogue'
+      fullPath: '/dev/catalogue'
+      preLoaderRoute: typeof DevCatalogueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/category/$slug': {
       id: '/category/$slug'
       path: '/category/$slug'
@@ -700,6 +720,7 @@ const rootRouteChildren: RootRouteChildren = {
   SupplierApplicationRoute: SupplierApplicationRoute,
   TermsRoute: TermsRoute,
   CategorySlugRoute: CategorySlugRoute,
+  DevCatalogueRoute: DevCatalogueRoute,
   ProductSlugRoute: ProductSlugRoute,
   ProjectSlugRoute: ProjectSlugRoute,
 }

@@ -27,7 +27,6 @@ import { publicCollectionsQuery, storefrontProductsQuery } from "@/lib/queries";
 import { buildSections } from "@/lib/merchandising";
 import { ContactStrip } from "@/components/support/ContactStrip";
 import { COMPLIANCE_BADGES, GUARANTEES, TRUST_STATS } from "@/config/trust";
-import heroImage from "@/assets/hero-projects.jpg";
 import { companyConfig } from "@/config/company";
 import { GroupBadge } from "@/components/company/GroupBadge";
 
@@ -405,8 +404,8 @@ function Hero() {
   return (
     <section className="relative isolate overflow-hidden border-b border-primary/20">
       <img
-        src={heroImage}
-        alt="Cossa site supervisor, facility technician and smart-security installer at work on a South African commercial site"
+        src={companyConfig.backgrounds.heroEagle}
+        alt="Cossa Nexus eagle emblem"
         width={1600}
         height={1200}
         fetchPriority="high"
@@ -414,14 +413,6 @@ function Hero() {
         className="absolute inset-0 h-full w-full object-cover object-center"
       />
       <div className="hero-veil absolute inset-0" aria-hidden />
-      <img
-        src={companyConfig.backgrounds.heroEagle}
-        alt=""
-        aria-hidden
-        loading="lazy"
-        decoding="async"
-        className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-1/2 object-cover object-center opacity-[0.14] mix-blend-screen [mask-image:linear-gradient(to_left,black,transparent)] md:block"
-      />
       <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-32">
         <div className="max-w-2xl">
           <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-primary sm:text-xs">

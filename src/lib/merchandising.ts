@@ -39,6 +39,14 @@ export function isService(product: Product): boolean {
   return product.product_type === "service" || product.fulfilment_type === "service";
 }
 
+export function isDemo(product: Product): boolean {
+  return product.is_demo === true;
+}
+
+export function isProjectKit(product: Product): boolean {
+  return product.product_type === "bundle" || (product.kit_items?.length ?? 0) > 0;
+}
+
 /** Affiliate and quote-only lines never enter the Cossa cart. */
 export function canAddToCart(product: Product): boolean {
   if (isAffiliate(product)) return false;
@@ -62,7 +70,10 @@ export function availabilityLabel(product: Product): ProductBadge {
 }
 
 export function productBadges(product: Product): ProductBadge[] {
-  const badges: ProductBadge[] = [availabilityLabel(product)];
+  const badges: ProductBadge[] = [];
+  if (isDemo(product)) badges.push({ label: "Demo product", tone: "warning" });
+  badges.push(availabilityLabel(product));
+  if (isProjectKit(product)) badges.push({ label: "Project kit", tone: "gold" });
   if (isNewArrival(product)) badges.push({ label: "New arrival", tone: "gold" });
   if (isTrending(product)) badges.push({ label: "Trending", tone: "gold" });
   if (product.requires_quote) badges.push({ label: "Quote only", tone: "neutral" });

@@ -8,6 +8,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, PROJECTS, getCategory, getProject } from "@/data/categories";
+import { DEMO_STOREFRONT, findDemoProductBySlug } from "@/data/demo-catalogue";
 import type {
   Category,
   FulfilmentType,
@@ -193,7 +194,7 @@ export async function listProducts(query: ProductQuery = {}): Promise<Product[]>
     .order("created_at", { ascending: false });
   if (error) throw error;
 
-  let results = (data ?? []).map(mapProduct);
+  let results = [...(data ?? []).map(mapProduct), ...DEMO_STOREFRONT];
 
   if (query.category) results = results.filter((p) => p.category === query.category);
   if (query.subcategory) results = results.filter((p) => p.subcategory === query.subcategory);
@@ -232,10 +233,15 @@ export async function listProjectProducts(slug: string): Promise<Product[]> {
   const project = getProject(slug);
   if (!project) return [];
   const all = await listProducts();
-  return all.filter((p) => project.categories.includes(p.category as never));
+  return all.filter(
+    (p) =>
+      (p.project_slugs ?? []).includes(slug) || project.categories.includes(p.category as never),
+  );
 }
 
 export async function fetchProductBySlug(slug: string): Promise<Product | null> {
+  const demo = findDemoProductBySlug(slug);
+  if (demo) return demo;
   const { data, error } = await supabase.from("products").select(SELECT).eq("slug", slug).maybeSingle();
   if (error) throw error;
   return data ? mapProduct(data) : null;
@@ -243,9 +249,12 @@ export async function fetchProductBySlug(slug: string): Promise<Product | null> 
 
 export async function fetchProductsByIds(ids: string[]): Promise<Product[]> {
   if (ids.length === 0) return [];
-  const { data, error } = await supabase.from("products").select(SELECT).in("id", ids);
+  const demo = DEMO_STOREFRONT.filter((p) => ids.includes(p.id));
+  const realIds = ids.filter((id) => !demo.some((p) => p.id === id));
+  if (realIds.length === 0) return demo;
+  const { data, error } = await supabase.from("products").select(SELECT).in("id", realIds);
   if (error) throw error;
-  return (data ?? []).map(mapProduct);
+  return [...(data ?? []).map(mapProduct), ...demo];
 }
 
 export async function listFeaturedProducts(limit = 8): Promise<Product[]> {
@@ -256,18 +265,23 @@ export async function listFeaturedProducts(limit = 8): Promise<Product[]> {
     .order("published_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return (data ?? []).map(mapProduct);
+  const demoFeatured = DEMO_STOREFRONT.filter((p) => p.is_featured);
+  return [...(data ?? []).map(mapProduct), ...demoFeatured].slice(0, limit);
 }
 
 export async function listRelatedProducts(product: Product, limit = 4): Promise<Product[]> {
   const all = await listProducts();
+  const explicit = (product.related_slugs ?? [])
+    .map((id) => all.find((p) => p.id === id || p.slug === id))
+    .filter((p): p is Product => Boolean(p) && p!.id !== product.id);
   const sameCollection = all.filter(
     (p) => p.id !== product.id && product.collection && p.collection?.slug === product.collection.slug,
   );
   const sameCategory = all.filter(
     (p) => p.id !== product.id && p.category === product.category && !sameCollection.includes(p),
   );
-  return [...sameCollection, ...sameCategory].slice(0, limit);
+  const merged = [...explicit, ...sameCollection, ...sameCategory];
+  return Array.from(new Map(merged.map((p) => [p.id, p])).values()).slice(0, limit);
 }
 
 export async function listPublicCollections() {
@@ -291,5 +305,5 @@ export async function listStorefrontProducts(limit = 120): Promise<Product[]> {
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return (data ?? []).map(mapProduct);
+  return [...(data ?? []).map(mapProduct), ...DEMO_STOREFRONT].slice(0, limit);
 }

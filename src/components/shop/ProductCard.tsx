@@ -75,13 +75,18 @@ export function ProductCard({
         to="/product/$slug"
         params={{ slug: product.slug }}
         onClick={open}
-        className="block aspect-square overflow-hidden bg-secondary"
+        className="relative block aspect-square overflow-hidden bg-secondary"
       >
         <ProductImage
           url={image?.url}
           alt={image?.alt ?? product.name}
           className="h-full w-full transition-transform duration-300 group-hover:scale-[1.03]"
         />
+        {product.is_demo ? (
+          <span className="absolute left-0 top-3 bg-warning px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-background shadow">
+            Demo — replace before launch
+          </span>
+        ) : null}
       </Link>
 
       <div className="flex flex-1 flex-col p-3 sm:p-4">
