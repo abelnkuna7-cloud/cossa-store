@@ -11,7 +11,9 @@ import { supabase } from "@/integrations/supabase/client";
 export const PRODUCT_MEDIA_BUCKET = "product-media";
 
 export function isExternalUrl(value: string | null | undefined): boolean {
-  return typeof value === "string" && /^https?:\/\//i.test(value);
+  // Absolute http(s) URLs and app-served asset paths ("/assets/...") are used
+  // directly; anything else is a private storage bucket path.
+  return typeof value === "string" && (/^https?:\/\//i.test(value) || value.startsWith("/"));
 }
 
 export async function signedMediaUrl(path: string): Promise<string | null> {
