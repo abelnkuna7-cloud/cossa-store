@@ -136,6 +136,29 @@ export interface Product {
   /** True only when real counted stock is available. */
   stock_available: boolean;
   affiliate: AffiliateOfferPublic | null;
+
+  /* ---- Optional extended fields (used by the demo/placeholder catalogue) ---- */
+  /** DEMO PRODUCT — REPLACE BEFORE LAUNCH. Never a real, sellable line. */
+  is_demo?: boolean;
+  /** Draft / published state for catalogue migration tooling. */
+  publication_status?: "draft" | "published";
+  supplier_name?: string | null;
+  supplier_reference?: string | null;
+  province_availability?: string[];
+  project_slugs?: string[];
+  service_options?: string[];
+  related_slugs?: string[];
+  frequently_together?: string[];
+  digital_download?: boolean;
+  affiliate_url?: string | null;
+  printify_product_id?: string | null;
+  dropship_reference?: string | null;
+  service_included?: boolean;
+  lead_time?: string | null;
+  customisation_options?: string[];
+  kit_items?: { label: string; quantity: string }[];
+  /** Human display label for the demo taxonomy (e.g. "Print-on-Demand Apparel"). */
+  display_category?: string;
 }
 
 export interface Subcategory {
