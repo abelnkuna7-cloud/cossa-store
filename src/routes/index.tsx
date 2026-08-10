@@ -27,7 +27,6 @@ import { publicCollectionsQuery, storefrontProductsQuery } from "@/lib/queries";
 import { buildSections } from "@/lib/merchandising";
 import { ContactStrip } from "@/components/support/ContactStrip";
 import { COMPLIANCE_BADGES, GUARANTEES, TRUST_STATS } from "@/config/trust";
-import heroImage from "@/assets/hero-projects.jpg";
 import { companyConfig } from "@/config/company";
 import { GroupBadge } from "@/components/company/GroupBadge";
 
