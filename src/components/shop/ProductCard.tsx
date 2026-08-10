@@ -83,7 +83,7 @@ export function ProductCard({
           className="h-full w-full transition-transform duration-300 group-hover:scale-[1.03]"
         />
         {product.is_demo ? (
-          <span className="absolute left-0 top-3 bg-warning px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-warning-foreground shadow">
+          <span className="absolute left-0 top-3 bg-warning px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-background shadow">
             Demo — replace before launch
           </span>
         ) : null}
