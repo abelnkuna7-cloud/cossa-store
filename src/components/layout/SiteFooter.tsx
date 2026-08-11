@@ -1,16 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import {
+  ExternalLink,
   Facebook,
   Globe,
   Instagram,
-  Linkedin,
   Mail,
   MapPin,
   MessageCircle,
   Phone,
   ShieldCheck,
-  Store,
-  ExternalLink,
 } from "lucide-react";
 
 import { CATEGORIES } from "@/data/categories";
@@ -22,10 +20,11 @@ import { useSupport } from "@/components/support/support-context";
 import { companyConfig } from "@/config/company";
 
 /**
- * Public Cossa digital platforms.
+ * Additional Cossa platforms.
  *
- * Keep public platform URLs centralised here until they are moved
- * into companyConfig or another shared Cossa ecosystem configuration.
+ * These are intentionally secondary to Cossa Store.
+ * The footer remains store-focused while allowing customers
+ * and business buyers to discover related Cossa platforms.
  */
 const COSSA_PLATFORMS = [
   {
@@ -46,47 +45,43 @@ const COSSA_PLATFORMS = [
 ] as const;
 
 /**
- * Official social channels with confirmed handle-style URLs.
+ * Primary Cossa Store social media.
  *
- * Add Facebook Construction and any additional platforms once
- * their exact public profile URLs are confirmed.
+ * Store customers should see store-specific social channels first.
  */
-const SOCIAL_LINKS = [
+const STORE_SOCIAL_LINKS = [
   {
-    label: "Instagram — Cossa Nexus Holdings",
+    label: "Cossa Store on Instagram",
     shortLabel: "Instagram",
-    href: "https://www.instagram.com/cossa_nexus_holdings",
-    icon: Instagram,
-  },
-  {
-    label: "Instagram — Cossa Store",
-    shortLabel: "Store Instagram",
     href: "https://www.instagram.com/cossa_nexus_store",
     icon: Instagram,
   },
   {
-    label: "Facebook — Cossa Nexus Holdings",
+    label: "Cossa Store on Facebook",
     shortLabel: "Facebook",
-    href: "https://www.facebook.com/Cossanexusholdings",
-    icon: Facebook,
-  },
-  {
-    label: "Facebook — Cossa Store",
-    shortLabel: "Store Facebook",
     href: "https://www.facebook.com/Cossastore",
     icon: Facebook,
   },
+] as const;
+
+/**
+ * Parent-company social channels.
+ *
+ * These remain secondary and are clearly identified
+ * as Cossa Nexus Holdings rather than Cossa Store.
+ */
+const PARENT_SOCIAL_LINKS = [
   {
-    label: "X — Cossa Nexus Holdings",
-    shortLabel: "X",
-    href: "https://x.com/cossa_nexus",
-    icon: Globe,
+    label: "Cossa Nexus Holdings on Instagram",
+    shortLabel: "Holdings Instagram",
+    href: "https://www.instagram.com/cossa_nexus_holdings",
+    icon: Instagram,
   },
   {
-    label: "TikTok — Cossa Nexus Holdings",
-    shortLabel: "TikTok",
-    href: "https://www.tiktok.com/@cossa_nexus_holdings",
-    icon: Globe,
+    label: "Cossa Nexus Holdings on Facebook",
+    shortLabel: "Holdings Facebook",
+    href: "https://www.facebook.com/Cossanexusholdings",
+    icon: Facebook,
   },
 ] as const;
 
@@ -97,7 +92,7 @@ export function SiteFooter() {
     <footer className="mt-16 border-t border-border bg-secondary">
       {/* MAIN FOOTER */}
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-5 lg:px-8">
-        {/* BRAND / COMPANY */}
+        {/* STORE IDENTITY */}
         <div className="lg:col-span-2">
           <img
             src={companyConfig.store.logo}
@@ -113,7 +108,7 @@ export function SiteFooter() {
             {SITE.positioning}
           </p>
 
-          {/* PARENT COMPANY */}
+          {/* LEGAL PARENT */}
           <div className="mt-5 flex items-start gap-3">
             <img
               src={companyConfig.parentCompany.logo}
@@ -127,17 +122,16 @@ export function SiteFooter() {
 
             <div>
               <p className="text-xs font-medium text-foreground">
-                A division of {SITE.parent}
+                Operated by {SITE.parent}
               </p>
 
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Registered South African company operating the Cossa business
-                ecosystem.
+                Registered South African company.
               </p>
             </div>
           </div>
 
-          {/* COMPANY TRUST DETAILS */}
+          {/* TRUST DETAILS */}
           <dl className="mt-5 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
             <div>
               <dt className="inline font-medium text-foreground">
@@ -190,7 +184,9 @@ export function SiteFooter() {
           <div className="mt-5 space-y-2.5 text-sm">
             <a
               href={`mailto:${SITE.email}`}
-              onClick={() => trackEvent("email_clicked", { trigger: "footer" })}
+              onClick={() =>
+                trackEvent("email_clicked", { trigger: "footer" })
+              }
               className="flex items-center gap-2 font-medium hover:underline"
             >
               <Mail className="h-4 w-4 text-primary" aria-hidden />
@@ -275,14 +271,20 @@ export function SiteFooter() {
           </ul>
         </div>
 
-        {/* BUSINESS / ECOSYSTEM */}
+        {/* BUSINESS & MORE FROM COSSA */}
         <div>
-          <p className="text-sm font-semibold">Cossa ecosystem</p>
+          <p className="text-sm font-semibold">Business & services</p>
 
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
             <li>
               <Link to="/business-account" className="hover:underline">
                 Business buying
+              </Link>
+            </li>
+
+            <li>
+              <Link to="/business-account" className="hover:underline">
+                Business account
               </Link>
             </li>
 
@@ -303,44 +305,40 @@ export function SiteFooter() {
                 About Cossa Store
               </Link>
             </li>
-
-            {COSSA_PLATFORMS.map((platform) => (
-              <li key={platform.label}>
-                <a
-                  href={platform.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex items-start gap-1.5 hover:underline"
-                >
-                  <span>
-                    {platform.label}
-                    <span className="block text-xs opacity-80">
-                      {platform.description}
-                    </span>
-                  </span>
-
-                  <ExternalLink
-                    className="mt-0.5 h-3 w-3 shrink-0 opacity-60"
-                    aria-hidden
-                  />
-                </a>
-              </li>
-            ))}
           </ul>
 
-          {/* GROUP COMPANIES */}
-          <div className="mt-5 border-t border-border pt-4">
+          {/* RELATED COSSA PLATFORMS */}
+          <div className="mt-6 border-t border-border pt-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-foreground">
-              Group companies
+              More from Cossa
             </p>
 
-            <ul className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-              <li>Cossa Nexus Construction</li>
-              <li>Cossa Facility Services</li>
-              <li>Cossa Tech</li>
-              <li>Cossa Store</li>
-              <li>Cossa Logistics — planned</li>
-              <li>Cossa Cuisine — planned</li>
+            <ul className="mt-3 space-y-3 text-xs text-muted-foreground">
+              {COSSA_PLATFORMS.map((platform) => (
+                <li key={platform.label}>
+                  <a
+                    href={platform.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex items-start gap-1.5 hover:underline"
+                  >
+                    <span>
+                      <span className="font-medium text-foreground">
+                        {platform.label}
+                      </span>
+
+                      <span className="block">
+                        {platform.description}
+                      </span>
+                    </span>
+
+                    <ExternalLink
+                      className="mt-0.5 h-3 w-3 shrink-0 opacity-60"
+                      aria-hidden
+                    />
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
@@ -413,7 +411,7 @@ export function SiteFooter() {
             </li>
           </ul>
 
-          {/* TRUST */}
+          {/* CUSTOMER PROTECTION */}
           <div className="mt-5 rounded-lg border border-border bg-background/40 p-4">
             <div className="flex items-center gap-2">
               <ShieldCheck
@@ -428,28 +426,29 @@ export function SiteFooter() {
 
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
               Purchases made directly from Cossa Store are subject to our
-              published terms, delivery and returns policies and applicable
-              South African consumer law.
+              published Terms and Conditions, Shipping & Delivery Policy,
+              Returns & Refunds Policy and applicable South African consumer
+              law.
             </p>
           </div>
         </div>
       </div>
 
-      {/* SOCIAL MEDIA */}
+      {/* STORE SOCIAL MEDIA */}
       <div className="border-t border-border">
         <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-semibold">Connect with Cossa</p>
+              <p className="text-sm font-semibold">Follow Cossa Store</p>
 
               <p className="mt-1 text-xs text-muted-foreground">
-                Follow Cossa Nexus Holdings and Cossa Store for products,
-                projects, updates and business opportunities.
+                Follow us for new products, collections, promotions, buying
+                guides and store updates.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3">
-              {SOCIAL_LINKS.map((item) => {
+              {STORE_SOCIAL_LINKS.map((item) => {
                 const Icon = item.icon;
 
                 return (
@@ -460,13 +459,49 @@ export function SiteFooter() {
                     rel="noopener noreferrer"
                     aria-label={item.label}
                     title={item.label}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium transition-colors hover:bg-background"
+                    onClick={() =>
+                      trackEvent("social_link_clicked", {
+                        platform: item.shortLabel,
+                        brand: "Cossa Store",
+                      })
+                    }
+                    className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-xs font-medium transition-colors hover:bg-background"
                   >
                     <Icon className="h-4 w-4 text-primary" aria-hidden />
                     {item.shortLabel}
                   </a>
                 );
               })}
+            </div>
+          </div>
+
+          {/* PARENT SOCIAL — SECONDARY */}
+          <div className="mt-5 border-t border-border/60 pt-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-muted-foreground">
+                Cossa Store is part of {SITE.parent}.
+              </p>
+
+              <div className="flex flex-wrap gap-3">
+                {PARENT_SOCIAL_LINKS.map((item) => {
+                  const Icon = item.icon;
+
+                  return (
+                    <a
+                      key={item.label}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={item.label}
+                      title={item.label}
+                      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:underline"
+                    >
+                      <Icon className="h-3.5 w-3.5" aria-hidden />
+                      {item.shortLabel}
+                    </a>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -479,7 +514,7 @@ export function SiteFooter() {
         </div>
       </div>
 
-      {/* BOTTOM BAR */}
+      {/* BOTTOM LEGAL BAR */}
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 text-xs text-muted-foreground sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div className="space-y-1">
@@ -488,7 +523,7 @@ export function SiteFooter() {
             </p>
 
             <p>
-              Cossa Store is operated by {SITE.parent} · Reg.{" "}
+              {SITE.name} is operated by {SITE.parent} · Reg.{" "}
               {SITE.registrationNumber}
             </p>
           </div>
