@@ -17,7 +17,7 @@ export const SITE = {
   /**
    * Company registration date.
    */
-  registrationDate: "29 June 2026",
+  registrationDate: " June 2026",
 
   /**
    * Parent company domain and corporate website.
@@ -31,7 +31,7 @@ export const SITE = {
    * Replace this value when the permanent Cossa Store
    * custom domain/subdomain is connected.
    */
-  storeWebsite: "https://cossa-store.vercel.app",
+  storeWebsite: "https://store.cossanexusholdings.co.za",
 
   /**
    * Brand positioning.
