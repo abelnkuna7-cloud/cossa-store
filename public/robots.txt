@@ -1,8 +1,16 @@
 User-agent: *
 Allow: /
-Disallow: /cart
-Disallow: /checkout
-Disallow: /account
+
+# Private / account-specific areas
+Disallow: /account/
+Disallow: /admin/
+Disallow: /staff/
+
+# Internal application/API routes if exposed publicly
+Disallow: /api/
+
+# Search-result pages are intentionally excluded from crawling
+# to reduce duplicate/thin URL discovery.
 Disallow: /search
 
-Sitemap: https://cossa-store.lovable.app/sitemap.xml
+Sitemap: https://store.cossanexusholdings.co.za/sitemap.xml
