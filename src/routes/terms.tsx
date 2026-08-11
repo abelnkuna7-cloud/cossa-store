@@ -34,7 +34,8 @@ export const Route = createFileRoute("/terms")({
         {
           heading: "1. About Cossa Store",
           body: [
-            `Cossa Store is operated by ${SITE.parent}. These Terms and Conditions govern your use of the Cossa Store website, your requests for quotations and your purchase of products or services offered directly through Cossa Store.`,
+            `Cossa Store is operated by ${SITE.parent}, registration number ${SITE.registrationNumber}, a company registered in the Republic of South Africa.`,
+            "These Terms and Conditions govern your use of the Cossa Store website, quotation requests, orders and purchases made directly through Cossa Store.",
             "Cossa Store may offer physical stocked goods, print-on-demand products, personalised products, supplier-fulfilled or dropshipped products, special-order products, imported products, digital products, business procurement options and links to selected third-party or affiliate products.",
             "The fulfilment method used for a product does not remove any statutory consumer rights that apply to a purchase made directly from Cossa Store.",
           ],
@@ -43,8 +44,9 @@ export const Route = createFileRoute("/terms")({
         {
           heading: "2. Acceptance of these terms",
           body: [
-            "By browsing this website, creating or submitting a quotation request, creating an account where available, placing an order or completing a purchase directly through Cossa Store, you agree to these Terms and Conditions together with any policies incorporated into them.",
-            "Where checkout functionality is enabled, you may be required to affirmatively acknowledge these Terms and Conditions and our Returns & Refunds Policy before completing payment.",
+            "By browsing this website, submitting a quotation request, creating an account where available, placing an order or completing a purchase directly through Cossa Store, you agree to these Terms and Conditions together with the policies and transaction terms that apply to your purchase.",
+            "Where checkout functionality is enabled, you may be required to affirmatively accept these Terms and Conditions and our Returns & Refunds Policy before completing an order or payment.",
+            "Our Shipping & Delivery Policy and Privacy Policy should also be reviewed before completing a purchase.",
             "If you do not agree with these Terms and Conditions, you should not complete a purchase through Cossa Store.",
           ],
         },
@@ -80,9 +82,9 @@ export const Route = createFileRoute("/terms")({
         {
           heading: "6. Prices and currency",
           body: [
-            "Unless another currency is clearly displayed for a specific transaction, prices on Cossa Store are shown in South African Rand (ZAR).",
-            "Applicable taxes will be handled in accordance with South African law and Cossa Nexus Holdings' applicable tax-registration status.",
-            "Where Cossa Nexus Holdings is required or entitled to charge VAT, VAT will be dealt with in accordance with the Value-Added Tax Act and applicable SARS requirements.",
+            `Unless another currency is clearly displayed for a specific transaction, prices on Cossa Store are shown in ${SITE.currency}.`,
+            `Applicable taxes will be handled in accordance with South African law and ${SITE.parent}'s applicable tax-registration status.`,
+            `Where ${SITE.parent} is required or entitled to charge VAT, VAT will be dealt with in accordance with applicable South African tax law and SARS requirements.`,
             "We will not represent an amount as VAT, issue a VAT tax invoice, or describe a price as VAT-inclusive unless legally appropriate.",
             "Shipping, delivery, customs, duties, import charges or other applicable transaction costs may be shown separately where relevant.",
           ],
@@ -121,9 +123,9 @@ export const Route = createFileRoute("/terms")({
           heading: "10. Payment methods",
           body: [
             "Cossa Store may support one or more approved payment service providers from time to time.",
-            "Available payment methods will be displayed at checkout when those payment methods are operational and available for the particular transaction.",
+            "Available payment methods will be displayed at checkout only when those payment methods are operational and available for the relevant transaction.",
             "Cossa Store is not limited to one payment provider and may add, remove, suspend or replace payment methods as merchant approvals, technical integrations, commercial arrangements or regulatory requirements change.",
-            "We will not represent a payment provider as available for customer checkout until the relevant integration and merchant approval are operational.",
+            "We will not represent a payment provider as available for customer checkout until the relevant merchant approval and technical integration are operational.",
           ],
         },
 
@@ -150,7 +152,7 @@ export const Route = createFileRoute("/terms")({
         {
           heading: "13. Shipping and delivery",
           body: [
-            "Processing periods, delivery areas, estimated delivery times, shipping costs and other fulfilment information are governed by our Shipping Policy and the relevant product information.",
+            "Processing periods, delivery areas, estimated delivery times, shipping costs and other fulfilment information are governed by our Shipping & Delivery Policy and the relevant product information.",
             "Processing time and delivery time are not always the same. Print-on-demand, personalised, supplier-fulfilled, special-order and imported goods may require additional time before dispatch.",
             "Delivery estimates are estimates rather than guaranteed dates unless we expressly agree otherwise.",
             "You are responsible for providing an accurate and complete delivery address and suitable contact details.",
@@ -239,7 +241,7 @@ export const Route = createFileRoute("/terms")({
         {
           heading: "22. Intellectual property",
           body: [
-            "Unless otherwise indicated, Cossa Store branding, logos, website text, original graphics, product designs, software, layout and other proprietary content are owned by or licensed to Cossa Nexus Holdings.",
+            `Unless otherwise indicated, Cossa Store branding, logos, website text, original graphics, product designs, software, layout and other proprietary content are owned by or licensed to ${SITE.parent}.`,
             "You may use the website for lawful personal or business purchasing purposes.",
             "You may not reproduce, republish, scrape, distribute, modify, sell, commercially exploit or create derivative works from protected Cossa Store content without permission except where permitted by law.",
             "Third-party trademarks, product names and intellectual property remain the property of their respective owners.",
@@ -294,7 +296,7 @@ export const Route = createFileRoute("/terms")({
           heading: "28. Limitation of liability",
           body: [
             "Nothing in these Terms and Conditions excludes or limits liability or consumer rights where such exclusion or limitation is prohibited by South African law.",
-            "To the extent permitted by law, Cossa Nexus Holdings will not be responsible for indirect or consequential losses that were not reasonably foreseeable as a result of a breach or event for which we are legally responsible.",
+            `To the extent permitted by law, ${SITE.parent} will not be responsible for indirect or consequential losses that were not reasonably foreseeable as a result of a breach or event for which we are legally responsible.`,
             "Any limitation of liability in these Terms must be interpreted subject to the Consumer Protection Act and other applicable law.",
           ],
         },
@@ -336,7 +338,7 @@ export const Route = createFileRoute("/terms")({
         {
           heading: "33. Entire terms",
           body: [
-            "These Terms and Conditions should be read together with our Returns & Refunds Policy, Shipping Policy and Privacy Policy, as well as any product-specific, quotation, business-account or licence terms that expressly apply to a particular transaction.",
+            "These Terms and Conditions should be read together with our Returns & Refunds Policy, Shipping & Delivery Policy and Privacy Policy, as well as any product-specific, quotation, business-account or licence terms that expressly apply to a particular transaction.",
             "If a provision of these Terms is found to be unlawful or unenforceable, the remaining provisions will continue to operate to the extent permitted by law.",
           ],
         },
@@ -344,11 +346,13 @@ export const Route = createFileRoute("/terms")({
         {
           heading: "34. Contact details",
           body: [
-            `${SITE.parent} — Cossa Store`,
+            `${SITE.parent} — ${SITE.name}`,
+            `Registration number: ${SITE.registrationNumber}`,
             `Email: ${SITE.email}`,
             `Phone / WhatsApp: ${SITE.phoneDisplay}`,
-            "Registered address: Ext 27 Olivenoutbouch 163, 163 Centurion Olivenoutbousch, Centurion, Gauteng, 0187",
-            "Website: www.cossanexusholdings.co.za",
+            `Location: ${SITE.publicAddress}`,
+            `Store: ${SITE.storeWebsite}`,
+            `Corporate website: ${SITE.corporateWebsite}`,
           ],
         },
       ]}
