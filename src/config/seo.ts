@@ -1,1 +1,1 @@
-export const SITE_URL = "https://cossa-store.lovable.app";
+export const SITE_URL = "https://store.cossanexusholdings.co.za";
