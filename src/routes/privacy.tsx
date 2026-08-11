@@ -34,7 +34,8 @@ export const Route = createFileRoute("/privacy")({
         {
           heading: "1. Who we are",
           body: [
-            `Cossa Store is operated by ${SITE.parent}, a company registered in the Republic of South Africa. Cossa Store is the e-commerce division through which we may offer physical products, print-on-demand products, supplier-fulfilled or dropshipped products, digital products, business purchasing services and links to selected third-party or affiliate products.`,
+            `Cossa Store is operated by ${SITE.parent}, registration number ${SITE.registrationNumber}, a company registered in the Republic of South Africa.`,
+            "Cossa Store is the e-commerce division through which we may offer physical products, print-on-demand products, supplier-fulfilled or dropshipped products, digital products, business purchasing services and links to selected third-party or affiliate products.",
             `For purposes of applicable South African data-protection law, including the Protection of Personal Information Act 4 of 2013 ("POPIA"), ${SITE.parent} is responsible for determining how personal information collected through Cossa Store is processed, except where another party independently determines the purposes and means of processing.`,
             `You may contact us about privacy matters at ${SITE.email}.`,
           ],
@@ -54,10 +55,11 @@ export const Route = createFileRoute("/privacy")({
         {
           heading: "3. Payment information",
           body: [
-            "Payments made directly through Cossa Store may be processed by approved third-party payment service providers.",
-            "Where a payment provider hosts or processes the payment transaction, payment credentials such as full card details or banking credentials are handled by that provider according to its own security and privacy requirements. Cossa Store does not intend to store complete payment-card numbers, CVV security codes or online-banking passwords on its own systems.",
+            "Payments made directly through Cossa Store may be processed by one or more approved third-party payment service providers.",
+            "Where a payment provider hosts or processes the payment transaction, payment credentials such as full card details or banking credentials are handled by that provider according to its own security and privacy requirements.",
+            "Cossa Store does not intend to store complete payment-card numbers, CVV security codes, card PINs or online-banking passwords on its own systems.",
             "We may receive transaction-related information from a payment provider, such as payment status, transaction reference, payment method, amount paid, refund status and fraud or verification indicators that are reasonably necessary to fulfil, reconcile or support your order.",
-            "The payment methods available at checkout may change from time to time as merchant integrations are approved or updated.",
+            "The payment methods available at checkout may change from time to time as merchant approvals, integrations and commercial arrangements change.",
           ],
         },
 
@@ -85,7 +87,7 @@ export const Route = createFileRoute("/privacy")({
           heading: "6. How we may share personal information",
           body: [
             "We do not sell your personal information.",
-            "We may share information with payment processors where necessary to process payments, refunds, fraud checks or transaction verification.",
+            "We may share information with approved payment processors where necessary to process payments, refunds, fraud checks or transaction verification.",
             "We may share delivery information with couriers, logistics providers and delivery partners where necessary to deliver your order.",
             "Where a product is fulfilled by a print-on-demand provider, manufacturer, wholesaler, dropshipping supplier or other fulfilment partner, we may provide the minimum information reasonably required to manufacture, pack, personalise, dispatch or support that order.",
             "We may share information with hosting, database, authentication, email, analytics, security, customer-support and other technology providers that help us operate Cossa Store.",
@@ -208,11 +210,13 @@ export const Route = createFileRoute("/privacy")({
         {
           heading: "19. Contact us",
           body: [
-            `${SITE.parent} — Cossa Store`,
+            `${SITE.parent} — ${SITE.name}`,
+            `Registration number: ${SITE.registrationNumber}`,
             `Email: ${SITE.email}`,
             `Phone / WhatsApp: ${SITE.phoneDisplay}`,
-            "Registered address: Ext 27 Olivenoutbouch 163, 163 Centurion Olivenoutbousch, Centurion, Gauteng, 0187",
-            "Website: www.cossanexusholdings.co.za",
+            `Location: ${SITE.publicAddress}`,
+            `Store: ${SITE.storeWebsite}`,
+            `Corporate website: ${SITE.corporateWebsite}`,
           ],
         },
       ]}
