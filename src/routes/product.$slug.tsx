@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  notFound,
+} from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   ExternalLink,
@@ -35,6 +39,7 @@ import {
 import type {
   AvailabilityStatus,
   Product,
+  ProductVariantPublic,
   VatStatus,
 } from "@/types/catalog";
 
@@ -42,20 +47,33 @@ import { SITE_URL } from "@/config/seo";
 import { SITE } from "@/config/site";
 
 /* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
+/* URL HELPERS                                                                */
 /* -------------------------------------------------------------------------- */
 
-function absoluteUrl(value: string | null | undefined): string | undefined {
-  if (!value) return undefined;
+function absoluteUrl(
+  value: string | null | undefined,
+): string | undefined {
+  if (!value) {
+    return undefined;
+  }
 
   try {
-    return new URL(value, SITE_URL).toString();
+    return new URL(
+      value,
+      SITE_URL,
+    ).toString();
   } catch {
     return undefined;
   }
 }
 
-function schemaAvailability(product: Product): string {
+/* -------------------------------------------------------------------------- */
+/* SCHEMA                                                                     */
+/* -------------------------------------------------------------------------- */
+
+function schemaAvailability(
+  product: Product,
+): string {
   const availability =
     product.availability_status ??
     product.stock_status;
@@ -96,7 +114,13 @@ function schemaAvailability(product: Product): string {
   }
 }
 
-function vatLabel(status: VatStatus): string | null {
+/* -------------------------------------------------------------------------- */
+/* VAT                                                                        */
+/* -------------------------------------------------------------------------- */
+
+function vatLabel(
+  status: VatStatus,
+): string {
   switch (status) {
     case "vat_inclusive":
       return "VAT included";
@@ -109,15 +133,19 @@ function vatLabel(status: VatStatus): string | null {
 
     case "exempt":
       return "VAT exempt";
-
-    case "not_specified":
-    default:
-      return null;
   }
 }
 
-function availabilityLabel(product: Product): string {
-  const status: AvailabilityStatus | undefined =
+/* -------------------------------------------------------------------------- */
+/* AVAILABILITY                                                               */
+/* -------------------------------------------------------------------------- */
+
+function availabilityLabel(
+  product: Product,
+): string {
+  const status:
+    | AvailabilityStatus
+    | undefined =
     product.availability_status;
 
   if (status) {
@@ -165,7 +193,7 @@ function availabilityLabel(product: Product): string {
       return "Supplier fulfilled";
 
     case "local_dropshipping":
-      return "Ships from local dropshipping supplier";
+      return "Ships from local supplier";
 
     case "international_dropshipping":
       return "International fulfilment";
@@ -192,17 +220,29 @@ function availabilityLabel(product: Product): string {
 
     case "cossa_stock":
     default:
-      return product.stock_status === "out_of_stock"
-        ? "Out of stock"
-        : product.stock_status === "low_stock"
-          ? "Low stock"
-          : product.stock_status === "backorder"
-            ? "Available on backorder"
-            : "In stock";
+      switch (product.stock_status) {
+        case "out_of_stock":
+          return "Out of stock";
+
+        case "low_stock":
+          return "Low stock";
+
+        case "backorder":
+          return "Available on backorder";
+
+        case "made_to_order":
+          return "Made to order";
+
+        case "in_stock":
+        default:
+          return "In stock";
+      }
   }
 }
 
-function fulfilmentTimingLabel(product: Product): string {
+function fulfilmentTimingLabel(
+  product: Product,
+): string {
   switch (product.fulfilment_type) {
     case "digital":
       return "Access / delivery";
@@ -216,33 +256,55 @@ function fulfilmentTimingLabel(product: Product): string {
     case "quote_only":
       return "Fulfilment";
 
+    case "project_kit":
+      return "Project fulfilment";
+
     default:
       return "Estimated delivery";
   }
 }
 
-function shouldShowPhysicalStockBadge(product: Product): boolean {
+function shouldShowPhysicalStockBadge(
+  product: Product,
+): boolean {
   return (
-    product.fulfilment_type === "cossa_stock" ||
-    product.fulfilment_type === "print_on_demand"
+    product.fulfilment_type ===
+      "cossa_stock" ||
+    product.fulfilment_type ===
+      "print_on_demand"
   );
 }
 
-function isPublicIndexableProduct(product: Product): boolean {
-  if (product.is_demo) return false;
+/* -------------------------------------------------------------------------- */
+/* INDEXABILITY                                                               */
+/* -------------------------------------------------------------------------- */
 
-  if (product.status !== "active") return false;
+function isPublicIndexableProduct(
+  product: Product,
+): boolean {
+  if (product.is_demo) {
+    return false;
+  }
+
+  if (
+    product.status !==
+    "active"
+  ) {
+    return false;
+  }
 
   if (
     product.publication_state &&
-    product.publication_state !== "published"
+    product.publication_state !==
+      "published"
   ) {
     return false;
   }
 
   if (
     product.visibility &&
-    product.visibility !== "public"
+    product.visibility !==
+      "public"
   ) {
     return false;
   }
@@ -250,34 +312,182 @@ function isPublicIndexableProduct(product: Product): boolean {
   return true;
 }
 
-function buildProductStructuredData(product: Product, url: string) {
-  const imageUrls = product.images
-    .map((image) => absoluteUrl(image.url))
-    .filter((value): value is string => Boolean(value));
+/* -------------------------------------------------------------------------- */
+/* DIRECT PURCHASE ELIGIBILITY                                                */
+/* -------------------------------------------------------------------------- */
 
-  const breadcrumbId = `${url}#breadcrumb`;
-  const productId = `${url}#product`;
+function isDirectPurchaseUnavailable(
+  product: Product,
+): boolean {
+  return (
+    product.availability_status ===
+      "out_of_stock" ||
+    product.availability_status ===
+      "coming_soon" ||
+    product.stock_status ===
+      "out_of_stock"
+  );
+}
 
-  const isAffiliate = Boolean(product.affiliate);
+function requiresQuotation(
+  product: Product,
+): boolean {
+  return (
+    product.requires_quote ||
+    product.fulfilment_type ===
+      "quote_only" ||
+    product.price_display_mode ===
+      "quote" ||
+    product.availability_status ===
+      "quote_required"
+  );
+}
 
+function isAffiliateProduct(
+  product: Product,
+): boolean {
+  return (
+    Boolean(product.affiliate) ||
+    product.fulfilment_type ===
+      "affiliate" ||
+    product.availability_status ===
+      "partner_offer"
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* PRICE                                                                      */
+/* -------------------------------------------------------------------------- */
+
+function resolveDisplayedPrice(
+  product: Product,
+  variant:
+    | ProductVariantPublic
+    | null,
+): number {
+  if (
+    typeof variant?.retail_price ===
+      "number" &&
+    Number.isFinite(
+      variant.retail_price,
+    ) &&
+    variant.retail_price > 0
+  ) {
+    return variant.retail_price;
+  }
+
+  if (
+    Number.isFinite(
+      product.selling_price,
+    ) &&
+    product.selling_price > 0
+  ) {
+    return product.selling_price;
+  }
+
+  return 0;
+}
+
+function resolveDisplayedCompareAt(
+  product: Product,
+  variant:
+    | ProductVariantPublic
+    | null,
+  displayedPrice: number,
+): number | null {
+  if (
+    typeof variant?.compare_at_price ===
+      "number" &&
+    Number.isFinite(
+      variant.compare_at_price,
+    ) &&
+    variant.compare_at_price >
+      displayedPrice
+  ) {
+    return variant.compare_at_price;
+  }
+
+  if (
+    typeof product.compare_at_price ===
+      "number" &&
+    Number.isFinite(
+      product.compare_at_price,
+    ) &&
+    product.compare_at_price >
+      displayedPrice
+  ) {
+    return product.compare_at_price;
+  }
+
+  return null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* STRUCTURED DATA                                                            */
+/* -------------------------------------------------------------------------- */
+
+function buildProductStructuredData(
+  product: Product,
+  url: string,
+) {
+  const imageUrls =
+    product.images
+      .map((image) =>
+        absoluteUrl(
+          image.url,
+        ),
+      )
+      .filter(
+        (
+          value,
+        ): value is string =>
+          Boolean(value),
+      );
+
+  const breadcrumbId =
+    `${url}#breadcrumb`;
+
+  const productId =
+    `${url}#product`;
+
+  const affiliate =
+    isAffiliateProduct(
+      product,
+    );
+
+  /**
+   * We intentionally avoid publishing one simple Offer when variants
+   * have independent prices.
+   *
+   * ProductGroup / ProductModel structured data can be introduced later.
+   */
   const hasDirectOffer =
-    !isAffiliate &&
-    !product.requires_quote &&
-    product.price_display_mode !== "quote" &&
+    !affiliate &&
+    !requiresQuotation(
+      product,
+    ) &&
+    !isDirectPurchaseUnavailable(
+      product,
+    ) &&
     product.selling_price > 0 &&
     product.variants.length === 0;
 
-  const productNode: Record<string, unknown> = {
+  const productNode: Record<
+    string,
+    unknown
+  > = {
     "@type": "Product",
     "@id": productId,
 
     name: product.name,
+
     description:
       product.seo_description ||
       product.short_description ||
       product.full_description,
 
     sku: product.sku,
+
     url,
 
     image:
@@ -294,7 +504,8 @@ function buildProductStructuredData(product: Product, url: string) {
         }
       : undefined,
 
-    category: product.category,
+    category:
+      product.category,
 
     mainEntityOfPage: {
       "@type": "WebPage",
@@ -302,67 +513,85 @@ function buildProductStructuredData(product: Product, url: string) {
     },
   };
 
-  /**
-   * Only describe a direct Cossa Store commercial offer when:
-   *
-   * - Cossa Store is selling it directly;
-   * - the price is known;
-   * - it is not quote-only;
-   * - it is not an affiliate redirect;
-   * - variant pricing cannot make the single Offer price misleading.
-   *
-   * Variant/ProductGroup structured data will be added later once
-   * variant commerce is fully connected end-to-end.
-   */
   if (hasDirectOffer) {
     productNode.offers = {
       "@type": "Offer",
 
       url,
 
-      price: product.selling_price,
-      priceCurrency: SITE.currency,
+      price:
+        product.selling_price,
 
-      availability: schemaAvailability(product),
+      priceCurrency:
+        SITE.currency,
+
+      availability:
+        schemaAvailability(
+          product,
+        ),
 
       seller: {
-        "@id": SITE.structuredDataId,
+        "@id":
+          SITE.structuredDataId,
       },
 
-      itemCondition: "https://schema.org/NewCondition",
+      itemCondition:
+        "https://schema.org/NewCondition",
     };
   }
 
   return {
-    "@context": "https://schema.org",
+    "@context":
+      "https://schema.org",
 
     "@graph": [
       productNode,
 
       {
-        "@type": "BreadcrumbList",
-        "@id": breadcrumbId,
+        "@type":
+          "BreadcrumbList",
+
+        "@id":
+          breadcrumbId,
 
         itemListElement: [
           {
-            "@type": "ListItem",
+            "@type":
+              "ListItem",
+
             position: 1,
-            name: SITE.name,
-            item: `${SITE_URL}/`,
+
+            name:
+              SITE.name,
+
+            item:
+              `${SITE_URL}/`,
           },
 
           {
-            "@type": "ListItem",
+            "@type":
+              "ListItem",
+
             position: 2,
-            name: "Shop",
-            item: `${SITE_URL}/shop`,
+
+            name:
+              "Shop",
+
+            item:
+              `${SITE_URL}/shop`,
           },
 
           {
-            "@type": "ListItem",
+            "@type":
+              "ListItem",
+
             position: 3,
-            name: product.name,
-            item: url,
+
+            name:
+              product.name,
+
+            item:
+              url,
           },
         ],
       },
@@ -374,207 +603,272 @@ function buildProductStructuredData(product: Product, url: string) {
 /* ROUTE                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export const Route = createFileRoute("/product/$slug")({
-  loader: async ({
-    params,
-    context,
-  }): Promise<{ product: Product }> => {
-    const product =
-      await context.queryClient.ensureQueryData(
-        productQuery(params.slug),
-      );
+export const Route =
+  createFileRoute(
+    "/product/$slug",
+  )({
+    loader: async ({
+      params,
+      context,
+    }): Promise<{
+      product: Product;
+    }> => {
+      const product =
+        await context.queryClient.ensureQueryData(
+          productQuery(
+            params.slug,
+          ),
+        );
 
-    if (!product) {
-      throw notFound();
-    }
+      if (!product) {
+        throw notFound();
+      }
 
-    return { product };
-  },
-
-  head: ({ loaderData }) => {
-    if (!loaderData) {
       return {
-        meta: [
+        product,
+      };
+    },
+
+    head: ({
+      loaderData,
+    }) => {
+      if (!loaderData) {
+        return {
+          meta: [
+            {
+              title:
+                "Product unavailable | Cossa Store",
+            },
+
+            {
+              name:
+                "robots",
+
+              content:
+                "noindex, nofollow",
+            },
+          ],
+        };
+      }
+
+      const product =
+        loaderData.product;
+
+      const url =
+        `${SITE_URL}/product/${product.slug}`;
+
+      const indexable =
+        isPublicIndexableProduct(
+          product,
+        );
+
+      const image =
+        absoluteUrl(
+          product.images[0]
+            ?.url,
+        );
+
+      const title =
+        product.seo_title ||
+        `${product.name} | Cossa Store`;
+
+      const description =
+        product.seo_description ||
+        product.short_description ||
+        product.full_description;
+
+      const meta = [
+        {
+          title,
+        },
+
+        {
+          name:
+            "description",
+
+          content:
+            description,
+        },
+
+        {
+          property:
+            "og:type",
+
+          content:
+            "product",
+        },
+
+        {
+          property:
+            "og:site_name",
+
+          content:
+            SITE.name,
+        },
+
+        {
+          property:
+            "og:title",
+
+          content:
+            title,
+        },
+
+        {
+          property:
+            "og:description",
+
+          content:
+            description,
+        },
+
+        {
+          property:
+            "og:url",
+
+          content:
+            url,
+        },
+
+        {
+          property:
+            "og:locale",
+
+          content:
+            "en_ZA",
+        },
+
+        {
+          name:
+            "twitter:card",
+
+          content:
+            "summary_large_image",
+        },
+
+        {
+          name:
+            "twitter:title",
+
+          content:
+            title,
+        },
+
+        {
+          name:
+            "twitter:description",
+
+          content:
+            description,
+        },
+
+        ...(!indexable
+          ? [
+              {
+                name:
+                  "robots",
+
+                content:
+                  "noindex, nofollow",
+              },
+            ]
+          : []),
+
+        ...(image
+          ? [
+              {
+                property:
+                  "og:image",
+
+                content:
+                  image,
+              },
+
+              {
+                name:
+                  "twitter:image",
+
+                content:
+                  image,
+              },
+            ]
+          : []),
+      ];
+
+      return {
+        meta,
+
+        links: [
           {
-            title: "Product unavailable | Cossa Store",
-          },
-          {
-            name: "robots",
-            content: "noindex, nofollow",
+            rel:
+              "canonical",
+
+            href:
+              url,
           },
         ],
+
+        scripts:
+          indexable
+            ? [
+                {
+                  type:
+                    "application/ld+json",
+
+                  children:
+                    JSON.stringify(
+                      buildProductStructuredData(
+                        product,
+                        url,
+                      ),
+                    ),
+                },
+              ]
+            : [],
       };
-    }
+    },
 
-    const product = loaderData.product;
+    errorComponent: () => (
+      <div className="mx-auto max-w-3xl px-4 py-16">
+        <ErrorBlock description="This product could not be loaded." />
+      </div>
+    ),
 
-    const url =
-      `${SITE_URL}/product/${product.slug}`;
+    notFoundComponent: () => (
+      <div className="mx-auto max-w-3xl px-4 py-16">
+        <EmptyBlock
+          title="Product not found"
+          description="This product is no longer listed or is not publicly available."
+          action={
+            <Button asChild>
+              <Link to="/shop">
+                Browse the catalogue
+              </Link>
+            </Button>
+          }
+        />
+      </div>
+    ),
 
-    const indexable =
-      isPublicIndexableProduct(product);
-
-    const image =
-      absoluteUrl(product.images[0]?.url);
-
-    const meta = [
-      {
-        title:
-          product.seo_title ||
-          `${product.name} | Cossa Store`,
-      },
-
-      {
-        name: "description",
-        content:
-          product.seo_description ||
-          product.short_description,
-      },
-
-      {
-        property: "og:type",
-        content: "product",
-      },
-
-      {
-        property: "og:site_name",
-        content: SITE.name,
-      },
-
-      {
-        property: "og:title",
-        content:
-          product.seo_title ||
-          `${product.name} | Cossa Store`,
-      },
-
-      {
-        property: "og:description",
-        content:
-          product.seo_description ||
-          product.short_description,
-      },
-
-      {
-        property: "og:url",
-        content: url,
-      },
-
-      {
-        property: "og:locale",
-        content: "en_ZA",
-      },
-
-      {
-        name: "twitter:card",
-        content: "summary_large_image",
-      },
-
-      {
-        name: "twitter:title",
-        content:
-          product.seo_title ||
-          `${product.name} | Cossa Store`,
-      },
-
-      {
-        name: "twitter:description",
-        content:
-          product.seo_description ||
-          product.short_description,
-      },
-
-      /**
-       * Development/demo/private products remain directly viewable
-       * when their URL is known, but must not be submitted as genuine
-       * search inventory.
-       */
-      ...(!indexable
-        ? [
-            {
-              name: "robots",
-              content: "noindex, nofollow",
-            },
-          ]
-        : []),
-
-      ...(image
-        ? [
-            {
-              property: "og:image",
-              content: image,
-            },
-            {
-              name: "twitter:image",
-              content: image,
-            },
-          ]
-        : []),
-    ];
-
-    return {
-      meta,
-
-      links: [
-        {
-          rel: "canonical",
-          href: url,
-        },
-      ],
-
-      /**
-       * Never publish product commercial structured data for demo,
-       * draft, hidden or otherwise non-indexable records.
-       */
-      scripts: indexable
-        ? [
-            {
-              type: "application/ld+json",
-              children: JSON.stringify(
-                buildProductStructuredData(
-                  product,
-                  url,
-                ),
-              ),
-            },
-          ]
-        : [],
-    };
-  },
-
-  errorComponent: () => (
-    <div className="mx-auto max-w-3xl px-4 py-16">
-      <ErrorBlock description="This product could not be loaded." />
-    </div>
-  ),
-
-  notFoundComponent: () => (
-    <div className="mx-auto max-w-3xl px-4 py-16">
-      <EmptyBlock
-        title="Product not found"
-        description="This product is no longer listed or is not publicly available."
-        action={
-          <Button asChild>
-            <Link to="/shop">
-              Browse the catalogue
-            </Link>
-          </Button>
-        }
-      />
-    </div>
-  ),
-
-  component: ProductPage,
-});
+    component:
+      ProductPage,
+  });
 
 /* -------------------------------------------------------------------------- */
 /* PAGE                                                                       */
 /* -------------------------------------------------------------------------- */
 
 function ProductPage() {
-  const { product } = Route.useLoaderData();
+  const {
+    product,
+  } =
+    Route.useLoaderData();
 
-  return <ProductDetail product={product} />;
+  return (
+    <ProductDetail
+      product={product}
+    />
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -586,12 +880,20 @@ function ProductDetail({
 }: {
   product: Product;
 }) {
-  const [quantity, setQuantity] =
-    useState(1);
+  const [
+    quantity,
+    setQuantity,
+  ] = useState(1);
 
-  const [variantId, setVariantId] =
-    useState<string | null>(
-      product.variants[0]?.id ?? null,
+  const [
+    variantId,
+    setVariantId,
+  ] =
+    useState<
+      string | null
+    >(
+      product.variants[0]
+        ?.id ?? null,
     );
 
   const {
@@ -602,75 +904,123 @@ function ProductDetail({
     hydrated,
   } = useCommerce();
 
-  const related = useQuery(
-    relatedProductsQuery(product),
-  );
+  const related =
+    useQuery(
+      relatedProductsQuery(
+        product,
+      ),
+    );
 
   const wishlisted =
-    hydrated && isWishlisted(product.id);
+    hydrated &&
+    isWishlisted(
+      product.id,
+    );
 
   const selectedVariant =
     useMemo(
       () =>
         product.variants.find(
           (variant) =>
-            variant.id === variantId,
+            variant.id ===
+            variantId,
         ) ?? null,
-      [product.variants, variantId],
+      [
+        product.variants,
+        variantId,
+      ],
+    );
+
+  const isDemo =
+    Boolean(
+      product.is_demo,
     );
 
   const affiliate =
-    Boolean(product.affiliate);
+    isAffiliateProduct(
+      product,
+    );
 
-  const isDemo =
-    Boolean(product.is_demo);
+  const quoteRequired =
+    requiresQuotation(
+      product,
+    );
 
   const currentlyUnavailable =
-    product.availability_status ===
-      "out_of_stock" ||
-    product.availability_status ===
-      "coming_soon" ||
-    product.stock_status ===
-      "out_of_stock";
+    isDirectPurchaseUnavailable(
+      product,
+    );
+
+  const hasVariants =
+    product.variants.length >
+    0;
+
+  /**
+   * A variant-based product must have a valid selected variant.
+   */
+  const validVariantSelection =
+    !hasVariants ||
+    Boolean(
+      selectedVariant,
+    );
 
   const displayedPrice =
-    selectedVariant?.retail_price &&
-    selectedVariant.retail_price > 0
-      ? selectedVariant.retail_price
-      : product.selling_price;
+    resolveDisplayedPrice(
+      product,
+      selectedVariant,
+    );
 
   const displayedCompareAt =
-    selectedVariant?.compare_at_price &&
-    selectedVariant.compare_at_price >
-      displayedPrice
-      ? selectedVariant.compare_at_price
-      : product.compare_at_price &&
-          product.compare_at_price >
-            displayedPrice
-        ? product.compare_at_price
-        : null;
+    resolveDisplayedCompareAt(
+      product,
+      selectedVariant,
+      displayedPrice,
+    );
 
-  const hasPrice =
+  const hasCheckoutPrice =
     displayedPrice > 0 &&
     product.price_display_mode !==
       "quote" &&
-    !product.requires_quote;
+    !quoteRequired;
 
   const purchasable =
     !isDemo &&
     !affiliate &&
     !currentlyUnavailable &&
-    !product.requires_quote &&
-    hasPrice;
+    !quoteRequired &&
+    validVariantSelection &&
+    hasCheckoutPrice &&
+    product.status ===
+      "active" &&
+    (!product.publication_state ||
+      product.publication_state ===
+        "published") &&
+    (!product.visibility ||
+      product.visibility ===
+        "public");
 
+  /**
+   * Demo records must never enter the live quotation workflow.
+   */
   const quoteable =
-    !isDemo;
+    !isDemo &&
+    !affiliate &&
+    product.status ===
+      "active" &&
+    (!product.publication_state ||
+      product.publication_state ===
+        "published") &&
+    (!product.visibility ||
+      product.visibility ===
+        "public");
 
   const image =
     product.images[0];
 
   const taxLabel =
-    vatLabel(product.vat_status);
+    vatLabel(
+      product.vat_status,
+    );
 
   const productCategoryName =
     subcategoryName(
@@ -678,9 +1028,54 @@ function ProductDetail({
       product.subcategory,
     );
 
+  const selectedVariantId =
+    selectedVariant?.id ??
+    null;
+
+  /* ---------------------------------------------------------------------- */
+  /* ACTION LABEL                                                           */
+  /* ---------------------------------------------------------------------- */
+
+  let purchaseButtonLabel =
+    "Add to cart";
+
+  if (quoteRequired) {
+    purchaseButtonLabel =
+      "Quote required";
+  } else if (
+    currentlyUnavailable
+  ) {
+    purchaseButtonLabel =
+      product.availability_status ===
+      "coming_soon"
+        ? "Coming soon"
+        : "Currently unavailable";
+  } else if (
+    hasVariants &&
+    !selectedVariant
+  ) {
+    purchaseButtonLabel =
+      "Choose an option";
+  } else if (
+    !hasCheckoutPrice
+  ) {
+    purchaseButtonLabel =
+      "Price unavailable";
+  } else if (
+    (product.kit_items
+      ?.length ??
+      0) > 0
+  ) {
+    purchaseButtonLabel =
+      "Add full kit to cart";
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      {/* BREADCRUMB */}
+      {/* ------------------------------------------------------------------ */}
+      {/* BREADCRUMB                                                         */}
+      {/* ------------------------------------------------------------------ */}
+
       <nav
         aria-label="Breadcrumb"
         className="mb-6 text-sm text-muted-foreground"
@@ -702,11 +1097,14 @@ function ProductDetail({
         <Link
           to="/category/$slug"
           params={{
-            slug: product.category,
+            slug:
+              product.category,
           }}
           className="hover:underline"
         >
-          {productCategoryName}
+          {
+            productCategoryName
+          }
         </Link>
 
         <span
@@ -725,13 +1123,20 @@ function ProductDetail({
       </nav>
 
       <div className="grid gap-10 lg:grid-cols-2">
-        {/* MEDIA */}
+        {/* ---------------------------------------------------------------- */}
+        {/* MEDIA                                                            */}
+        {/* ---------------------------------------------------------------- */}
+
         <div>
           <div className="relative aspect-4/3 overflow-hidden rounded-lg border border-border bg-secondary">
             {image?.url ? (
               <ProductImage
-                url={image.url}
-                alt={image.alt}
+                url={
+                  image.url
+                }
+                alt={
+                  image.alt
+                }
                 className="h-full w-full"
               />
             ) : (
@@ -743,7 +1148,8 @@ function ProductDetail({
                   />
 
                   <p className="mt-3 text-xs uppercase tracking-wide text-muted-foreground">
-                    Product image pending
+                    Product image
+                    pending
                   </p>
                 </div>
               </div>
@@ -751,41 +1157,65 @@ function ProductDetail({
 
             {isDemo ? (
               <span className="absolute left-0 top-4 bg-warning px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-background">
-                Demo product — not for sale
+                Demo product —
+                not for sale
               </span>
             ) : null}
           </div>
 
-          {product.images.length > 1 ? (
+          {product.images
+            .length > 1 ? (
             <div className="mt-3 grid grid-cols-4 gap-2">
               {product.images
-                .slice(0, 4)
-                .map((img, index) => (
-                  <div
-                    key={`${img.url ?? "image"}-${index}`}
-                    className="aspect-square overflow-hidden rounded border border-border"
-                  >
-                    <ProductImage
-                      url={img.url}
-                      alt={img.alt}
-                      className="h-full w-full"
-                    />
-                  </div>
-                ))}
+                .slice(
+                  0,
+                  4,
+                )
+                .map(
+                  (
+                    img,
+                    index,
+                  ) => (
+                    <div
+                      key={`${img.url ?? "image"}-${index}`}
+                      className="aspect-square overflow-hidden rounded border border-border"
+                    >
+                      <ProductImage
+                        url={
+                          img.url
+                        }
+                        alt={
+                          img.alt
+                        }
+                        className="h-full w-full"
+                      />
+                    </div>
+                  ),
+                )}
             </div>
           ) : null}
         </div>
 
-        {/* PRODUCT INFORMATION */}
+        {/* ---------------------------------------------------------------- */}
+        {/* PRODUCT INFORMATION                                              */}
+        {/* ---------------------------------------------------------------- */}
+
         <div>
           {isDemo ? (
             <div className="mb-4 rounded-lg border border-warning/50 bg-warning/10 p-4 text-xs text-warning">
               <strong className="font-semibold uppercase tracking-wide">
-                Demo product — not a live commercial offer.
+                Demo product —
+                not a live
+                commercial offer.
               </strong>{" "}
-              This placeholder demonstrates how this product type will
-              appear in Cossa Store. Its stock, supplier, price and
-              fulfilment information must not be treated as a real
+              This placeholder
+              demonstrates how this
+              product type will
+              appear in Cossa Store.
+              Its stock, supplier,
+              price and fulfilment
+              information must not
+              be treated as a real
               customer offer.
             </div>
           ) : null}
@@ -801,16 +1231,23 @@ function ProductDetail({
           </h1>
 
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            {product.short_description}
+            {
+              product.short_description
+            }
           </p>
 
-          {/* PRICE */}
-          {!hasPrice ? (
+          {/* -------------------------------------------------------------- */}
+          {/* PRICE                                                          */}
+          {/* -------------------------------------------------------------- */}
+
+          {!hasCheckoutPrice ? (
             <p className="mt-6 text-2xl font-semibold">
               {product.price_display_mode ===
               "free"
                 ? "Free"
-                : "Price on request"}
+                : quoteRequired
+                  ? "Price on request"
+                  : "Price unavailable"}
             </p>
           ) : (
             <>
@@ -836,15 +1273,17 @@ function ProductDetail({
               </div>
 
               <p className="mt-1 text-xs text-muted-foreground">
-                {taxLabel
-                  ? `${taxLabel} · `
-                  : ""}
-                SKU {product.sku}
+                {taxLabel} · SKU{" "}
+                {selectedVariant?.sku ||
+                  product.sku}
               </p>
             </>
           )}
 
-          {/* AVAILABILITY / FULFILMENT */}
+          {/* -------------------------------------------------------------- */}
+          {/* AVAILABILITY                                                   */}
+          {/* -------------------------------------------------------------- */}
+
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {shouldShowPhysicalStockBadge(
               product,
@@ -876,10 +1315,15 @@ function ProductDetail({
               )}
               :
             </span>{" "}
-            {product.estimated_delivery}
+            {
+              product.estimated_delivery
+            }
           </p>
 
-          {/* AFFILIATE DISCLOSURE */}
+          {/* -------------------------------------------------------------- */}
+          {/* AFFILIATE                                                      */}
+          {/* -------------------------------------------------------------- */}
+
           {product.affiliate ? (
             <div className="mt-5 rounded-lg border border-border bg-secondary/40 p-4">
               <div className="flex gap-2">
@@ -894,7 +1338,8 @@ function ProductDetail({
                   </p>
 
                   <p className="mt-1">
-                    {product.affiliate
+                    {product
+                      .affiliate
                       .disclosure_text ??
                       `This product is offered by ${product.affiliate.partner_name}. If you continue to the partner website, their pricing, availability, checkout, delivery, returns and privacy terms apply.`}
                   </p>
@@ -903,34 +1348,56 @@ function ProductDetail({
             </div>
           ) : null}
 
-          {/* VARIANTS */}
-          {product.variants.length > 0 ? (
+          {/* -------------------------------------------------------------- */}
+          {/* VARIANTS                                                       */}
+          {/* -------------------------------------------------------------- */}
+
+          {hasVariants ? (
             <div className="mt-6">
               <label
                 htmlFor="variant"
                 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
               >
-                Choose an option
+                Choose an
+                option
               </label>
 
               <select
                 id="variant"
-                value={variantId ?? ""}
-                onChange={(event) =>
+                value={
+                  variantId ??
+                  ""
+                }
+                onChange={(
+                  event,
+                ) =>
                   setVariantId(
-                    event.target.value,
+                    event.target
+                      .value ||
+                      null,
                   )
                 }
                 className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 {product.variants.map(
-                  (variant) => (
+                  (
+                    variant,
+                  ) => (
                     <option
-                      key={variant.id}
-                      value={variant.id}
+                      key={
+                        variant.id
+                      }
+                      value={
+                        variant.id
+                      }
                     >
-                      {variant.name}
-                      {variant.retail_price
+                      {
+                        variant.name
+                      }
+                      {typeof variant.retail_price ===
+                        "number" &&
+                      variant.retail_price >
+                        0
                         ? ` — ${formatZar(
                             variant.retail_price,
                           )}`
@@ -941,42 +1408,74 @@ function ProductDetail({
               </select>
 
               {selectedVariant ? (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Selected:{" "}
-                  {selectedVariant.name}
-                  {selectedVariant.sku
-                    ? ` · SKU ${selectedVariant.sku}`
-                    : ""}
-                </p>
-              ) : null}
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span>
+                    Selected:{" "}
+                    {
+                      selectedVariant.name
+                    }
+                  </span>
 
-              {/*
-               * IMPORTANT:
-               *
-               * The current commerce store does not yet persist variantId
-               * when adding a line to cart/quote.
-               *
-               * The next file we will upgrade is commerce-store.ts so
-               * real variant selection flows into cart, quote, checkout
-               * and orders correctly.
-               */}
+                  {selectedVariant.sku ? (
+                    <span>
+                      SKU{" "}
+                      {
+                        selectedVariant.sku
+                      }
+                    </span>
+                  ) : null}
+
+                  {selectedVariant.colour ? (
+                    <span>
+                      Colour:{" "}
+                      {
+                        selectedVariant.colour
+                      }
+                    </span>
+                  ) : null}
+
+                  {selectedVariant.size ? (
+                    <span>
+                      Size:{" "}
+                      {
+                        selectedVariant.size
+                      }
+                    </span>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-warning">
+                  Select a valid
+                  product option
+                  before adding this
+                  item.
+                </p>
+              )}
             </div>
           ) : null}
 
-          {/* ACTIONS */}
+          {/* -------------------------------------------------------------- */}
+          {/* ACTIONS                                                        */}
+          {/* -------------------------------------------------------------- */}
+
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            {!affiliate && !isDemo ? (
+            {!affiliate &&
+            !isDemo ? (
               <div className="flex items-center rounded-md border border-input">
                 <button
                   type="button"
                   className="px-3 py-2 text-sm"
                   aria-label="Decrease quantity"
                   onClick={() =>
-                    setQuantity((current) =>
-                      Math.max(
-                        1,
-                        current - 1,
-                      ),
+                    setQuantity(
+                      (
+                        current,
+                      ) =>
+                        Math.max(
+                          1,
+                          current -
+                            1,
+                        ),
                     )
                   }
                 >
@@ -996,8 +1495,11 @@ function ProductDetail({
                   aria-label="Increase quantity"
                   onClick={() =>
                     setQuantity(
-                      (current) =>
-                        current + 1,
+                      (
+                        current,
+                      ) =>
+                        current +
+                        1,
                     )
                   }
                 >
@@ -1006,12 +1508,14 @@ function ProductDetail({
               </div>
             ) : null}
 
+            {/* DIRECT PURCHASE */}
             {isDemo ? (
               <Button
                 size="lg"
                 disabled
               >
-                Demo — not for sale
+                Demo — not for
+                sale
               </Button>
             ) : product.affiliate ? (
               <Button
@@ -1020,7 +1524,8 @@ function ProductDetail({
               >
                 <a
                   href={
-                    product.affiliate
+                    product
+                      .affiliate
                       .tracking_url
                   }
                   target="_blank"
@@ -1028,62 +1533,82 @@ function ProductDetail({
                 >
                   View at{" "}
                   {
-                    product.affiliate
+                    product
+                      .affiliate
                       .partner_name
                   }
-                  <ExternalLink className="ml-2 h-4 w-4" />
+
+                  <ExternalLink
+                    className="ml-2 h-4 w-4"
+                    aria-hidden
+                  />
                 </a>
               </Button>
             ) : (
               <Button
                 size="lg"
-                disabled={!purchasable}
+                disabled={
+                  !purchasable
+                }
                 onClick={() => {
+                  /**
+                   * CRITICAL:
+                   *
+                   * Product + variant forms the cart-line identity.
+                   *
+                   * Do not remove selectedVariantId.
+                   */
                   addToCart(
                     product.id,
                     quantity,
+                    selectedVariantId,
                   );
 
                   toast.success(
-                    (product.kit_items
+                    (product
+                      .kit_items
                       ?.length ??
                       0) > 0
                       ? "Full kit added to cart"
                       : "Added to cart",
                     {
                       description:
-                        product.name,
+                        selectedVariant
+                          ? `${product.name} — ${selectedVariant.name}`
+                          : product.name,
                     },
                   );
                 }}
               >
-                {purchasable
-                  ? (product.kit_items
-                      ?.length ??
-                      0) > 0
-                    ? "Add full kit to cart"
-                    : "Add to cart"
-                  : product.requires_quote
-                    ? "Quote required"
-                    : "Currently unavailable"}
+                {
+                  purchaseButtonLabel
+                }
               </Button>
             )}
 
+            {/* QUOTATION */}
             {quoteable ? (
               <Button
                 size="lg"
                 variant="outline"
                 onClick={() => {
+                  /**
+                   * Quote lines use the exact same variant-aware identity
+                   * as cart lines.
+                   */
                   addToQuote(
                     product.id,
                     quantity,
+                    selectedVariantId,
                   );
 
                   toast.success(
                     "Added to your quote request",
                     {
                       description:
-                        product.name,
+                        selectedVariant
+                          ? `${product.name} — ${selectedVariant.name}`
+                          : product.name,
                     },
                   );
                 }}
@@ -1092,6 +1617,7 @@ function ProductDetail({
               </Button>
             ) : null}
 
+            {/* WISHLIST */}
             <Button
               size="icon"
               variant="outline"
@@ -1115,11 +1641,15 @@ function ProductDetail({
                     ? "h-4 w-4 fill-current text-accent"
                     : "h-4 w-4"
                 }
+                aria-hidden
               />
             </Button>
           </div>
 
-          {/* PRODUCT INFORMATION */}
+          {/* -------------------------------------------------------------- */}
+          {/* PRODUCT INFORMATION                                            */}
+          {/* -------------------------------------------------------------- */}
+
           <div className="mt-8 space-y-6 border-t border-border pt-6">
             {product.full_description ? (
               <section>
@@ -1135,8 +1665,8 @@ function ProductDetail({
               </section>
             ) : null}
 
-            {product.features.length >
-            0 ? (
+            {product.features
+              .length > 0 ? (
               <section>
                 <h2 className="font-sans text-sm font-semibold uppercase tracking-wide">
                   Features
@@ -1144,9 +1674,17 @@ function ProductDetail({
 
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
                   {product.features.map(
-                    (feature) => (
-                      <li key={feature}>
-                        {feature}
+                    (
+                      feature,
+                    ) => (
+                      <li
+                        key={
+                          feature
+                        }
+                      >
+                        {
+                          feature
+                        }
                       </li>
                     ),
                   )}
@@ -1163,17 +1701,23 @@ function ProductDetail({
 
                 <dl className="mt-2 divide-y divide-border border-y border-border text-sm">
                   {product.specifications.map(
-                    (spec) => (
+                    (
+                      spec,
+                    ) => (
                       <div
                         key={`${spec.label}-${spec.value}`}
                         className="flex justify-between gap-4 py-2"
                       >
                         <dt className="text-muted-foreground">
-                          {spec.label}
+                          {
+                            spec.label
+                          }
                         </dt>
 
                         <dd className="text-right font-medium">
-                          {spec.value}
+                          {
+                            spec.value
+                          }
                         </dd>
                       </div>
                     ),
@@ -1198,26 +1742,23 @@ function ProductDetail({
                 {
                   product.return_eligibility
                 }{" "}
+
                 <Link
                   to="/returns"
                   className="underline"
                 >
-                  Full returns policy
+                  Full returns
+                  policy
                 </Link>
               </p>
             </section>
 
             <FulfilmentDetails
-              product={product}
+              product={
+                product
+              }
             />
 
-            {/*
-             * Preserve Cossa ecosystem cross-support.
-             *
-             * Construction / Facility / Tech recommendations should remain
-             * contextual to the product/category rather than becoming a
-             * generic corporate directory.
-             */}
             <ServiceCrossSell
               categorySlug={
                 product.category
@@ -1227,7 +1768,10 @@ function ProductDetail({
         </div>
       </div>
 
-      {/* RELATED PRODUCTS */}
+      {/* ------------------------------------------------------------------ */}
+      {/* RELATED PRODUCTS                                                   */}
+      {/* ------------------------------------------------------------------ */}
+
       <section className="mt-16">
         <h2 className="text-2xl font-semibold tracking-tight">
           Related products
@@ -1256,14 +1800,20 @@ function ProductDetail({
           ) : null}
 
           {related.data &&
-          related.data.length > 0 ? (
+          related.data.length >
+            0 ? (
             <ProductGrid
-              products={related.data}
+              products={
+                related.data
+              }
             />
           ) : null}
 
-          {related.data &&
-          related.data.length === 0 ? (
+          {!related.isPending &&
+          !related.isError &&
+          related.data &&
+          related.data.length ===
+            0 ? (
             <EmptyBlock title="No related products yet" />
           ) : null}
         </div>
