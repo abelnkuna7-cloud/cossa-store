@@ -1730,14 +1730,38 @@ export function ProductEditor({
             }
           />
 
-          {/* STEP 8 — ONLY POD */}
-          {isPod ? (
-            <PodSection
-              productId={
-                productId
-              }
-            />
-          ) : null}
+          {/* STEP 8 — SOURCING / PARTNERS / FULFILMENT */}
+{needsSourcingSection ? (
+  <SourcingSection
+    productId={productId}
+    sourcingModel={form.sourcing_model}
+    isPod={isPod}
+    isAffiliate={isAffiliate}
+    isSupplierSourced={isSupplierSourced}
+    isAdmin={access.isAdmin}
+  />
+) : (
+  <Section
+    number={8}
+    title="Sourcing and fulfilment"
+    description="This product does not currently require an external supplier, POD provider or affiliate partner."
+    defaultOpen={false}
+  >
+    <div className="rounded-lg border border-border bg-secondary/30 p-4 text-sm">
+      <p className="font-medium">
+        No external sourcing required
+      </p>
+
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        This product is currently configured as{" "}
+        <strong className="text-foreground">
+          {form.sourcing_model.replace(/_/g, " ")}
+        </strong>
+        . You can change the fulfilment model in Step 4 if the commercial arrangement changes.
+      </p>
+    </div>
+  </Section>
+)}
 
           {/* STEP 9 */}
           <Section
