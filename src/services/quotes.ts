@@ -31,6 +31,7 @@ import type {
 /* -------------------------------------------------------------------------- */
 
 const TITLE = "Shopping cart | Cossa Store";
+
 const DESCRIPTION =
   "Review the products, selected options and quantities in your Cossa Store cart.";
 
@@ -54,10 +55,9 @@ export const Route = createFileRoute("/cart")({
       },
 
       /**
-       * Cart pages are customer-specific utility pages.
+       * Cart pages are private customer utility pages.
        *
-       * They should remain crawlable enough for robots directives
-       * to be read, but must not enter search results.
+       * They must not appear in search results.
        */
       {
         name: "robots",
@@ -75,15 +75,19 @@ export const Route = createFileRoute("/cart")({
 
 interface ResolvedCartLine {
   line: CommerceCartLine;
+
   product: Product;
+
   variant: ProductVariantPublic | null;
 
   unitPrice: number;
+
   compareAtPrice: number | null;
 
   lineTotal: number;
 
   purchasable: boolean;
+
   issue: string | null;
 }
 
@@ -113,12 +117,20 @@ function resolveUnitPrice(
   if (
     variant?.retail_price !== null &&
     variant?.retail_price !== undefined &&
+    Number.isFinite(variant.retail_price) &&
     variant.retail_price > 0
   ) {
     return variant.retail_price;
   }
 
-  return product.selling_price;
+  if (
+    Number.isFinite(product.selling_price) &&
+    product.selling_price > 0
+  ) {
+    return product.selling_price;
+  }
+
+  return 0;
 }
 
 function resolveCompareAtPrice(
@@ -131,6 +143,7 @@ function resolveCompareAtPrice(
 
   if (
     typeof variantCompare === "number" &&
+    Number.isFinite(variantCompare) &&
     variantCompare > unitPrice
   ) {
     return variantCompare;
@@ -138,6 +151,7 @@ function resolveCompareAtPrice(
 
   if (
     typeof product.compare_at_price === "number" &&
+    Number.isFinite(product.compare_at_price) &&
     product.compare_at_price > unitPrice
   ) {
     return product.compare_at_price;
@@ -174,14 +188,24 @@ function lineIssue(
   line: CommerceCartLine,
   unitPrice: number,
 ): string | null {
+  /**
+   * Demo products are visual/development records only.
+   */
   if (product.is_demo) {
     return "Demo products cannot be purchased.";
   }
 
+  /**
+   * Product must still be operational.
+   */
   if (product.status !== "active") {
     return "This product is no longer active.";
   }
 
+  /**
+   * Where publication state is present, require the product
+   * to still be published.
+   */
   if (
     product.publication_state &&
     product.publication_state !== "published"
@@ -189,6 +213,10 @@ function lineIssue(
     return "This product is no longer publicly available.";
   }
 
+  /**
+   * Public checkout must never continue with hidden/private
+   * catalogue records.
+   */
   if (
     product.visibility &&
     product.visibility !== "public"
@@ -196,14 +224,30 @@ function lineIssue(
     return "This product is no longer publicly available.";
   }
 
-  if (product.affiliate) {
+  /**
+   * Affiliate offers are completed on the partner website.
+   */
+  if (
+    product.affiliate ||
+    product.fulfilment_type === "affiliate"
+  ) {
     return "Partner offers must be purchased on the partner website.";
   }
 
-  if (product.requires_quote) {
+  /**
+   * Quote-only products must not enter normal checkout.
+   */
+  if (
+    product.requires_quote ||
+    product.fulfilment_type === "quote_only" ||
+    product.price_display_mode === "quote"
+  ) {
     return "This item requires a quotation instead of direct checkout.";
   }
 
+  /**
+   * Customer cannot order genuinely unavailable inventory.
+   */
   if (
     product.availability_status === "out_of_stock" ||
     product.stock_status === "out_of_stock"
@@ -217,15 +261,31 @@ function lineIssue(
     return "This item is not available for ordering yet.";
   }
 
-  if (line.variant_id && !variant) {
+  /**
+   * A previously selected variant may have been removed or
+   * deactivated after the customer placed it in the cart.
+   */
+  if (
+    line.variant_id &&
+    !variant
+  ) {
     return "The selected product option is no longer available.";
   }
 
-  if (variant && !variant.is_active) {
+  if (
+    variant &&
+    !variant.is_active
+  ) {
     return "The selected product option is no longer active.";
   }
 
-  if (unitPrice <= 0) {
+  /**
+   * Direct checkout requires an actual commercial price.
+   */
+  if (
+    !Number.isFinite(unitPrice) ||
+    unitPrice <= 0
+  ) {
     return "A confirmed checkout price is not currently available.";
   }
 
@@ -246,8 +306,10 @@ function CartPage() {
   } = useCommerce();
 
   /**
-   * Fetch each product once even if multiple variants of the
-   * same product exist in the cart.
+   * One product may appear in multiple cart lines because each
+   * selected variant is a separate commerce line.
+   *
+   * Fetch each underlying product only once.
    */
   const productIds = useMemo(
     () =>
@@ -262,7 +324,10 @@ function CartPage() {
   );
 
   const query = useQuery({
-    ...productsByIdsQuery(productIds),
+    ...productsByIdsQuery(
+      productIds,
+    ),
+
     enabled:
       hydrated &&
       productIds.length > 0,
@@ -270,6 +335,10 @@ function CartPage() {
 
   const products =
     query.data ?? [];
+
+  /* ---------------------------------------------------------------------- */
+  /* RESOLVE CART LINES                                                     */
+  /* ---------------------------------------------------------------------- */
 
   const resolvedLines =
     useMemo<ResolvedCartLine[]>(
@@ -320,6 +389,7 @@ function CartPage() {
               variant,
 
               unitPrice,
+
               compareAtPrice,
 
               lineTotal:
@@ -338,14 +408,36 @@ function CartPage() {
             ): value is ResolvedCartLine =>
               value !== null,
           ),
-      [cart, products],
+      [
+        cart,
+        products,
+      ],
     );
 
+  /**
+   * Count saved cart lines that no longer resolve to the
+   * current catalogue.
+   *
+   * IMPORTANT:
+   * A temporary network/query failure must NOT make the Store
+   * claim that products were removed.
+   *
+   * This value must always be a number.
+   */
   const unresolvedLines =
     hydrated &&
     !query.isPending &&
-    cart.length -
-      resolvedLines.length;
+    !query.isError
+      ? Math.max(
+          0,
+          cart.length -
+            resolvedLines.length,
+        )
+      : 0;
+
+  /* ---------------------------------------------------------------------- */
+  /* TOTALS                                                                 */
+  /* ---------------------------------------------------------------------- */
 
   const subtotal =
     resolvedLines.reduce(
@@ -361,17 +453,31 @@ function CartPage() {
         !item.purchasable,
     );
 
+  /**
+   * Checkout is allowed only when every saved cart line:
+   *
+   * - resolves to the current catalogue;
+   * - remains commercially valid;
+   * - has no blocking condition;
+   * - and the catalogue query itself succeeded.
+   */
   const canCheckout =
     hydrated &&
-    resolvedLines.length > 0 &&
+    !query.isPending &&
+    !query.isError &&
+    cart.length > 0 &&
+    resolvedLines.length ===
+      cart.length &&
     blockedLines.length === 0 &&
     unresolvedLines === 0;
 
   /**
-   * VAT summary must not assume every line uses the same tax treatment.
+   * We deliberately do not calculate a blanket 15% VAT amount.
    *
-   * Until the catalogue has authoritative per-product VAT data,
-   * the cart deliberately avoids calculating a blanket 15% VAT portion.
+   * Products may have different tax classifications.
+   *
+   * catalog.service.ts will later map the authoritative database
+   * tax_class + product_prices.vat_inclusive fields into vat_status.
    */
   const allVatInclusive =
     resolvedLines.length > 0 &&
@@ -381,12 +487,18 @@ function CartPage() {
         "vat_inclusive",
     );
 
+  /* ---------------------------------------------------------------------- */
+  /* RENDER                                                                 */
+  /* ---------------------------------------------------------------------- */
+
   return (
     <div>
       <PageHeader
         eyebrow="Cart"
         title="Shopping cart"
-        description={DESCRIPTION}
+        description={
+          DESCRIPTION
+        }
       />
 
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -422,19 +534,22 @@ function CartPage() {
           />
         ) : null}
 
-        {/* CART */}
+        {/* CART CONTENT */}
         {hydrated &&
         cart.length > 0 ? (
           <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
-            {/* LINES */}
+            {/* ------------------------------------------------------------ */}
+            {/* CART LINES                                                   */}
+            {/* ------------------------------------------------------------ */}
+
             <div className="space-y-4">
               {query.isPending ? (
-                <LoadingBlock />
+                <LoadingBlock label="Checking your cart…" />
               ) : null}
 
               {query.isError ? (
                 <ErrorBlock
-                  description="Your cart products could not be loaded."
+                  description="Your cart products could not be loaded. Your saved cart has not been changed."
                   action={
                     <Button
                       type="button"
@@ -458,8 +573,9 @@ function CartPage() {
                   {unresolvedLines === 1
                     ? "item could"
                     : "items could"}{" "}
-                  not be matched to the current public catalogue. They may have
-                  been removed, unpublished or changed since being added.
+                  not be matched to the current public catalogue. The product
+                  may have been removed, unpublished or changed since it was
+                  added to your cart.
                 </NoticeBlock>
               ) : null}
 
@@ -478,6 +594,9 @@ function CartPage() {
                       product.vat_status,
                     );
 
+                  /**
+                   * Product + variant is the unique commerce line.
+                   */
                   const lineId =
                     `${product.id}-${line.variant_id ?? "base"}`;
 
@@ -487,15 +606,19 @@ function CartPage() {
                       className="rounded-lg border border-border bg-card p-4"
                     >
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                        {/* PRODUCT INFORMATION */}
                         <div className="min-w-0 flex-1">
                           <Link
                             to="/product/$slug"
                             params={{
-                              slug: product.slug,
+                              slug:
+                                product.slug,
                             }}
                             className="font-medium hover:underline"
                           >
-                            {product.name}
+                            {
+                              product.name
+                            }
                           </Link>
 
                           <p className="mt-1 text-xs text-muted-foreground">
@@ -503,11 +626,14 @@ function CartPage() {
                             {product.sku}
                           </p>
 
+                          {/* SELECTED VARIANT */}
                           {variant ? (
                             <div className="mt-2 rounded-md bg-secondary/50 px-3 py-2 text-xs">
                               <p className="font-medium text-foreground">
                                 Selected option:{" "}
-                                {variant.name}
+                                {
+                                  variant.name
+                                }
                               </p>
 
                               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
@@ -568,6 +694,7 @@ function CartPage() {
                             </div>
                           ) : null}
 
+                          {/* PRICE */}
                           <div className="mt-2 flex flex-wrap items-baseline gap-2">
                             <span className="text-sm font-medium">
                               {formatZar(
@@ -590,6 +717,7 @@ function CartPage() {
                             ) : null}
                           </div>
 
+                          {/* LINE BLOCKER */}
                           {issue ? (
                             <div className="mt-3 flex items-start gap-2 rounded-md border border-warning/50 bg-warning/10 p-3 text-xs text-warning">
                               <AlertTriangle
@@ -604,6 +732,7 @@ function CartPage() {
                           ) : null}
                         </div>
 
+                        {/* LINE CONTROLS */}
                         <div className="flex flex-wrap items-center gap-3 sm:justify-end">
                           <div>
                             <label
@@ -611,7 +740,9 @@ function CartPage() {
                               htmlFor={`qty-${lineId}`}
                             >
                               Quantity for{" "}
-                              {product.name}
+                              {
+                                product.name
+                              }
                               {variant
                                 ? ` — ${variant.name}`
                                 : ""}
@@ -621,23 +752,39 @@ function CartPage() {
                               id={`qty-${lineId}`}
                               type="number"
                               min={1}
+                              step={1}
                               inputMode="numeric"
                               value={
                                 line.quantity
                               }
                               onChange={(
                                 event,
-                              ) =>
-                                setCartQuantity(
-                                  product.id,
+                              ) => {
+                                const nextQuantity =
                                   Number(
                                     event
                                       .target
                                       .value,
+                                  );
+
+                                if (
+                                  !Number.isFinite(
+                                    nextQuantity,
+                                  ) ||
+                                  nextQuantity <
+                                    1
+                                ) {
+                                  return;
+                                }
+
+                                setCartQuantity(
+                                  product.id,
+                                  Math.floor(
+                                    nextQuantity,
                                   ),
                                   line.variant_id,
-                                )
-                              }
+                                );
+                              }}
                               className="w-20 rounded-md border border-input bg-background px-3 py-2 text-sm"
                             />
                           </div>
@@ -664,7 +811,10 @@ function CartPage() {
                               )
                             }
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2
+                              className="h-4 w-4"
+                              aria-hidden
+                            />
                           </Button>
                         </div>
                       </div>
@@ -673,35 +823,41 @@ function CartPage() {
                 },
               )}
 
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={
-                    clearCart
-                  }
-                >
-                  Clear cart
-                </Button>
+              {/* CART ACTIONS */}
+              {!query.isPending ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={
+                      clearCart
+                    }
+                  >
+                    Clear cart
+                  </Button>
 
-                <Button
-                  asChild
-                  variant="ghost"
-                >
-                  <Link to="/shop">
-                    Continue shopping
-                  </Link>
-                </Button>
-              </div>
+                  <Button
+                    asChild
+                    variant="ghost"
+                  >
+                    <Link to="/shop">
+                      Continue shopping
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
             </div>
 
-            {/* ORDER SUMMARY */}
+            {/* ------------------------------------------------------------ */}
+            {/* ORDER SUMMARY                                                */}
+            {/* ------------------------------------------------------------ */}
+
             <aside className="h-fit space-y-4 rounded-lg border border-border bg-card p-6 lg:sticky lg:top-24">
               <h2 className="font-display text-lg font-semibold">
                 Order summary
               </h2>
 
-              <dl className="space-y-2 text-sm">
+              <dl className="space-y-3 text-sm">
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">
                     Merchandise subtotal
@@ -719,10 +875,10 @@ function CartPage() {
                     Tax
                   </dt>
 
-                  <dd className="text-right">
+                  <dd className="max-w-[190px] text-right text-xs">
                     {allVatInclusive
-                      ? "Included where applicable"
-                      : "Calculated according to applicable product tax treatment"}
+                      ? "Included in listed prices where applicable"
+                      : "Handled according to each product's applicable tax treatment"}
                   </dd>
                 </div>
 
@@ -731,7 +887,7 @@ function CartPage() {
                     Delivery
                   </dt>
 
-                  <dd className="text-right">
+                  <dd className="max-w-[190px] text-right text-xs">
                     Confirmed before payment
                   </dd>
                 </div>
@@ -749,6 +905,7 @@ function CartPage() {
                 </div>
               </dl>
 
+              {/* BLOCKED PRODUCTS */}
               {blockedLines.length >
               0 ? (
                 <NoticeBlock
@@ -764,38 +921,53 @@ function CartPage() {
                 </NoticeBlock>
               ) : null}
 
+              {/* STALE PRODUCTS */}
               {unresolvedLines > 0 ? (
                 <NoticeBlock
                   tone="pending"
                   title="Catalogue changed"
                 >
                   Some saved items can no longer be verified against the current
-                  catalogue. Checkout remains disabled until the cart is
+                  public catalogue. Checkout remains disabled until the cart is
                   resolved.
                 </NoticeBlock>
               ) : null}
 
-              <Button
-                asChild={
-                  canCheckout
-                }
-                disabled={
-                  !canCheckout
-                }
-                className="w-full"
-                size="lg"
-              >
-                {canCheckout ? (
+              {/* QUERY FAILURE */}
+              {query.isError ? (
+                <NoticeBlock
+                  tone="pending"
+                  title="Catalogue verification unavailable"
+                >
+                  Checkout is temporarily disabled because Cossa Store could
+                  not verify the current product information. Your cart remains
+                  saved.
+                </NoticeBlock>
+              ) : null}
+
+              {/* CHECKOUT */}
+              {canCheckout ? (
+                <Button
+                  asChild
+                  className="w-full"
+                  size="lg"
+                >
                   <Link to="/checkout">
                     Continue to checkout
                   </Link>
-                ) : (
-                  <span>
-                    Checkout unavailable
-                  </span>
-                )}
-              </Button>
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  className="w-full"
+                  size="lg"
+                  disabled
+                >
+                  Checkout unavailable
+                </Button>
+              )}
 
+              {/* QUOTATION */}
               <Button
                 asChild
                 variant="outline"
@@ -806,6 +978,7 @@ function CartPage() {
                 </Link>
               </Button>
 
+              {/* PAYMENT STATUS */}
               <NoticeBlock
                 tone="pending"
                 title="Online payments are not live yet"
