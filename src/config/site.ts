@@ -30,7 +30,8 @@ export const SITE = {
   parent: "Cossa Nexus Holdings (Pty) Ltd",
 
   /**
-   * CIPC company registration number.
+   * CIPC company registration number for the legal operator
+   * of Cossa Store.
    */
   registrationNumber: "2026/504313/07",
 
@@ -46,7 +47,7 @@ export const SITE = {
   countryCode: "ZA",
 
   /**
-   * Primary currency.
+   * Primary store currency.
    */
   currency: "ZAR",
 
@@ -56,7 +57,7 @@ export const SITE = {
   domain: "cossanexusholdings.co.za",
 
   /**
-   * Corporate website.
+   * Parent-company corporate website.
    */
   corporateWebsite: "https://cossanexusholdings.co.za",
 
@@ -65,7 +66,7 @@ export const SITE = {
    *
    * This is the canonical customer-facing Store domain.
    *
-   * The underlying Vercel URL is deployment infrastructure only
+   * The underlying Vercel deployment URLs are infrastructure only
    * and must not be used as the public Store identity in:
    * - canonical URLs
    * - sitemap URLs
@@ -80,8 +81,8 @@ export const SITE = {
   /**
    * Related public Cossa digital platforms.
    *
-   * These should remain secondary to Cossa Store in the
-   * customer experience.
+   * These remain secondary to Cossa Store in the
+   * customer-facing Store experience.
    */
   platforms: {
     corporate: "https://cossanexusholdings.co.za",
@@ -90,7 +91,7 @@ export const SITE = {
   },
 
   /**
-   * Primary public Store positioning.
+   * Primary Store positioning.
    *
    * Keep this accurate and evidence-based.
    * Avoid unverified claims such as "trusted worldwide".
@@ -99,10 +100,10 @@ export const SITE = {
     "Products, project solutions and business procurement for homes, projects and businesses.",
 
   /**
-   * Expanded business description.
+   * Expanded Store description.
    *
-   * This can later support:
-   * - Organization / OnlineStore structured data
+   * This can support:
+   * - OnlineStore / Organization structured data
    * - AI knowledge context
    * - About content
    * - metadata
@@ -113,9 +114,6 @@ export const SITE = {
 
   /**
    * Core customer promise.
-   *
-   * This can support hero, metadata or structured descriptions,
-   * but should not automatically be used everywhere.
    */
   customerPromise:
     "Buy the products. Plan the project. Get the job done.",
@@ -141,7 +139,7 @@ export const SITE = {
   /**
    * Customer-facing location.
    *
-   * Use on ordinary public pages where a full registered-office
+   * Use on ordinary public pages where the full registered-office
    * address is unnecessary.
    */
   publicAddress:
@@ -160,11 +158,10 @@ export const SITE = {
     "EXT 27 OLIVENOUTBOUCH 163, 163 CENTURION OLIVENOUTBOUSCH, CENTURION, GAUTENG, 0187",
 
   /**
-   * Store social media.
+   * Primary Cossa Store social profiles.
    *
-   * These are the primary social profiles for Cossa Store.
    * Footer and structured data should consume these values
-   * instead of hard-coding social URLs.
+   * rather than hard-coding them elsewhere.
    */
   social: {
     instagram: "https://www.instagram.com/cossa_nexus_store",
@@ -174,7 +171,7 @@ export const SITE = {
   /**
    * Parent-company social profiles.
    *
-   * These are secondary to Store social media and should only
+   * These are secondary to Store social channels and should only
    * appear where parent-company context is useful.
    */
   parentSocial: {
@@ -185,11 +182,10 @@ export const SITE = {
   },
 
   /**
-   * Search / AI identity aliases.
+   * Search / AI entity aliases.
    *
-   * These are NOT a ranking trick.
-   * They are canonical names and descriptive terms we can use
-   * consistently in structured data, metadata and AI context.
+   * These are canonical identity terms, not keyword stuffing.
+   * They can support structured data and approved AI context.
    */
   alternateNames: [
     "Cossa Store",
@@ -198,10 +194,9 @@ export const SITE = {
   ],
 
   /**
-   * High-level subject areas represented by the Store.
+   * High-level Store subject areas.
    *
-   * Use carefully for metadata, internal search and AI context.
-   * Do not keyword-stuff page titles/descriptions.
+   * Use carefully for search, AI context and internal classification.
    */
   topics: [
     "e-commerce",
@@ -213,20 +208,19 @@ export const SITE = {
     "print-on-demand",
     "digital products",
     "supplier-fulfilled products",
+    "dropshipping",
+    "affiliate products",
     "project kits",
   ],
 
   /**
-   * Future structured-data entity identifier.
-   *
-   * This gives our Organization / OnlineStore schema a stable
-   * internal @id once we implement JSON-LD.
+   * Stable structured-data identifier for Cossa Store.
    */
   structuredDataId:
     "https://store.cossanexusholdings.co.za/#online-store",
 
   /**
-   * Parent-company structured-data identifier.
+   * Stable parent-company structured-data identifier.
    */
   parentStructuredDataId:
     "https://cossanexusholdings.co.za/#organization",
@@ -246,7 +240,7 @@ export function whatsappLink(
 /**
  * Prefilled WhatsApp customer-support options.
  *
- * These should eventually feed the same central customer-support /
+ * These should eventually feed the same central Customer Support /
  * Growth workflow rather than becoming isolated Store-only records.
  */
 export const WHATSAPP_OPTIONS = [
@@ -314,10 +308,10 @@ export const SA_PROVINCES = [
 /**
  * Customer callback reasons.
  *
- * Keep Store-first.
- * Requests that need specialist Cossa services can be routed
- * internally after qualification rather than forcing customers
- * to understand the group structure.
+ * Keep this Store-first.
+ *
+ * Requests requiring specialist group-company support can be routed
+ * internally after qualification through Growth / Customer Support.
  */
 export const CALLBACK_REASONS = [
   "Product information",
@@ -329,51 +323,74 @@ export const CALLBACK_REASONS = [
   "Supplier enquiry",
   "Order or delivery support",
   "Returns or refunds",
-  "Technical product support",
+  "Installation or project support",
+  "Cleaning or facility support",
+  "Technology product support",
   "General enquiry",
 ] as const;
 
 /**
  * Store-relevant professional support pathways.
  *
- * IMPORTANT:
- * These are customer needs, not a corporate directory.
+ * Cossa Store remains the primary customer-facing brand.
  *
- * We deliberately do not expose subsidiary registration details here.
- * The Store can route qualified requests to the appropriate Cossa
- * business internally through Growth / customer-support workflows.
+ * These pathways identify the appropriate specialist Cossa business
+ * where that business materially helps complete the customer's job.
+ *
+ * IMPORTANT:
+ * - Do not place subsidiary registration numbers here.
+ * - Do not place subsidiary tax numbers here.
+ * - Do not place subsidiary B-BBEE/CIDB data here.
+ * - Do not turn this into a full group-company directory.
+ *
+ * The purpose is commercial clarity:
+ *
+ * Product need -> Store -> specialist support where relevant.
  */
 export const STORE_SUPPORT_PATHWAYS = [
   {
-    id: "installation_project_support",
-    name: "Installation & project support",
-    need: "Need help installing, building, renovating or completing a project?",
+    id: "construction_support",
+    name: "Installation & Project Support",
+    provider: "Cossa Nexus Construction",
+    need:
+      "Need installation, building, renovation, maintenance or project work?",
     description:
-      "Cossa Store can help route suitable product-related project enquiries to the appropriate professional support team where available.",
+      "Suitable product purchases and project requirements can be supported by Cossa Nexus Construction for installation, renovation, maintenance and related construction work.",
+    quoteMessage:
+      "Hello Cossa Store, I need products together with installation or project support.",
   },
+
   {
     id: "facility_support",
-    name: "Cleaning & facility support",
-    need: "Need help with cleaning, hygiene or facility requirements?",
+    name: "Cleaning & Facility Support",
+    provider: "Cossa Facility Services",
+    need:
+      "Need professional cleaning, hygiene, facility or recurring service support?",
     description:
-      "Business and property customers can request support for suitable cleaning, hygiene, facility and recurring procurement requirements.",
+      "Business, commercial and property customers can combine suitable products with cleaning, hygiene, facility-management and recurring service support from Cossa Facility Services.",
+    quoteMessage:
+      "Hello Cossa Store, I need products together with cleaning or facility support.",
   },
+
   {
     id: "technology_support",
-    name: "Technology support",
-    need: "Need help selecting, setting up or supporting technology?",
+    name: "Technology & Smart Solutions",
+    provider: "Cossa Tech",
+    need:
+      "Need technology selection, setup, configuration or technical support?",
     description:
-      "Customers can request support for suitable technology products, smart solutions and related setup requirements.",
+      "Suitable technology, smart-building and digital product requirements can be supported by Cossa Tech where setup, configuration or specialist assistance is required.",
+    quoteMessage:
+      "Hello Cossa Store, I need products together with technology setup or technical support.",
   },
 ] as const;
 
 /**
  * Backward-compatible alias.
  *
- * Keep temporarily if existing components still import
- * SERVICE_ECOSYSTEM.
+ * Existing components that still import SERVICE_ECOSYSTEM will continue
+ * to work while we migrate them to STORE_SUPPORT_PATHWAYS.
  *
- * Once the repository-wide migration is complete, update those
- * imports to STORE_SUPPORT_PATHWAYS and remove this alias.
+ * Once the repository-wide migration is complete, remove this alias.
  */
 export const SERVICE_ECOSYSTEM = STORE_SUPPORT_PATHWAYS;
