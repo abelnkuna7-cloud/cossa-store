@@ -3,20 +3,36 @@ import { createFileRoute } from "@tanstack/react-router";
 import { CatalogueShell } from "@/components/admin/CatalogueShell";
 import { ProductEditor } from "@/components/admin/ProductEditor";
 
-export const Route = createFileRoute("/_authenticated/admin/catalogue/new")({
+export const Route = createFileRoute(
+  "/_authenticated/admin/catalogue/new",
+)({
   head: () => ({
     meta: [
-      { title: "New product | Cossa internal" },
-      { name: "description", content: "Capture a new Cossa Store product." },
-      { name: "robots", content: "noindex" },
+      {
+        title: "Add product | Cossa Store Catalogue",
+      },
+      {
+        name: "description",
+        content:
+          "Add and manage Cossa Store products, supplier products, dropshipping items, print-on-demand products, affiliate offers and digital products.",
+      },
+      {
+        name: "robots",
+        content: "noindex, nofollow",
+      },
     ],
   }),
-  component: () => (
+
+  component: NewCatalogueProductPage,
+});
+
+function NewCatalogueProductPage() {
+  return (
     <CatalogueShell
-      title="New product"
-      description="Capture real product details manually. Drafts are never visible on the storefront."
+      title="Add a product"
+      description="Add products without coding. Choose what you are adding, complete the guided steps, save as a draft and publish only after review."
     >
       <ProductEditor />
     </CatalogueShell>
-  ),
-});
+  );
+}
