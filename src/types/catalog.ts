@@ -47,3 +47,36 @@ export type CategorySlug =
   | "travel-luggage"
   | "mobile-accessories"
   | "gaming-entertainment";
+export type CategorySlug =
+  | "construction-diy"
+  | "home-living"
+  | "cleaning-household"
+  | "technology-electronics"
+  | "women"
+  | "men"
+  | "kids-baby"
+  | "automotive"
+  | "office-business"
+  | "health-personal-care"
+  | "beauty-grooming"
+  | "sports-fitness"
+  | "outdoor-garden"
+  | "pet-supplies"
+  | "digital-products"
+  | "print-on-demand"
+  | "gifts-personalised"
+  | "security-smart-home"
+  | "tools-industrial"
+  | "school-education"
+  | "travel-luggage"
+  | "mobile-accessories"
+  | "gaming-entertainment"
+
+  /*
+   * Temporary legacy compatibility.
+   *
+   * Existing project/category records still reference these values.
+   * Remove only after the catalogue migration is complete.
+   */
+  | "cleaning-facility-supplies"
+  | "technology-smart-solutions";
