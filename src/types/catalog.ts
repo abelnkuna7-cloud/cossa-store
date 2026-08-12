@@ -23,6 +23,37 @@
  * - SEO
  * - future Cossa AI product discovery
  */
+/* -------------------------------------------------------------------------- */
+/* FULFILMENT                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export type FulfilmentType =
+  | "cossa_stock"
+  | "local_supplier"
+  | "local_dropshipping"
+  | "international_dropshipping"
+  | "print_on_demand"
+  | "affiliate"
+  | "digital"
+  | "service"
+  | "quote_only"
+  | "project_kit";
+
+export const FULFILMENT_LABELS: Record<
+  FulfilmentType,
+  string
+> = {
+  cossa_stock: "Cossa stock",
+  local_supplier: "Ships from local supplier",
+  local_dropshipping: "Dropshipped from local supplier",
+  international_dropshipping: "International fulfilment",
+  print_on_demand: "Produced after ordering",
+  affiliate: "Partner offer",
+  digital: "Digital delivery",
+  service: "Service",
+  quote_only: "Quotation required",
+  project_kit: "Project kit",
+};
 export type CategorySlug =
   | "construction-diy"
   | "home-living"
