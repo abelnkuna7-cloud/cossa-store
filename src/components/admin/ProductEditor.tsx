@@ -1728,7 +1728,7 @@ export function ProductEditor({
             quoteOnly={
               form.requires_quote
             }
-            />
+/>
         {/* STEP 8 — SOURCING / PARTNERS / FULFILMENT */}
 {isPod ? (
   <PodSection productId={productId} />
