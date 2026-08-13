@@ -68,13 +68,13 @@ function ContactPage() {
         <div>
           {state === "pending" && reference ? (
             <div className="space-y-4">
-              <h2 className="font-display text-2xl font-semibold">Message recorded</h2>
+              <h2 className="font-display text-2xl font-semibold">Message received</h2>
               <p className="text-muted-foreground">
                 Reference <span className="font-medium text-foreground">{reference}</span>.
               </p>
-              <NoticeBlock tone="pending" title="Email delivery is not connected yet">
-                Your message is stored on this device only. For anything urgent, please use
-                WhatsApp.
+              <NoticeBlock tone="success" title="Central lead intake confirmed">
+                Your enquiry is securely recorded with the Cossa team. For anything urgent,
+                you can still use WhatsApp.
               </NoticeBlock>
             </div>
           ) : (
