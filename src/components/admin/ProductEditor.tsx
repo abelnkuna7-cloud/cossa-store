@@ -25,8 +25,8 @@ import { LoadingBlock } from "@/components/common/StateBlocks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
 import { formatZar } from "@/lib/format";
 import {
@@ -69,9 +69,7 @@ import type { PublicationState } from "@/types/catalog";
 /* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export type ProductEditorMode =
-  | "create"
-  | "edit";
+export type ProductEditorMode = "create" | "edit";
 
 type CatalogueEntryType =
   | "cossa_stocked_product"
@@ -371,7 +369,8 @@ function deriveEntryType(
   }
 
   if (
-    product.sourcing_model === "print_on_demand"
+    product.sourcing_model ===
+    "print_on_demand"
   ) {
     return "print_on_demand_product";
   }
@@ -400,7 +399,8 @@ function deriveEntryType(
   }
 
   if (
-    product.sourcing_model === "local_supplier"
+    product.sourcing_model ===
+    "local_supplier"
   ) {
     return "local_supplier_product";
   }
@@ -434,7 +434,10 @@ function Section({
         type="button"
         className="flex w-full items-start justify-between gap-4 p-4 text-left sm:p-5"
         onClick={() =>
-          setOpen((current) => !current)
+          setOpen(
+            (current) =>
+              !current,
+          )
         }
         aria-expanded={open}
       >
@@ -493,6 +496,7 @@ function Field({
     <div className="min-w-0 space-y-1.5">
       <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
+
         {required ? (
           <span className="ml-1 text-destructive">
             *
@@ -552,9 +556,12 @@ export function ProductEditor({
   productId,
   mode,
 }: ProductEditorProps) {
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
+
   const queryClient =
     useQueryClient();
+
   const access =
     useCatalogueAccess();
 
@@ -705,19 +712,14 @@ export function ProductEditor({
 
     setForm((previous) => ({
       ...previous,
-
       sourcing_model:
         definition.sourcingModel,
-
       product_type:
         definition.productType,
-
       requires_shipping:
         definition.requiresShipping,
-
       requires_quote:
         definition.requiresQuote,
-
       sourcing_enabled:
         definition.sourcingEnabled,
     }));
@@ -808,29 +810,22 @@ export function ProductEditor({
       const payload: ProductDraftInput =
         {
           ...form,
-
           name:
             form.name.trim(),
-
           sku:
             cleanSku(
               form.sku.trim(),
             ),
-
           slug:
             slugify(
               form.slug,
             ),
-
           item_type:
             form.item_type.trim(),
-
           short_description:
             form.short_description.trim(),
-
           full_description:
             form.full_description.trim(),
-
           tags:
             Array.from(
               new Set(
@@ -839,7 +834,6 @@ export function ProductEditor({
                 ),
               ),
             ),
-
           features:
             Array.from(
               new Set(
@@ -894,13 +888,17 @@ export function ProductEditor({
 
       await queryClient.invalidateQueries(
         {
-          queryKey: ["admin"],
+          queryKey: [
+            "admin",
+          ],
         },
       );
 
       navigate({
         to: "/admin/catalogue/$id",
-        params: { id },
+        params: {
+          id,
+        },
       });
     } catch (error) {
       const description =
@@ -948,7 +946,9 @@ export function ProductEditor({
 
       await queryClient.invalidateQueries(
         {
-          queryKey: ["admin"],
+          queryKey: [
+            "admin",
+          ],
         },
       );
 
@@ -1048,12 +1048,10 @@ export function ProductEditor({
             <span className="h-2 w-2 rounded-full bg-primary" />
 
             <span className="capitalize">
-              {
-                publicationState.replace(
-                  /_/g,
-                  " ",
-                )
-              }
+              {publicationState.replace(
+                /_/g,
+                " ",
+              )}
             </span>
           </div>
         </div>
@@ -1151,25 +1149,21 @@ export function ProductEditor({
 
               return {
                 ...previous,
-
-                name: nextName,
-
+                name:
+                  nextName,
                 slug:
                   previous.slug ||
                   slugify(
                     nextName,
                   ),
-
                 full_description:
                   details.description ??
                   previous.full_description,
-
                 features:
                   details.features
                     ?.length
                     ? details.features
                     : previous.features,
-
                 care_instructions:
                   details.care_instructions ??
                   previous.care_instructions,
@@ -1389,14 +1383,22 @@ export function ProductEditor({
               {(
                 brands.data ??
                 []
-              ).map((brand) => (
-                <option
-                  key={brand.id}
-                  value={brand.id}
-                >
-                  {brand.name}
-                </option>
-              ))}
+              ).map(
+                (brand) => (
+                  <option
+                    key={
+                      brand.id
+                    }
+                    value={
+                      brand.id
+                    }
+                  >
+                    {
+                      brand.name
+                    }
+                  </option>
+                ),
+              )}
             </select>
           </Field>
 
@@ -1482,7 +1484,7 @@ export function ProductEditor({
                 set(
                   "product_type",
                   event.target
-                    .value,
+                    .value as ProductDraftInput["product_type"],
                 )
               }
             >
@@ -1515,7 +1517,7 @@ export function ProductEditor({
                 set(
                   "sourcing_model",
                   event.target
-                    .value,
+                    .value as ProductDraftInput["sourcing_model"],
                 )
               }
             >
@@ -1548,7 +1550,7 @@ export function ProductEditor({
                 set(
                   "visibility",
                   event.target
-                    .value,
+                    .value as ProductDraftInput["visibility"],
                 )
               }
             >
@@ -1717,7 +1719,9 @@ export function ProductEditor({
             isAdmin={
               access.isAdmin
             }
-            podProduct={isPod}
+            podProduct={
+              isPod
+            }
           />
 
           {/* STEP 7 */}
@@ -1728,45 +1732,55 @@ export function ProductEditor({
             quoteOnly={
               form.requires_quote
             }
-/>
-        {/* STEP 8 — SOURCING / PARTNERS / FULFILMENT */}
-{isPod ? (
-  <PodSection productId={productId} />
-) : (
-  <Section
-    number={8}
-    title="Sourcing and fulfilment"
-    description={
-      isAffiliate
-        ? "This affiliate product is fulfilled by an external partner."
-        : "Review how this product is sourced and fulfilled."
-    }
-    defaultOpen={false}
-  >
-    <div className="rounded-lg border border-border bg-secondary/30 p-4 text-sm">
-      <p className="font-medium">
-        {isAffiliate
-          ? "Affiliate / partner fulfilment"
-          : form.sourcing_enabled
-            ? "External sourcing enabled"
-            : "No external sourcing required"}
-      </p>
+          />
 
-      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-        This product is currently configured as{" "}
-        <strong className="text-foreground">
-          {form.sourcing_model.replace(/_/g, " ")}
-        </strong>
-        .
-        {form.sourcing_enabled
-          ? " Supplier and fulfilment details can be expanded in a dedicated sourcing workflow without affecting storefront publication."
-          : " You can change the fulfilment model in Step 4 if the commercial arrangement changes."}
-      </p>
-    </div>
-  </Section>
-)}
+          {/* STEP 8 — SOURCING / PARTNERS / FULFILMENT */}
+          {isPod ? (
+            <PodSection
+              productId={
+                productId
+              }
+            />
+          ) : (
+            <Section
+              number={8}
+              title="Sourcing and fulfilment"
+              description={
+                isAffiliate
+                  ? "This affiliate product is fulfilled by an external partner."
+                  : "Review how this product is sourced and fulfilled."
+              }
+              defaultOpen={false}
+            >
+              <div className="rounded-lg border border-border bg-secondary/30 p-4 text-sm">
+                <p className="font-medium">
+                  {isAffiliate
+                    ? "Affiliate / partner fulfilment"
+                    : form.sourcing_enabled
+                      ? "External sourcing enabled"
+                      : "No external sourcing required"}
+                </p>
 
-    
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  This product is
+                  currently configured
+                  as{" "}
+                  <strong className="text-foreground">
+                    {form.sourcing_model.replace(
+                      /_/g,
+                      " ",
+                    )}
+                  </strong>
+                  .
+
+                  {form.sourcing_enabled
+                    ? " Supplier and fulfilment details can be expanded in a dedicated sourcing workflow without affecting storefront publication."
+                    : " You can change the fulfilment model in Step 4 if the commercial arrangement changes."}
+                </p>
+              </div>
+            </Section>
+          )}
+
           {/* STEP 9 */}
           <Section
             number={9}
@@ -1778,9 +1792,11 @@ export function ProductEditor({
               <Toggle
                 label="Trending"
                 description="Manual merchandising selection. Do not use this as a fake sales claim."
-                value={form.tags.includes(
-                  "trending",
-                )}
+                value={
+                  form.tags.includes(
+                    "trending",
+                  )
+                }
                 onChange={(
                   value,
                 ) =>
@@ -1806,9 +1822,11 @@ export function ProductEditor({
 
               <Toggle
                 label="Business buying deal"
-                value={form.tags.includes(
-                  "business-deal",
-                )}
+                value={
+                  form.tags.includes(
+                    "business-deal",
+                  )
+                }
                 onChange={(
                   value,
                 ) =>
@@ -1904,9 +1922,11 @@ export function ProductEditor({
                 hint="Comma separated."
               >
                 <Input
-                  value={form.tags.join(
-                    ", ",
-                  )}
+                  value={
+                    form.tags.join(
+                      ", ",
+                    )
+                  }
                   onChange={(
                     event,
                   ) =>
@@ -1926,9 +1946,11 @@ export function ProductEditor({
                 hint="Comma separated."
               >
                 <Input
-                  value={form.features.join(
-                    ", ",
-                  )}
+                  value={
+                    form.features.join(
+                      ", ",
+                    )
+                  }
                   onChange={(
                     event,
                   ) =>
@@ -2299,10 +2321,13 @@ function PasteHelper({
             value={raw}
             onChange={(event) =>
               setRaw(
-                event.target.value,
+                event.target
+                  .value,
               )
             }
-            placeholder="Title: ...&#10;Description: ...&#10;Features: ..."
+            placeholder={
+              "Title: ...\nDescription: ...\nFeatures: ..."
+            }
           />
 
           {hasSuggestions ? (
@@ -2324,8 +2349,12 @@ function PasteHelper({
                 size="sm"
                 className="mt-3"
                 onClick={() => {
-                  onApply(parsed);
-                  setOpen(false);
+                  onApply(
+                    parsed,
+                  );
+                  setOpen(
+                    false,
+                  );
                 }}
               >
                 Apply suggestions
@@ -2382,7 +2411,8 @@ function PodSection({
             }
           | null
           | undefined
-      )?.product_pod_details?.[0] ??
+      )
+        ?.product_pod_details?.[0] ??
       {}
     ) as Record<
       string,
@@ -2416,13 +2446,14 @@ function PodSection({
   const set = (
     key: string,
     next: unknown,
-  ) =>
+  ) => {
     setPodForm(
       (previous) => ({
         ...previous,
         [key]: next,
       }),
     );
+  };
 
   const save =
     useMutation({
@@ -2524,7 +2555,9 @@ function PodSection({
     "provider_dashboard_url",
   ].some(
     (key) =>
-      value(key) &&
+      Boolean(
+        value(key),
+      ) &&
       !/^https?:\/\//i.test(
         value(key),
       ),
@@ -2620,9 +2653,11 @@ function PodSection({
               label={label}
             >
               <Input
-                value={value(
-                  key,
-                )}
+                value={
+                  value(
+                    key,
+                  )
+                }
                 onChange={(
                   event,
                 ) =>
@@ -2641,13 +2676,16 @@ function PodSection({
       <Field label="Fulfilment notes">
         <Textarea
           rows={3}
-          value={value(
-            "fulfilment_notes",
-          )}
+          value={
+            value(
+              "fulfilment_notes",
+            )
+          }
           onChange={(event) =>
             set(
               "fulfilment_notes",
-              event.target.value,
+              event.target
+                .value,
             )
           }
         />
@@ -2670,9 +2708,8 @@ function PodSection({
 
       {invalidUrl ? (
         <p className="text-xs text-destructive">
-          Provider URLs must
-          start with http:// or
-          https://.
+          Provider URLs must start
+          with http:// or https://.
         </p>
       ) : null}
 
@@ -2751,7 +2788,8 @@ function MediaSection({
     suggestAltText({
       productName,
       itemType,
-      index: rows.length,
+      index:
+        rows.length,
       fileName,
     });
 
@@ -2777,21 +2815,18 @@ function MediaSection({
       await addProductMedia({
         product_id:
           productId,
-
-        url: cleanUrl,
-
+        url:
+          cleanUrl,
         alt_text:
           alt.trim() ||
           suggestion() ||
           null,
-
         display_order:
           rows.length,
-
         is_primary:
           rows.length === 0,
-
-        is_public: true,
+        is_public:
+          true,
       });
 
       setUrl("");
@@ -2831,23 +2866,20 @@ function MediaSection({
       await addProductMedia({
         product_id:
           productId,
-
-        url: path,
-
+        url:
+          path,
         alt_text:
           alt.trim() ||
           suggestion(
             file.name,
           ) ||
           null,
-
         display_order:
           rows.length,
-
         is_primary:
           rows.length === 0,
-
-        is_public: true,
+        is_public:
+          true,
       });
 
       setAlt("");
@@ -3007,14 +3039,16 @@ function MediaSection({
                 isPublic={
                   mediaItem.is_public
                 }
-                suggestion={suggestAltText(
-                  {
-                    productName,
-                    itemType,
-                    fileName:
-                      mediaItem.url,
-                  },
-                )}
+                suggestion={
+                  suggestAltText(
+                    {
+                      productName,
+                      itemType,
+                      fileName:
+                        mediaItem.url,
+                    },
+                  )
+                }
                 onChanged={
                   refresh
                 }
@@ -3042,14 +3076,21 @@ function MediaRow({
   isPrimary: boolean;
   isPublic: boolean;
   suggestion: string;
-  onChanged: () => void;
+  onChanged: () =>
+    void | Promise<void>;
 }) {
-  const [value, setValue] =
+  const [
+    value,
+    setValue,
+  ] =
     useState(
       altText ?? "",
     );
 
-  const [saving, setSaving] =
+  const [
+    saving,
+    setSaving,
+  ] =
     useState(false);
 
   async function saveAltText(
@@ -3060,7 +3101,8 @@ function MediaRow({
     try {
       await updateProductMediaAlt(
         id,
-        next.trim() || null,
+        next.trim() ||
+          null,
       );
 
       await onChanged();
@@ -3131,7 +3173,8 @@ function MediaRow({
           value={value}
           onChange={(event) =>
             setValue(
-              event.target.value,
+              event.target
+                .value,
             )
           }
         />
@@ -3218,24 +3261,31 @@ function VariantSection({
       ),
   });
 
-  const [draft, setDraft] =
+  const [
+    draft,
+    setDraft,
+  ] =
     useState({
       ...EMPTY_VARIANT,
     });
 
-  const [busy, setBusy] =
+  const [
+    busy,
+    setBusy,
+  ] =
     useState(false);
 
   const set = (
     key: keyof typeof EMPTY_VARIANT,
     value: string,
-  ) =>
+  ) => {
     setDraft(
       (previous) => ({
         ...previous,
         [key]: value,
       }),
     );
+  };
 
   async function add() {
     const price =
@@ -3272,7 +3322,9 @@ function VariantSection({
 
     if (
       price !== null &&
-      (!Number.isFinite(price) ||
+      (!Number.isFinite(
+        price,
+      ) ||
         price < 0)
     ) {
       toast.error(
@@ -3298,7 +3350,9 @@ function VariantSection({
 
     if (
       cost !== null &&
-      (!Number.isFinite(cost) ||
+      (!Number.isFinite(
+        cost,
+      ) ||
         cost < 0)
     ) {
       toast.error(
@@ -3367,9 +3421,11 @@ function VariantSection({
             draft.shipping_estimate.trim() ||
             null,
 
-          currency: "ZAR",
+          currency:
+            "ZAR",
 
-          is_active: true,
+          is_active:
+            true,
         },
 
         podProduct
@@ -3484,7 +3540,10 @@ function VariantSection({
               "colour",
               "Colour",
             ],
-            ["size", "Size"],
+            [
+              "size",
+              "Size",
+            ],
             [
               "finish",
               "Finish",
@@ -3597,8 +3656,7 @@ function VariantSection({
                     ) =>
                       set(
                         key,
-                        event
-                          .target
+                        event.target
                           .value,
                       )
                     }
@@ -3622,7 +3680,8 @@ function VariantSection({
       </Button>
 
       {(
-        variants.data ?? []
+        variants.data ??
+        []
       ).length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No variants captured.
@@ -3634,116 +3693,119 @@ function VariantSection({
       ) : (
         <ul className="space-y-2 text-sm">
           {(
-            variants.data ?? []
-          ).map((variant) => {
-            const provider =
-              (
-                variant as unknown as {
-                  product_variant_provider_details?:
-                    | Array<{
-                        production_cost?:
-                          | number
-                          | null;
-                        provider_currency?:
-                          | string
-                          | null;
-                      }>
-                    | null;
-                }
-              )
-                .product_variant_provider_details?.[0];
+            variants.data ??
+            []
+          ).map(
+            (variant) => {
+              const provider =
+                (
+                  variant as unknown as {
+                    product_variant_provider_details?:
+                      | Array<{
+                          production_cost?:
+                            | number
+                            | null;
+                          provider_currency?:
+                            | string
+                            | null;
+                        }>
+                      | null;
+                  }
+                )
+                  .product_variant_provider_details?.[0];
 
-            return (
-              <li
-                key={
-                  variant.id
-                }
-                className="flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <strong>
-                    {
-                      variant.name
-                    }
-                  </strong>
-
-                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                    <span className="font-mono">
+              return (
+                <li
+                  key={
+                    variant.id
+                  }
+                  className="flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <strong>
                       {
-                        variant.variant_sku
+                        variant.name
                       }
-                    </span>
+                    </strong>
 
-                    {variant.retail_price ? (
-                      <span>
-                        {formatZar(
-                          Number(
-                            variant.retail_price,
-                          ),
-                        )}
-                      </span>
-                    ) : null}
-
-                    {!variant.is_active ? (
-                      <span>
-                        Inactive
-                      </span>
-                    ) : null}
-
-                    {isAdmin &&
-                    provider?.production_cost ? (
-                      <span>
-                        Internal
-                        cost:{" "}
+                    <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      <span className="font-mono">
                         {
-                          provider.provider_currency
-                        }{" "}
-                        {
-                          provider.production_cost
+                          variant.variant_sku
                         }
                       </span>
-                    ) : null}
-                  </div>
-                </div>
 
-                {variant.is_active ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={async () => {
-                      try {
-                        await deactivateVariant(
-                          variant.id,
-                        );
+                      {variant.retail_price ? (
+                        <span>
+                          {formatZar(
+                            Number(
+                              variant.retail_price,
+                            ),
+                          )}
+                        </span>
+                      ) : null}
 
-                        await queryClient.invalidateQueries(
+                      {!variant.is_active ? (
+                        <span>
+                          Inactive
+                        </span>
+                      ) : null}
+
+                      {isAdmin &&
+                      provider?.production_cost ? (
+                        <span>
+                          Internal
+                          cost:{" "}
                           {
-                            queryKey:
-                              [
-                                "admin",
-                                "variants",
-                                productId,
-                              ],
-                          },
-                        );
+                            provider.provider_currency
+                          }{" "}
+                          {
+                            provider.production_cost
+                          }
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
 
-                        toast.success(
-                          "Variant deactivated",
-                        );
-                      } catch {
-                        toast.error(
-                          "Variant could not be deactivated.",
-                        );
-                      }
-                    }}
-                  >
-                    Deactivate
-                  </Button>
-                ) : null}
-              </li>
-            );
-          })}
+                  {variant.is_active ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => {
+                        try {
+                          await deactivateVariant(
+                            variant.id,
+                          );
+
+                          await queryClient.invalidateQueries(
+                            {
+                              queryKey:
+                                [
+                                  "admin",
+                                  "variants",
+                                  productId,
+                                ],
+                            },
+                          );
+
+                          toast.success(
+                            "Variant deactivated",
+                          );
+                        } catch {
+                          toast.error(
+                            "Variant could not be deactivated.",
+                          );
+                        }
+                      }}
+                    >
+                      Deactivate
+                    </Button>
+                  ) : null}
+                </li>
+              );
+            },
+          )}
         </ul>
       )}
     </Section>
@@ -3786,7 +3848,10 @@ function PricingSection({
       | "business"
     >("retail");
 
-  const [amount, setAmount] =
+  const [
+    amount,
+    setAmount,
+  ] =
     useState("");
 
   const [
@@ -3795,10 +3860,16 @@ function PricingSection({
   ] =
     useState("1");
 
-  const [from, setFrom] =
+  const [
+    from,
+    setFrom,
+  ] =
     useState("");
 
-  const [until, setUntil] =
+  const [
+    until,
+    setUntil,
+  ] =
     useState("");
 
   const [
@@ -3844,7 +3915,8 @@ function PricingSection({
         amount:
           numericAmount,
 
-        currency: "ZAR",
+        currency:
+          "ZAR",
 
         minimum_quantity:
           minimumQuantity,
@@ -3992,7 +4064,9 @@ function PricingSection({
       <Toggle
         label="Price includes VAT"
         description="Set this according to the actual approved product price and tax treatment."
-        value={vatInclusive}
+        value={
+          vatInclusive
+        }
         onChange={
           setVatInclusive
         }
@@ -4009,7 +4083,8 @@ function PricingSection({
       </Button>
 
       {(
-        prices.data ?? []
+        prices.data ??
+        []
       ).length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No customer pricing has
@@ -4018,66 +4093,71 @@ function PricingSection({
       ) : (
         <ul className="space-y-2 text-sm">
           {(
-            prices.data ?? []
-          ).map((price) => (
-            <li
-              key={price.id}
-              className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <span className="capitalize">
-                {
-                  price.price_type
-                }{" "}
-                ·{" "}
-                {formatZar(
-                  Number(
-                    price.amount,
-                  ),
-                )}{" "}
-                · minimum{" "}
-                {
-                  price.minimum_quantity
+            prices.data ??
+            []
+          ).map(
+            (price) => (
+              <li
+                key={
+                  price.id
                 }
-                {price.vat_inclusive
-                  ? " · VAT included"
-                  : " · VAT excluded"}
-              </span>
-
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={async () => {
-                  try {
-                    await removeProductPrice(
-                      price.id,
-                    );
-
-                    await queryClient.invalidateQueries(
-                      {
-                        queryKey:
-                          [
-                            "admin",
-                            "prices",
-                            productId,
-                          ],
-                      },
-                    );
-
-                    toast.success(
-                      "Price removed",
-                    );
-                  } catch {
-                    toast.error(
-                      "Price could not be removed.",
-                    );
-                  }
-                }}
+                className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
               >
-                Remove
-              </Button>
-            </li>
-          ))}
+                <span className="capitalize">
+                  {
+                    price.price_type
+                  }{" "}
+                  ·{" "}
+                  {formatZar(
+                    Number(
+                      price.amount,
+                    ),
+                  )}{" "}
+                  · minimum{" "}
+                  {
+                    price.minimum_quantity
+                  }
+                  {price.vat_inclusive
+                    ? " · VAT included"
+                    : " · VAT excluded"}
+                </span>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={async () => {
+                    try {
+                      await removeProductPrice(
+                        price.id,
+                      );
+
+                      await queryClient.invalidateQueries(
+                        {
+                          queryKey:
+                            [
+                              "admin",
+                              "prices",
+                              productId,
+                            ],
+                        },
+                      );
+
+                      toast.success(
+                        "Price removed",
+                      );
+                    } catch {
+                      toast.error(
+                        "Price could not be removed.",
+                      );
+                    }
+                  }}
+                >
+                  Remove
+                </Button>
+              </li>
+            ),
+          )}
         </ul>
       )}
     </Section>
