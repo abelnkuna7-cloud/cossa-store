@@ -72,7 +72,7 @@ function ContactPage() {
               <p className="text-muted-foreground">
                 Reference <span className="font-medium text-foreground">{reference}</span>.
               </p>
-              <NoticeBlock tone="success" title="Central lead intake confirmed">
+              <NoticeBlock tone="info" title="Central lead intake confirmed">
                 Your enquiry is securely recorded with the Cossa team. For anything urgent,
                 you can still use WhatsApp.
               </NoticeBlock>
