@@ -1,6 +1,7 @@
 /** Supplier applications -> submit_supplier_application RPC (CSP reference). */
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
+import { submitCentralStoreLead } from "@/services/centralLeadIntake";
 import {
   campaignSource,
   currentPage,
@@ -53,6 +54,31 @@ export async function submitSupplierApplication(
     if (error) return failure(error);
     const row = data?.[0];
     if (!row?.reference) return failure("missing reference");
+
+    await submitCentralStoreLead({
+      sourceRecordId: row.id,
+      leadType: "supplier_application",
+      fullName: input.contact_person,
+      email: input.email,
+      phone: input.phone,
+      service: "Supplier partnership",
+      location: input.delivery_areas,
+      company: input.company_name,
+      notes: [
+        input.brands_supplied ? `Brands: ${input.brands_supplied}` : null,
+        input.lead_times ? `Lead times: ${input.lead_times}` : null,
+      ].filter(Boolean).join("\n"),
+      rawPayload: {
+        company_name: input.company_name,
+        product_categories: input.product_categories,
+        wholesale_available: input.wholesale_available,
+        dropshipping_available: input.dropshipping_available,
+        feed_capability: input.feed_capability,
+        source_page: currentPage(),
+        campaign_source: campaignSource(),
+      },
+    });
+
     trackEvent("supplier_application_submitted");
     return { success: true, id: row.id, referenceNumber: row.reference };
   } catch (error) {
