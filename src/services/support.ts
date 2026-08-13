@@ -1,6 +1,7 @@
 /** Human-support requests -> submit_human_support_request RPC (CSH reference). */
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
+import { submitCentralStoreLead } from "@/services/centralLeadIntake";
 import {
   campaignSource,
   currentPage,
@@ -37,6 +38,25 @@ export async function submitHumanSupportRequest(
     if (error) return failure(error);
     const row = data?.[0];
     if (!row?.reference) return failure("missing reference");
+
+    if (input.name && (input.phone || input.email)) {
+      await submitCentralStoreLead({
+        sourceRecordId: row.id,
+        leadType: "human_support_request",
+        fullName: input.name,
+        email: input.email,
+        phone: input.phone,
+        service: "Store support",
+        notes: input.reason,
+        rawPayload: {
+          channel: input.channel,
+          conversation_id: input.conversation_id ?? null,
+          source_page: currentPage(),
+          campaign_source: campaignSource(),
+        },
+      });
+    }
+
     trackEvent("human_support_requested", { channel: input.channel });
     return { success: true, id: row.id, referenceNumber: row.reference };
   } catch (error) {
