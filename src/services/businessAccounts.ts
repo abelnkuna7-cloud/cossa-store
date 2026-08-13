@@ -1,6 +1,7 @@
 /** Business accounts -> submit_business_account_application (CBA reference). */
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
+import { submitCentralStoreLead } from "@/services/centralLeadIntake";
 import {
   campaignSource,
   currentPage,
@@ -51,6 +52,31 @@ export async function submitBusinessAccountApplication(
     if (error) return failure(error);
     const row = data?.[0];
     if (!row?.reference) return failure("missing reference");
+
+    await submitCentralStoreLead({
+      sourceRecordId: row.id,
+      leadType: "business_account_application",
+      fullName: input.contact_person || input.registered_name,
+      email: input.email,
+      phone: input.phone,
+      service: input.industry,
+      company: input.registered_name,
+      notes: [
+        input.industry ? `Industry: ${input.industry}` : null,
+        input.bulk_requirements ? `Requirements: ${input.bulk_requirements}` : null,
+      ].filter(Boolean).join("\n"),
+      rawPayload: {
+        registered_name: input.registered_name,
+        trading_name: input.trading_name,
+        industry: input.industry,
+        estimated_monthly_spend: input.estimated_monthly_spend,
+        required_categories: input.required_categories,
+        bulk_requirements: input.bulk_requirements,
+        source_page: currentPage(),
+        campaign_source: campaignSource(),
+      },
+    });
+
     trackEvent("business_account_submitted");
     return { success: true, id: row.id, referenceNumber: row.reference };
   } catch (error) {
