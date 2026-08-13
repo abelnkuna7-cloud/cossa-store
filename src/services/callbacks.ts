@@ -1,6 +1,7 @@
 /** Callback requests -> submit_callback_request RPC (returns a CCB reference). */
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
+import { submitCentralStoreLead } from "@/services/centralLeadIntake";
 import {
   campaignSource,
   currentPage,
@@ -39,6 +40,28 @@ export async function submitCallbackRequest(
     if (error) return failure(error);
     const row = data?.[0];
     if (!row?.reference) return failure("missing reference");
+
+    await submitCentralStoreLead({
+      sourceRecordId: row.id,
+      leadType: "callback_request",
+      fullName: input.full_name,
+      email: input.email,
+      phone: input.phone,
+      service: input.product_category ?? input.reason,
+      location: input.location,
+      notes: [
+        input.reason ? `Reason: ${input.reason}` : null,
+        input.preferred_time ? `Preferred time: ${input.preferred_time}` : null,
+      ].filter(Boolean).join("\n"),
+      rawPayload: {
+        preferred_time: input.preferred_time,
+        reason: input.reason,
+        product_category: input.product_category,
+        source_page: currentPage(),
+        campaign_source: campaignSource(),
+      },
+    });
+
     trackEvent("callback_submitted");
     return { success: true, id: row.id, referenceNumber: row.reference };
   } catch (error) {
