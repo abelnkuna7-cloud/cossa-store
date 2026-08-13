@@ -13,6 +13,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
+import { submitCentralStoreLead } from "@/services/centralLeadIntake";
 
 import {
   campaignSource,
@@ -334,6 +335,35 @@ export async function submitQuoteRequest(
         "missing reference",
       );
     }
+
+    await submitCentralStoreLead({
+      sourceRecordId: row.id,
+      leadType: "quote_request",
+      fullName: contactName,
+      email,
+      phone,
+      service: input.scope,
+      location: cleanOptionalText(input.location),
+      notes: [
+        `Requirements: ${requirements}`,
+        input.budget ? `Budget: ${input.budget}` : null,
+        input.required_date ? `Required date: ${input.required_date}` : null,
+        input.additional_information
+          ? `Additional information: ${input.additional_information}`
+          : null,
+      ].filter(Boolean).join("\n"),
+      company: cleanOptionalText(input.company),
+      rawPayload: {
+        scope: input.scope,
+        estimated_quantity: cleanOptionalText(input.estimated_quantity),
+        required_date: cleanOptionalText(input.required_date),
+        budget: cleanOptionalText(input.budget),
+        additional_information: cleanOptionalText(input.additional_information),
+        items,
+        source_page: currentPage(),
+        campaign_source: campaignSource(),
+      },
+    });
 
     /**
      * Keep customer PII out of analytics.
