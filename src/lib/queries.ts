@@ -2,17 +2,20 @@ import { queryOptions } from "@tanstack/react-query";
 
 import {
   fetchCategory,
-  fetchProductBySlug,
-  fetchProductsByIds,
   fetchProject,
-  listFeaturedProducts,
-  listProducts,
   listProjectProducts,
   listPublicCollections,
+} from "@/services/catalog.service";
+
+import {
+  fetchProductBySlug,
+  fetchProductsByIds,
+  listFeaturedProducts,
+  listProducts,
   listRelatedProducts,
   listStorefrontProducts,
   type ProductQuery,
-} from "@/services/catalog.service";
+} from "@/services/store-products.service";
 
 import type { Product } from "@/types/catalog";
 
@@ -107,9 +110,6 @@ export const relatedProductsQuery = (
  * ["b", "a"]
  *
  * use the same React Query cache entry.
- *
- * The original IDs are still passed to the service because the service
- * remains responsible for resolving the actual catalogue records.
  */
 export const productsByIdsQuery = (
   ids: string[],
