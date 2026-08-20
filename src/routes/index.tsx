@@ -540,8 +540,8 @@ function Hero() {
       <img
         src={companyConfig.backgrounds.heroEagle}
         alt=""
-        width={1600}
-        height={1200}
+        width={1146}
+        height={1368}
         fetchPriority="high"
         decoding="async"
         className="absolute inset-0 h-full w-full object-cover object-center"

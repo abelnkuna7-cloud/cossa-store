@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Copy, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { CatalogueShell } from "@/components/admin/CatalogueShell";
@@ -12,6 +13,7 @@ import { formatZar } from "@/lib/format";
 
 const db = supabase as any;
 const ORGANISATION_ID = "00000000-0000-4000-8000-000000000001";
+const STORE_PRODUCT_URL = "https://store.cossanexusholdings.co.za/product";
 
 type ProductRow = {
   id: string;
@@ -30,6 +32,41 @@ type ProductRow = {
   featured: boolean;
   updated_at: string;
 };
+
+function publicProductUrl(slug: string): string {
+  return `${STORE_PRODUCT_URL}/${encodeURIComponent(slug)}`;
+}
+
+async function copyProductLink(row: ProductRow): Promise<void> {
+  const url = publicProductUrl(row.slug);
+
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("Clipboard access is unavailable");
+    await navigator.clipboard.writeText(url);
+    toast.success("Product link copied", { description: url });
+  } catch {
+    window.prompt("Copy this public product link", url);
+  }
+}
+
+async function shareProduct(row: ProductRow): Promise<void> {
+  const url = publicProductUrl(row.slug);
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: row.name,
+        text: `Shop ${row.name} from Cossa Store`,
+        url,
+      });
+      return;
+    } catch (error) {
+      if ((error as { name?: string }).name === "AbortError") return;
+    }
+  }
+
+  await copyProductLink(row);
+}
 
 export const Route = createFileRoute("/_authenticated/admin/catalogue/")({
   head: () => ({
@@ -178,6 +215,18 @@ function CatalogueTable() {
                       <Button asChild size="sm" variant="outline">
                         <Link to="/admin/catalogue/$id" params={{ id: row.id }}>Edit</Link>
                       </Button>
+                      {row.status === "active" ? (
+                        <>
+                          <Button size="sm" variant="ghost" onClick={() => void copyProductLink(row)}>
+                            <Copy className="mr-1 h-3.5 w-3.5" aria-hidden />
+                            Copy link
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => void shareProduct(row)}>
+                            <Share2 className="mr-1 h-3.5 w-3.5" aria-hidden />
+                            Share
+                          </Button>
+                        </>
+                      ) : null}
                       {row.status === "active" ? (
                         <Button size="sm" variant="ghost" disabled={mutation.isPending} onClick={() => mutation.mutate({ id: row.id, nextStatus: "draft" })}>Unpublish</Button>
                       ) : (

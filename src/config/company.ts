@@ -257,7 +257,7 @@ export const companyConfig = {
 
   backgrounds: {
     heroEagle:
-      "/assets/backgrounds/hero-eagle.jpg",
+      "/assets/backgrounds/cossa-eagle-hero.webp",
   },
 
   /* ---------------------------------------------------------------------- */

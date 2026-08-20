@@ -668,6 +668,11 @@ export const Route =
             ?.url,
         );
 
+      const imageAlt =
+        product.images[0]
+          ?.alt ||
+        product.name;
+
       const title =
         product.seo_title ||
         `${product.name} | Cossa Store`;
@@ -785,11 +790,27 @@ export const Route =
               },
 
               {
+                property:
+                  "og:image:alt",
+
+                content:
+                  imageAlt,
+              },
+
+              {
                 name:
                   "twitter:image",
 
                 content:
                   image,
+              },
+
+              {
+                name:
+                  "twitter:image:alt",
+
+                content:
+                  imageAlt,
               },
             ]
           : []),
