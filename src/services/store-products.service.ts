@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Product } from "@/types/catalog";
+import type { FulfilmentType, Product } from "@/types/catalog";
 
 const db = supabase as unknown as {
   from: (table: string) => any;
@@ -19,6 +19,16 @@ type PublicStoreProductRow = {
   slug: string;
   sku: string | null;
   product_type: "physical" | "digital" | "affiliate" | "pod" | "dropshipping";
+  fulfilment_model: Extract<
+    FulfilmentType,
+    | "cossa_stock"
+    | "local_supplier"
+    | "local_dropshipping"
+    | "international_dropshipping"
+    | "print_on_demand"
+    | "affiliate"
+    | "digital"
+  >;
   status: "active";
   short_description: string | null;
   description: string | null;
@@ -39,6 +49,9 @@ type PublicStoreProductRow = {
   updated_at: string;
 };
 
+const PUBLIC_PRODUCT_SELECT =
+  "id,name,slug,sku,product_type,status,short_description,description,category,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at,fulfilment_model";
+
 const ALL_PROVINCES = [
   "Gauteng",
   "Western Cape",
@@ -56,47 +69,44 @@ function asNumber(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function fulfilmentFor(row: PublicStoreProductRow) {
-  switch (row.product_type) {
-    case "digital":
-      return "digital" as const;
-    case "affiliate":
-      return "affiliate" as const;
-    case "pod":
-      return "print_on_demand" as const;
-    case "dropshipping":
-      return "local_dropshipping" as const;
-    case "physical":
-    default:
-      return "cossa_stock" as const;
-  }
+function fulfilmentFor(row: PublicStoreProductRow): FulfilmentType {
+  return row.fulfilment_model;
 }
 
 function stockStatusFor(row: PublicStoreProductRow) {
-  if (row.product_type === "digital" || row.product_type === "affiliate") {
-    return "made_to_order" as const;
+  switch (row.fulfilment_model) {
+    case "digital":
+    case "affiliate":
+    case "print_on_demand":
+      return "made_to_order" as const;
+    case "local_supplier":
+    case "local_dropshipping":
+    case "international_dropshipping":
+      return "backorder" as const;
+    case "cossa_stock":
+    default:
+      if (row.unlimited_stock) return "in_stock" as const;
+      if (!row.track_inventory) return "made_to_order" as const;
+      if (row.stock_quantity <= 0) return "out_of_stock" as const;
+      if (row.stock_quantity <= 5) return "low_stock" as const;
+      return "in_stock" as const;
   }
-  if (row.product_type === "pod" || row.product_type === "dropshipping") {
-    return "made_to_order" as const;
-  }
-  if (row.unlimited_stock) return "in_stock" as const;
-  if (!row.track_inventory) return "made_to_order" as const;
-  if (row.stock_quantity <= 0) return "out_of_stock" as const;
-  if (row.stock_quantity <= 5) return "low_stock" as const;
-  return "in_stock" as const;
 }
 
 function availabilityFor(row: PublicStoreProductRow) {
-  switch (row.product_type) {
+  switch (row.fulfilment_model) {
     case "digital":
       return "digital_available" as const;
     case "affiliate":
       return "partner_offer" as const;
-    case "pod":
+    case "print_on_demand":
       return "made_to_order" as const;
-    case "dropshipping":
+    case "local_supplier":
+      return "available_from_supplier" as const;
+    case "local_dropshipping":
+    case "international_dropshipping":
       return "available_to_order" as const;
-    case "physical":
+    case "cossa_stock":
     default:
       if (row.unlimited_stock || !row.track_inventory) return "available_to_order" as const;
       if (row.stock_quantity <= 0) return "out_of_stock" as const;
@@ -106,16 +116,20 @@ function availabilityFor(row: PublicStoreProductRow) {
 }
 
 function estimatedDeliveryFor(row: PublicStoreProductRow) {
-  switch (row.product_type) {
+  switch (row.fulfilment_model) {
     case "digital":
       return "Digital access after successful payment confirmation.";
     case "affiliate":
       return "Delivery and fulfilment are handled by the partner retailer.";
-    case "pod":
+    case "print_on_demand":
       return "Made to order. Production and delivery timing is confirmed during checkout.";
-    case "dropshipping":
-      return "Supplier delivery timing is confirmed before order processing.";
-    case "physical":
+    case "local_supplier":
+      return "Local supplier availability and delivery timing are confirmed before dispatch.";
+    case "local_dropshipping":
+      return "Ships directly from a local fulfilment partner after order confirmation.";
+    case "international_dropshipping":
+      return "International supplier delivery timing and any applicable import handling are confirmed before processing.";
+    case "cossa_stock":
     default:
       return "Delivery timing is confirmed during checkout or before dispatch.";
   }
@@ -128,10 +142,12 @@ function mapRow(row: PublicStoreProductRow): Product {
   const stockStatus = stockStatusFor(row);
   const availability = availabilityFor(row);
   const stockAvailable =
-    row.product_type === "digital" ||
-    row.product_type === "affiliate" ||
-    row.product_type === "pod" ||
-    row.product_type === "dropshipping" ||
+    fulfilment === "digital" ||
+    fulfilment === "affiliate" ||
+    fulfilment === "print_on_demand" ||
+    fulfilment === "local_supplier" ||
+    fulfilment === "local_dropshipping" ||
+    fulfilment === "international_dropshipping" ||
     row.unlimited_stock ||
     !row.track_inventory ||
     row.stock_quantity > 0;
@@ -145,7 +161,7 @@ function mapRow(row: PublicStoreProductRow): Product {
   }));
 
   const affiliate =
-    row.product_type === "affiliate" && row.affiliate_url
+    fulfilment === "affiliate" && row.affiliate_url
       ? {
           partner_name: row.brand || "Partner retailer",
           tracking_url: row.affiliate_url,
@@ -182,7 +198,7 @@ function mapRow(row: PublicStoreProductRow): Product {
     availability_status: availability,
     stock_status: stockStatus,
     stock_available: stockAvailable,
-    stock_quantity: row.track_inventory ? row.stock_quantity : null,
+    stock_quantity: fulfilment === "cossa_stock" && row.track_inventory ? row.stock_quantity : null,
     category: row.category ?? "digital-products",
     subcategory: "",
     display_category: row.category ?? "Cossa Store",
@@ -199,10 +215,10 @@ function mapRow(row: PublicStoreProductRow): Product {
     requires_quote: sellingPrice <= 0,
     service_included: false,
     service_description: null,
-    digital_download: row.product_type === "digital",
+    digital_download: fulfilment === "digital",
     estimated_delivery: estimatedDeliveryFor(row),
-    province_availability: row.product_type === "digital" ? [] : ALL_PROVINCES,
-    lead_time: row.product_type === "pod" ? "production time varies by product" : null,
+    province_availability: fulfilment === "digital" ? [] : ALL_PROVINCES,
+    lead_time: fulfilment === "print_on_demand" ? "production time varies by product" : null,
     customisation_options: [],
     kit_items: [],
     project_slugs: [],
@@ -210,7 +226,7 @@ function mapRow(row: PublicStoreProductRow): Product {
     frequently_together_ids: [],
     warranty: null,
     return_policy:
-      row.product_type === "digital"
+      fulfilment === "digital"
         ? "Digital products are subject to the Cossa Store digital-products and returns terms."
         : null,
     seo_title: row.seo_title,
@@ -229,7 +245,7 @@ function mapRow(row: PublicStoreProductRow): Product {
 async function loadRows(): Promise<PublicStoreProductRow[]> {
   const { data, error } = await db
     .from("store_public_products")
-    .select("id,name,slug,sku,product_type,status,short_description,description,category,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at")
+    .select(PUBLIC_PRODUCT_SELECT)
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -292,7 +308,7 @@ export async function fetchProductBySlug(slug: string): Promise<Product | null> 
 
   const { data, error } = await db
     .from("store_public_products")
-    .select("id,name,slug,sku,product_type,status,short_description,description,category,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at")
+    .select(PUBLIC_PRODUCT_SELECT)
     .eq("slug", normalizedSlug)
     .maybeSingle();
 
@@ -310,7 +326,7 @@ export async function fetchProductsByIds(ids: string[]): Promise<Product[]> {
 
   const { data, error } = await db
     .from("store_public_products")
-    .select("id,name,slug,sku,product_type,status,short_description,description,category,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at")
+    .select(PUBLIC_PRODUCT_SELECT)
     .in("id", uniqueIds);
 
   if (error) {
