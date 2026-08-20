@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 
 import { CATEGORIES, PROJECTS } from "@/data/categories";
-import { listProducts } from "@/services/catalog.service";
+import { listProducts } from "@/services/store-products.service";
 import { SITE_URL } from "@/config/seo";
 
 /**
@@ -42,24 +42,15 @@ const STATIC_PUBLIC_ROUTES: SitemapEntry[] = [
   { path: "/terms" },
 ];
 
-/**
- * Escapes values inserted into XML.
- */
 function escapeXml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+    .replace(/\"/g, "&quot;")
     .replace(/'/g, "&apos;");
 }
 
-/**
- * Converts a timestamp/date into YYYY-MM-DD where possible.
- *
- * We only emit <lastmod> when we have an actual catalogue timestamp.
- * We do not invent modification dates for static pages.
- */
 function formatLastModified(value: unknown): string | undefined {
   if (!value) return undefined;
 
@@ -72,12 +63,6 @@ function formatLastModified(value: unknown): string | undefined {
   return date.toISOString().slice(0, 10);
 }
 
-/**
- * Extra sitemap-level protection.
- *
- * Even if catalog.service changes later, development/demo products
- * must never accidentally become indexable through the sitemap.
- */
 function isIndexableProduct(product: Record<string, unknown>): boolean {
   const slug =
     typeof product.slug === "string"
@@ -86,23 +71,10 @@ function isIndexableProduct(product: Record<string, unknown>): boolean {
 
   if (!slug) return false;
 
-  /**
-   * Demo records are development fixtures and must not be submitted
-   * to search engines as real Cossa Store inventory.
-   */
   if (slug.startsWith("demo-")) {
     return false;
   }
 
-  /**
-   * If these workflow fields exist on the returned product,
-   * enforce the public publication requirements.
-   *
-   * We intentionally do not fail a legitimate product merely because
-   * an older service result doesn't expose one of these fields yet.
-   * Once catalog.service is fully normalised, these guards can become
-   * strict required checks.
-   */
   if (
     typeof product.publication_state === "string" &&
     product.publication_state !== "published"
@@ -166,9 +138,6 @@ export const Route = createFileRoute("/sitemap.xml")({
             };
           });
 
-        /**
-         * Assemble the canonical public URL inventory.
-         */
         const entries: SitemapEntry[] = [
           ...STATIC_PUBLIC_ROUTES,
           ...categoryEntries,
@@ -176,9 +145,6 @@ export const Route = createFileRoute("/sitemap.xml")({
           ...productEntries,
         ];
 
-        /**
-         * Remove accidental duplicate paths.
-         */
         const uniqueEntries = Array.from(
           new Map(entries.map((entry) => [entry.path, entry])).values(),
         );
@@ -211,11 +177,6 @@ export const Route = createFileRoute("/sitemap.xml")({
         return new Response(xml, {
           headers: {
             "Content-Type": "application/xml; charset=utf-8",
-
-            /**
-             * Cache sitemap briefly while still allowing catalogue
-             * publication changes to appear reasonably quickly.
-             */
             "Cache-Control":
               "public, max-age=0, s-maxage=900, stale-while-revalidate=3600",
           },
