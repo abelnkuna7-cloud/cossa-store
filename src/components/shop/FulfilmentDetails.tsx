@@ -2,7 +2,6 @@ import { Link } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
 import { SITE, whatsappLink } from "@/config/site";
-import { serviceDescriptionFor } from "@/data/demo-catalogue";
 import type { Product } from "@/types/catalog";
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
@@ -16,8 +15,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 
 /**
  * Fulfilment-model specific explanation shown on the product page. Everything
- * here is derived from the product record, so replacing a placeholder with a
- * real product changes the messaging automatically.
+ * here is derived from the real product record.
  */
 export function FulfilmentDetails({ product }: { product: Product }) {
   const kit = product.kit_items ?? [];
@@ -52,7 +50,7 @@ export function FulfilmentDetails({ product }: { product: Product }) {
       {product.fulfilment_type === "cossa_stock" ? (
         <Panel title="Own stock">
           <p>
-            Held in the Cossa Store warehouse and dispatched by our own team.{" "}
+            Held in Cossa Store stock and dispatched through our fulfilment process.{" "}
             {product.stock_available
               ? "Available now."
               : "Availability is confirmed before dispatch."}
@@ -64,7 +62,7 @@ export function FulfilmentDetails({ product }: { product: Product }) {
       {product.fulfilment_type === "local_supplier" ? (
         <Panel title="Local supplier fulfilment">
           <p>
-            Supplied by {product.supplier_name ?? "a vetted local supplier"}. We confirm
+            Supplied by {product.supplier_name ?? "a verified local supplier"}. We confirm
             availability with the supplier before the order is processed.
           </p>
           <p>Delivery: {product.estimated_delivery}</p>
@@ -80,8 +78,8 @@ export function FulfilmentDetails({ product }: { product: Product }) {
           </p>
           <p>Estimated delivery: {product.estimated_delivery}</p>
           <p>
-            Returns are handled through the partner's return route — we coordinate the process on
-            your behalf.{" "}
+            Returns are handled through the applicable fulfilment route and Cossa Store coordinates
+            the process where the sale is made directly through Cossa Store.{" "}
             <Link to="/returns" className="underline">
               Returns policy
             </Link>
@@ -130,16 +128,17 @@ export function FulfilmentDetails({ product }: { product: Product }) {
 
       {product.digital_download ? (
         <Panel title="Digital delivery">
-          <p>No physical delivery. Access is issued to your email once payment is confirmed.</p>
+          <p>No physical delivery. Access is issued once payment is successfully confirmed.</p>
           <p>
-            Digital items cannot be cancelled or returned once the download has been accessed.
+            Digital-product cancellation and refund rights are governed by the applicable Cossa Store
+            terms and South African consumer law.
           </p>
         </Panel>
       ) : null}
 
       {product.service_included ? (
         <Panel title="Product + service">
-          <p>{serviceDescriptionFor(product) ?? "A Cossa service is included with this product."}</p>
+          <p>{product.service_description ?? "A Cossa service is included with this product."}</p>
           <p>
             Available in:{" "}
             {(product.province_availability ?? []).join(", ") || "selected service areas"}. We
