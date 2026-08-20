@@ -3,7 +3,6 @@ import { queryOptions } from "@tanstack/react-query";
 import {
   fetchCategory,
   fetchProject,
-  listProjectProducts,
   listPublicCollections,
 } from "@/services/catalog.service";
 
@@ -180,15 +179,27 @@ export const projectQuery = (
       slug,
     ],
 
-    queryFn: async () => ({
-      project:
-        await fetchProject(
-          slug,
-        ),
+    queryFn: async () => {
+      const project = await fetchProject(slug);
 
-      products:
-        await listProjectProducts(
-          slug,
-        ),
-    }),
+      if (!project) {
+        return {
+          project: null,
+          products: [] as Product[],
+        };
+      }
+
+      // Project-commerce products must come from the same production catalogue
+      // as Shop, product detail, search and cart. Never fall back to demo data.
+      const products = (await listProducts({})).filter(
+        (product) =>
+          (product.project_slugs ?? []).includes(slug) ||
+          project.categories.includes(product.category as never),
+      );
+
+      return {
+        project,
+        products,
+      };
+    },
   });
