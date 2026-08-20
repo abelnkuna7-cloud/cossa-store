@@ -15,12 +15,12 @@ export const Route = createFileRoute("/auth")({
       { title: "Member sign in | Cossa Store" },
       {
         name: "description",
-        content: "Sign in or create a Cossa Store member account to list and manage products.",
+        content: "Sign in or create a Cossa Store account to manage purchases, downloads and Store access.",
       },
       { property: "og:title", content: "Member sign in | Cossa Store" },
       {
         property: "og:description",
-        content: "Cossa Store member access for catalogue and product listing tools.",
+        content: "Cossa Store account access for purchases, downloads and catalogue tools.",
       },
       { name: "robots", content: "noindex" },
     ],
@@ -41,7 +41,7 @@ function AuthPage() {
   const [checkEmail, setCheckEmail] = useState(false);
 
   useEffect(() => {
-    if (!loading && session) navigate({ to: "/admin/catalogue", replace: true });
+    if (!loading && session) navigate({ to: "/account", replace: true });
   }, [loading, session, navigate]);
 
   async function onSubmit(event: React.FormEvent) {
@@ -69,7 +69,7 @@ function AuthPage() {
         });
         return;
       }
-      navigate({ to: "/admin/catalogue", replace: true });
+      navigate({ to: "/account", replace: true });
       return;
     }
 
@@ -79,7 +79,7 @@ function AuthPage() {
       toast.error("Sign in failed", { description: "Check your email address and password." });
       return;
     }
-    navigate({ to: "/admin/catalogue", replace: true });
+    navigate({ to: "/account", replace: true });
   }
 
   return (
@@ -87,7 +87,7 @@ function AuthPage() {
       <PageHeader
         eyebrow="Members"
         title={mode === "signin" ? "Sign in" : "Create your account"}
-        description="Cossa Store member access — list and manage your own products."
+        description="Sign in to access your purchases and downloads. Approved catalogue staff can also manage Store products."
       />
       <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
         <div className="mb-4 flex rounded-md border border-border p-1">
@@ -112,7 +112,7 @@ function AuthPage() {
 
         {checkEmail ? (
           <p className="mb-4 rounded-md border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-            Almost there — confirm your email address using the link we sent, then sign in.
+            Almost there â€” confirm your email address using the link we sent, then sign in.
           </p>
         ) : null}
 
@@ -177,18 +177,18 @@ function AuthPage() {
           <Button type="submit" className="w-full" disabled={busy}>
             {busy
               ? mode === "signin"
-                ? "Signing in…"
-                : "Creating account…"
+                ? "Signing inâ€¦"
+                : "Creating accountâ€¦"
               : mode === "signin"
                 ? "Sign in"
                 : "Create account"}
           </Button>
           <p className="text-xs text-muted-foreground">
-            Members can capture their own products (print-on-demand, dropshipping, affiliate,
-            services and stocked goods). Listings go live once a Cossa administrator approves them.
+            Customer purchases and digital downloads stay linked to this account. Approved Cossa catalogue staff can manage products through the internal catalogue tools.
           </p>
         </form>
       </div>
     </div>
   );
 }
+

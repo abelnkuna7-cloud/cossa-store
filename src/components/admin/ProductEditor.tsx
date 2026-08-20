@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  Boxes,
   Download,
   ExternalLink,
   ImagePlus,
-  Link2,
   LoaderCircle,
   Package,
   Save,
@@ -13,7 +11,6 @@ import {
   Store,
   Truck,
   UploadCloud,
-  Wrench,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -30,7 +27,7 @@ const IMAGE_BUCKET = "store-product-images";
 const DIGITAL_BUCKET = "store-digital-products";
 const db = supabase as any;
 
-type ProductType = "physical" | "digital" | "service" | "bundle" | "affiliate";
+type ProductType = "physical" | "digital" | "affiliate" | "pod" | "dropshipping";
 type FulfilmentModel =
   | "cossa_stock"
   | "local_supplier"
@@ -38,8 +35,7 @@ type FulfilmentModel =
   | "international_dropshipping"
   | "print_on_demand"
   | "affiliate"
-  | "digital"
-  | "service";
+  | "digital";
 type ProductStatus = "draft" | "active" | "archived";
 type ProductMode =
   | "physical"
@@ -47,9 +43,7 @@ type ProductMode =
   | "dropshipping"
   | "pod"
   | "affiliate"
-  | "digital"
-  | "service"
-  | "bundle";
+  | "digital";
 
 interface StoreProductForm {
   name: string;
@@ -125,15 +119,13 @@ const MODE_OPTIONS: Array<{
   { value: "pod", label: "Print on demand", description: "Made after purchase by Printify, Printful or another POD provider.", icon: Shirt },
   { value: "affiliate", label: "Affiliate product", description: "Customer buys on the partner website through your tracked link.", icon: ExternalLink },
   { value: "digital", label: "Digital product", description: "Downloads, templates, guides, files and digital tools.", icon: Download },
-  { value: "service", label: "Service", description: "Installation, setup or service-supported offers.", icon: Wrench },
-  { value: "bundle", label: "Bundle / project kit", description: "A grouped solution for a project or business requirement.", icon: Boxes },
 ];
 
 function slugify(value: string) {
   return value
     .toLowerCase()
     .trim()
-    .replace(/['’]/g, "")
+    .replace(/['â€™]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .replace(/-{2,}/g, "-");
@@ -162,8 +154,6 @@ function modeFromProduct(type: ProductType, fulfilment: FulfilmentModel): Produc
   if (type === "affiliate" || fulfilment === "affiliate") return "affiliate";
   if (fulfilment === "print_on_demand") return "pod";
   if (fulfilment === "local_dropshipping" || fulfilment === "international_dropshipping") return "dropshipping";
-  if (type === "service" || fulfilment === "service") return "service";
-  if (type === "bundle") return "bundle";
   if (fulfilment === "local_supplier") return "supplier";
   return "physical";
 }
@@ -181,7 +171,8 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
   const isDigital = productMode === "digital";
   const isAffiliate = productMode === "affiliate";
   const isPod = productMode === "pod";
-  const isSupplier = productMode === "supplier" || productMode === "dropshipping" || isPod || productMode === "bundle";
+  const isSupplier = productMode === "supplier" || productMode === "dropshipping" || isPod;
+  const usesPartner = isSupplier || isAffiliate;
   const isPhysicalStock = productMode === "physical";
   const needsInventory = isPhysicalStock;
 
@@ -246,6 +237,33 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
     [form.image_urls],
   );
 
+  const publicationIssues = useMemo(() => {
+    const issues: string[] = [];
+    if (!form.sku.trim() && !isAffiliate) issues.push("SKU");
+    if (!form.category.trim()) issues.push("category");
+    if (!form.description.trim()) issues.push("description");
+    if (imageUrls.length === 0) issues.push("product image");
+    if (!isAffiliate && Number(form.price) <= 0) issues.push("selling price");
+
+    if (isDigital && !form.digital_file_path.trim()) issues.push("digital file");
+    if (isAffiliate) {
+      if (!form.supplier_name.trim()) issues.push("partner or merchant name");
+      if (!/^https?:\/\//i.test(form.affiliate_url.trim())) issues.push("legitimate affiliate URL");
+    }
+    if (isPod) {
+      if (!form.supplier_name.trim()) issues.push("POD provider");
+      if (!form.supplier_product_ref.trim()) issues.push("provider product reference");
+    }
+    if (productMode === "dropshipping") {
+      if (!form.supplier_name.trim()) issues.push("supplier");
+      if (!form.supplier_product_ref.trim() && !form.supplier_url.trim()) issues.push("supplier reference or URL");
+    }
+    if (needsInventory && form.track_inventory && !form.unlimited_stock && Number(form.stock_quantity) <= 0) {
+      issues.push("available stock quantity");
+    }
+    return issues;
+  }, [form, imageUrls.length, isAffiliate, isDigital, isPod, needsInventory, productMode]);
+
   const set = <K extends keyof StoreProductForm>(key: K, value: StoreProductForm[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
@@ -262,10 +280,10 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
           Object.assign(patch, { product_type: "physical", fulfilment_model: "local_supplier", track_inventory: false, unlimited_stock: false });
           break;
         case "dropshipping":
-          Object.assign(patch, { product_type: "physical", fulfilment_model: "local_dropshipping", track_inventory: false, unlimited_stock: false });
+          Object.assign(patch, { product_type: "dropshipping", fulfilment_model: "local_dropshipping", track_inventory: false, unlimited_stock: false });
           break;
         case "pod":
-          Object.assign(patch, { product_type: "physical", fulfilment_model: "print_on_demand", track_inventory: false, unlimited_stock: true });
+          Object.assign(patch, { product_type: "pod", fulfilment_model: "print_on_demand", track_inventory: false, unlimited_stock: true });
           break;
         case "affiliate":
           Object.assign(patch, { product_type: "affiliate", fulfilment_model: "affiliate", track_inventory: false, unlimited_stock: true, cost_price: "0" });
@@ -279,12 +297,6 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
             category: current.category || "Digital Products",
             cost_price: current.cost_price || "0",
           });
-          break;
-        case "service":
-          Object.assign(patch, { product_type: "service", fulfilment_model: "service", track_inventory: false, unlimited_stock: true });
-          break;
-        case "bundle":
-          Object.assign(patch, { product_type: "bundle", fulfilment_model: "local_supplier", track_inventory: false, unlimited_stock: false });
           break;
       }
       return { ...current, ...patch };
@@ -363,10 +375,9 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
     if (!name) return void toast.error("Product name is required.");
     if (!slug) return void toast.error("Product URL slug is required.");
     if (!Number.isFinite(price) || price < 0) return void toast.error("Enter a valid selling price.");
-    if (publish && imageUrls.length === 0) return void toast.error("Add at least one real product image before publishing.");
-    if (publish && isDigital && !form.digital_file_path.trim()) return void toast.error("Upload the digital product file before publishing.");
-    if (publish && isAffiliate && !form.affiliate_url.trim()) return void toast.error("Add the real affiliate/partner URL before publishing.");
-    if (publish && isSupplier && !form.supplier_name.trim()) return void toast.error("Add the supplier or fulfilment partner before publishing.");
+    if (publish && publicationIssues.length > 0) {
+      return void toast.error(`Complete before publishing: ${publicationIssues.join(", ")}.`);
+    }
 
     setSaving(true);
     try {
@@ -385,7 +396,7 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
         description: nullable(form.description),
         category: nullable(form.category),
         brand: nullable(form.brand),
-        supplier_name: isSupplier ? nullable(form.supplier_name) : null,
+        supplier_name: usesPartner ? nullable(form.supplier_name) : null,
         supplier_product_ref: isSupplier ? nullable(form.supplier_product_ref) : null,
         supplier_url: isSupplier ? nullable(form.supplier_url) : null,
         affiliate_url: isAffiliate ? nullable(form.affiliate_url) : null,
@@ -433,7 +444,7 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
   if (loading) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
-        <LoaderCircle className="h-4 w-4 animate-spin" /> Loading product…
+        <LoaderCircle className="h-4 w-4 animate-spin" /> Loading productâ€¦
       </div>
     );
   }
@@ -507,7 +518,7 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
           <div className="rounded-lg border border-border bg-secondary/30 p-3 text-sm">
             <p className="font-medium">Configured automatically</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Type: <strong className="text-foreground">{form.product_type}</strong> · Fulfilment: <strong className="text-foreground">{form.fulfilment_model.replace(/_/g, " ")}</strong>
+              Type: <strong className="text-foreground">{form.product_type}</strong> Â· Fulfilment: <strong className="text-foreground">{form.fulfilment_model.replace(/_/g, " ")}</strong>
             </p>
           </div>
         </div>
@@ -606,7 +617,10 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
         <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
           <h2 className="text-lg font-semibold">4. Affiliate / partner purchase link</h2>
           <p className="mt-1 text-sm text-muted-foreground">Use the real tracked link supplied by the affiliate programme. The customer will leave Cossa Store to complete the purchase.</p>
-          <div className="mt-5">
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <Field label="Partner / merchant name" required>
+              <Input value={form.supplier_name} onChange={(event) => set("supplier_name", event.target.value)} placeholder="Retailer or affiliate programme" />
+            </Field>
             <Field label="Affiliate URL" required>
               <Input type="url" value={form.affiliate_url} onChange={(event) => set("affiliate_url", event.target.value)} placeholder="https://partner.example/product?..." />
             </Field>
@@ -620,10 +634,10 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
             {uploadingImages ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-            {uploadingImages ? "Uploading…" : "Upload images"}
+            {uploadingImages ? "Uploadingâ€¦" : "Upload images"}
             <input className="sr-only" type="file" accept="image/*" multiple disabled={uploadingImages} onChange={(event) => void uploadImages(event.target.files)} />
           </label>
-          <span className="text-xs text-muted-foreground">JPG, PNG, WebP and other browser image formats · max 8 MB each</span>
+          <span className="text-xs text-muted-foreground">JPG, PNG, WebP and other browser image formats Â· max 8 MB each</span>
         </div>
 
         {imageUrls.length ? (
@@ -660,7 +674,7 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
           <div className="mt-5">
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
               {uploadingDigital ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
-              {uploadingDigital ? "Uploading…" : form.digital_file_path ? "Replace digital file" : "Upload digital product"}
+              {uploadingDigital ? "Uploadingâ€¦" : form.digital_file_path ? "Replace digital file" : "Upload digital product"}
               <input className="sr-only" type="file" disabled={uploadingDigital} onChange={(event) => void uploadDigitalFile(event.target.files?.[0] ?? null)} />
             </label>
           </div>
@@ -696,6 +710,20 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
             <Textarea value={form.seo_description} onChange={(event) => set("seo_description", event.target.value)} placeholder="Short Google/search description for this product." />
           </Field>
         </div>
+      </section>
+
+      <section className={`rounded-xl border p-4 sm:p-5 ${publicationIssues.length ? "border-warning/50 bg-warning/5" : "border-primary/40 bg-primary/5"}`}>
+        <h2 className="text-lg font-semibold">Publication readiness</h2>
+        {publicationIssues.length ? (
+          <>
+            <p className="mt-1 text-sm text-muted-foreground">This product remains a draft until these items are completed.</p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-foreground">
+              {publicationIssues.map((issue) => <li key={issue}>Missing {issue}</li>)}
+            </ul>
+          </>
+        ) : (
+          <p className="mt-1 text-sm text-muted-foreground">This product has the information required for publishing. The database will perform the same checks when you publish.</p>
+        )}
       </section>
 
       <div className="sticky bottom-3 z-10 flex flex-wrap gap-2 rounded-xl border border-border bg-background/95 p-3 shadow-lg backdrop-blur">
@@ -741,3 +769,4 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
     </label>
   );
 }
+

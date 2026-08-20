@@ -35,6 +35,7 @@ type PublicStoreProductRow = {
   category: string | null;
   brand: string | null;
   affiliate_url: string | null;
+  partner_name: string | null;
   currency: "ZAR";
   price: number | string;
   compare_at_price: number | string | null;
@@ -50,7 +51,7 @@ type PublicStoreProductRow = {
 };
 
 const PUBLIC_PRODUCT_SELECT =
-  "id,name,slug,sku,product_type,status,short_description,description,category,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at,fulfilment_model";
+  "id,name,slug,sku,product_type,status,short_description,description,category,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at,fulfilment_model,partner_name";
 
 const ALL_PROVINCES = [
   "Gauteng",
@@ -163,7 +164,7 @@ function mapRow(row: PublicStoreProductRow): Product {
   const affiliate =
     fulfilment === "affiliate" && row.affiliate_url
       ? {
-          partner_name: row.brand || "Partner retailer",
+          partner_name: row.partner_name || row.brand || "Partner retailer",
           tracking_url: row.affiliate_url,
           disclosure_text:
             "This is a partner offer. Payment, delivery and returns are handled by the retailer. Cossa Store may earn a commission.",
@@ -345,3 +346,4 @@ export async function listRelatedProducts(product: Product, limit = 4): Promise<
     .filter((candidate) => candidate.id !== product.id && candidate.category === product.category)
     .slice(0, limit);
 }
+
