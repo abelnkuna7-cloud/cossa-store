@@ -3,7 +3,6 @@ import { queryOptions } from "@tanstack/react-query";
 import {
   fetchCategory,
   fetchProject,
-  listPublicCollections,
 } from "@/services/catalog.service";
 
 import {
@@ -136,6 +135,15 @@ export const productsByIdsQuery = (
 /* COLLECTIONS                                                                */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Legacy collections lived in the previous Store Supabase project.
+ *
+ * The consolidated cossa-growth database does not yet have the replacement
+ * collection model. Returning an empty collection set keeps the Store fully
+ * operational while preventing a missing legacy table from crashing SSR.
+ *
+ * Reconnect this query when real Store collections are added to cossa-growth.
+ */
 export const publicCollectionsQuery = () =>
   queryOptions({
     queryKey: [
@@ -143,8 +151,7 @@ export const publicCollectionsQuery = () =>
       "public",
     ],
 
-    queryFn: () =>
-      listPublicCollections(),
+    queryFn: async () => [],
   });
 
 /* -------------------------------------------------------------------------- */
