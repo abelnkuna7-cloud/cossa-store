@@ -1,0 +1,1 @@
+Printify product sync is deployed as a protected Supabase Edge Function. Variant identity is scoped by Cossa product + provider + provider variant ID. Source prices remain in USD; Cossa customer-facing prices are stored in ZAR per variant.

@@ -10,8 +10,16 @@ type PrintifyPreviewProduct = {
   title: string;
   visibleInPrintify: boolean;
   enabledVariantCount: number;
-  minRetailCents: number | null;
-  minCostCents: number | null;
+  minRetailUsd: number | null;
+  minRetailZar: number | null;
+  minCostUsd: number | null;
+  minCostZar: number | null;
+};
+
+type CurrencyInfo = {
+  source: "USD";
+  store: "ZAR";
+  fxRate: number;
 };
 
 type PrintifyPreview = {
@@ -21,6 +29,7 @@ type PrintifyPreview = {
     salesChannel?: unknown;
   };
   count: number;
+  currency: CurrencyInfo;
   products: PrintifyPreviewProduct[];
 };
 
@@ -30,15 +39,16 @@ type PrintifyStageResult = {
     title: string;
   };
   count: number;
+  currency: CurrencyInfo;
   staged: Array<{
     id: string;
     name: string;
     slug: string;
     status: string;
     supplier_product_ref: string;
-    enabledVariantCount: number;
-    minRetailCents: number | null;
-    minCostCents: number | null;
+    variantCount: number;
+    minRetailUsd: number | null;
+    minRetailZar: number | null;
   }>;
 };
 
@@ -52,8 +62,18 @@ async function invokePrintify<T>(action: "preview" | "stage_drafts"): Promise<T>
   return data as T;
 }
 
-function cents(value: number | null): string {
-  return value == null ? "—" : `${(value / 100).toFixed(2)} provider-currency`;
+function usd(value: number | null): string {
+  return value == null ? "—" : `US$ ${value.toFixed(2)}`;
+}
+
+function zar(value: number | null): string {
+  return value == null
+    ? "—"
+    : new Intl.NumberFormat("en-ZA", {
+        style: "currency",
+        currency: "ZAR",
+        minimumFractionDigits: 2,
+      }).format(value);
 }
 
 export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
@@ -81,7 +101,7 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
     try {
       const result = await invokePrintify<PrintifyStageResult>("stage_drafts");
       toast.success("Printify products staged", {
-        description: `${result.count} product${result.count === 1 ? "" : "s"} synced into the Cossa catalogue. New products remain Draft.`,
+        description: `${result.count} product${result.count === 1 ? "" : "s"} synced into the Cossa catalogue with variant pricing. New products remain Draft.`,
       });
       onSynced?.();
       const refreshed = await invokePrintify<PrintifyPreview>("preview");
@@ -99,7 +119,7 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
         <div>
           <h2 className="font-semibold">Printify POD connection</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Read the real products in the connected Printify shop and stage them in Cossa Store. New Printify items remain Draft until pricing, variants and fulfilment are reviewed.
+            Read the real products in the connected Printify shop and stage them in Cossa Store. Printify source prices remain in USD while customer selling prices are stored and displayed in ZAR. New items remain Draft until published.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -120,17 +140,19 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
             <span><strong>Shop:</strong> {preview.shop.title}</span>
             <span><strong>Shop ID:</strong> {preview.shop.id}</span>
             <span><strong>Products:</strong> {preview.count}</span>
+            <span><strong>FX:</strong> US$1 = R{preview.currency.fxRate.toFixed(4)}</span>
           </div>
           {preview.products.length ? (
             <div className="overflow-x-auto rounded-md border border-border">
-              <table className="w-full min-w-[720px] text-left text-sm">
+              <table className="w-full min-w-[840px] text-left text-sm">
                 <thead className="bg-secondary/60 text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2">Printify product</th>
                     <th className="px-3 py-2">Variants</th>
-                    <th className="px-3 py-2">Printify visible</th>
-                    <th className="px-3 py-2">Lowest retail</th>
-                    <th className="px-3 py-2">Lowest cost</th>
+                    <th className="px-3 py-2">Visible</th>
+                    <th className="px-3 py-2">Lowest retail USD</th>
+                    <th className="px-3 py-2">Store retail ZAR</th>
+                    <th className="px-3 py-2">Lowest cost USD</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -142,8 +164,9 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
                       </td>
                       <td className="px-3 py-2">{product.enabledVariantCount}</td>
                       <td className="px-3 py-2">{product.visibleInPrintify ? "Yes" : "No"}</td>
-                      <td className="px-3 py-2">{cents(product.minRetailCents)}</td>
-                      <td className="px-3 py-2">{cents(product.minCostCents)}</td>
+                      <td className="px-3 py-2">{usd(product.minRetailUsd)}</td>
+                      <td className="px-3 py-2 font-medium">{zar(product.minRetailZar)}</td>
+                      <td className="px-3 py-2">{usd(product.minCostUsd)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -153,7 +176,7 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
             <p className="text-sm text-muted-foreground">No products were returned by Printify.</p>
           )}
           <p className="text-xs text-muted-foreground">
-            Printify product prices/costs are shown only as provider-currency cents here. They are not converted into ZAR automatically yet, so the sync does not invent a Cossa selling price.
+            Printify remains the USD source of truth. Cossa Store stores the matching ZAR retail price for each enabled variant, and checkout validates the selected variant server-side.
           </p>
         </div>
       ) : null}
