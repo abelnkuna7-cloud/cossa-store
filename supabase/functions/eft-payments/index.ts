@@ -282,7 +282,7 @@ async function resolveSubscriptionOrganisation(
     120,
   );
   const fallbackName = cleanText(user.email?.split("@")[0], 80) || "NexDocs customer";
-  const legalName = `${displayName || fallbackName} — NexDocs account`;
+  const legalName = `${displayName || fallbackName} â€” NexDocs account`;
 
   const { data: organisation, error: organisationError } = await admin
     .from("organisations")
@@ -666,9 +666,21 @@ Deno.serve(async (request) => {
   if (origin && !ALLOWED_ORIGINS.has(origin)) return json(request, { error: "Origin not allowed." }, 403);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const publishableKey = Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
+  // Managed Supabase functions expose the legacy anon key in some projects
+  // and the newer publishable key in others. Either key is public and is
+  // used here only to verify the caller's supplied session token.
+  const publishableKey =
+    Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !publishableKey || !serviceRoleKey) {
+    console.error(
+      JSON.stringify({
+        event: "eft_payment_service_configuration_missing",
+        hasSupabaseUrl: Boolean(supabaseUrl),
+        hasPublishableKey: Boolean(publishableKey),
+        hasServiceRoleKey: Boolean(serviceRoleKey),
+      }),
+    );
     return json(request, { error: "The payment service is not configured." }, 503);
   }
 
@@ -717,3 +729,4 @@ Deno.serve(async (request) => {
     return json(request, { error: message }, 400);
   }
 });
+
