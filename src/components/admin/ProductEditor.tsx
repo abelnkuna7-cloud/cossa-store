@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { CATEGORIES } from "@/data/categories";
 import { supabase } from "@/integrations/supabase/client";
 
 const ORGANISATION_ID = "00000000-0000-4000-8000-000000000001";
@@ -158,6 +159,25 @@ function modeFromProduct(type: ProductType, fulfilment: FulfilmentModel): Produc
   return "physical";
 }
 
+/**
+ * Storefront filters use department slugs, while staff should see familiar
+ * department names. Resolve either form to the single stored slug so a
+ * product always appears under the department selected in the Store.
+ */
+function canonicalCategory(value: string | null | undefined) {
+  const clean = value?.trim();
+  if (!clean) return "";
+
+  const normalized = clean.toLocaleLowerCase();
+  return (
+    CATEGORIES.find(
+      (category) =>
+        category.slug === normalized ||
+        category.name.toLocaleLowerCase() === normalized,
+    )?.slug ?? clean
+  );
+}
+
 export function ProductEditor({ productId }: { productId?: string; mode?: "create" | "edit" }) {
   const navigate = useNavigate();
   const [form, setForm] = useState<StoreProductForm>(EMPTY);
@@ -202,7 +222,7 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
         status: (data.status ?? "draft") as ProductStatus,
         short_description: data.short_description ?? "",
         description: data.description ?? "",
-        category: data.category ?? "",
+        category: canonicalCategory(data.category),
         brand: data.brand ?? "",
         supplier_name: data.supplier_name ?? "",
         supplier_product_ref: data.supplier_product_ref ?? "",
@@ -294,7 +314,7 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
             fulfilment_model: "digital",
             track_inventory: false,
             unlimited_stock: true,
-            category: current.category || "Digital Products",
+            category: current.category || "digital-products",
             cost_price: current.cost_price || "0",
           });
           break;
@@ -394,7 +414,7 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
         status: publish ? "active" : form.status,
         short_description: nullable(form.short_description),
         description: nullable(form.description),
-        category: nullable(form.category),
+        category: nullable(canonicalCategory(form.category)),
         brand: nullable(form.brand),
         supplier_name: usesPartner ? nullable(form.supplier_name) : null,
         supplier_product_ref: isSupplier ? nullable(form.supplier_product_ref) : null,
@@ -510,7 +530,23 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
             />
           </Field>
           <Field label="Category">
-            <Input value={form.category} onChange={(event) => set("category", event.target.value)} placeholder={isDigital ? "Digital Products" : "Construction & DIY"} />
+            <select
+              value={form.category}
+              onChange={(event) => set("category", event.target.value)}
+              className="flex h-9 w-full cursor-pointer rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="" disabled>
+                Select a department
+              </option>
+              {CATEGORIES.map((category) => (
+                <option key={category.slug} value={category.slug}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              This keeps the product aligned with the Store navigation and department pages.
+            </p>
           </Field>
           <Field label="Brand">
             <Input value={form.brand} onChange={(event) => set("brand", event.target.value)} placeholder="Cossa Store or product brand" />
