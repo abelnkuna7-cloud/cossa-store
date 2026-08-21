@@ -5,6 +5,7 @@ import { Copy, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { CatalogueShell } from "@/components/admin/CatalogueShell";
+import { PrintifySyncPanel } from "@/components/admin/PrintifySyncPanel";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/common/StateBlocks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -158,6 +159,13 @@ function CatalogueTable() {
 
   return (
     <div className="space-y-5">
+      <PrintifySyncPanel
+        onSynced={() => {
+          queryClient.invalidateQueries({ queryKey: ["admin", "store-products"] });
+          queryClient.invalidateQueries({ queryKey: ["products"] });
+        }}
+      />
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Input placeholder="Search product or code" value={search} onChange={(event) => setSearch(event.target.value)} className="lg:col-span-2" />
         <FilterSelect label="Status" value={status} onChange={setStatus} options={["all", ...options.statuses]} />
