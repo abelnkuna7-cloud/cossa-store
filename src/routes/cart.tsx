@@ -808,11 +808,13 @@ function CartPage() {
 
               <NoticeBlock
                 tone="pending"
-                title="Online payments are not live yet"
+                title="Secure EFT checkout is available"
               >
-                Merchant verification and production payment integrations are
-                still being completed. Cossa Store will only present payment
-                methods as available once they are approved and operational.
+                Card and instant-payment integrations are still being completed.
+                Continue to checkout to create a secure EFT payment request with
+                the exact amount and a unique reference, then upload your proof
+                of payment for review. Digital access is released only after the
+                payment is approved.
               </NoticeBlock>
             </aside>
           </div>
