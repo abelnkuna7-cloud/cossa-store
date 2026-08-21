@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { CATEGORIES } from "@/data/categories";
 import type { FulfilmentType, Product } from "@/types/catalog";
 
 const db = supabase as unknown as {
@@ -136,10 +137,32 @@ function estimatedDeliveryFor(row: PublicStoreProductRow) {
   }
 }
 
+function storefrontCategory(row: PublicStoreProductRow) {
+  const raw = row.category?.trim();
+  if (!raw) {
+    return {
+      slug: "digital-products",
+      name: "Digital Products",
+    };
+  }
+
+  const normalized = raw.toLocaleLowerCase();
+  const category = CATEGORIES.find(
+    (candidate) =>
+      candidate.slug === normalized ||
+      candidate.name.toLocaleLowerCase() === normalized,
+  );
+
+  return category
+    ? { slug: category.slug, name: category.name }
+    : { slug: raw, name: raw };
+}
+
 function mapRow(row: PublicStoreProductRow): Product {
   const sellingPrice = asNumber(row.price);
   const compareAt = row.compare_at_price == null ? null : asNumber(row.compare_at_price);
   const fulfilment = fulfilmentFor(row);
+  const category = storefrontCategory(row);
   const stockStatus = stockStatusFor(row);
   const availability = availabilityFor(row);
   const stockAvailable =
@@ -200,9 +223,9 @@ function mapRow(row: PublicStoreProductRow): Product {
     stock_status: stockStatus,
     stock_available: stockAvailable,
     stock_quantity: fulfilment === "cossa_stock" && row.track_inventory ? row.stock_quantity : null,
-    category: row.category ?? "digital-products",
+    category: category.slug,
     subcategory: "",
-    display_category: row.category ?? "Cossa Store",
+    display_category: category.name,
     brand: row.brand,
     collection: null,
     images,
