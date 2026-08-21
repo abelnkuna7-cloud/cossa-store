@@ -29,6 +29,8 @@ export type EftInstructions = {
 export type EftOrder = {
   orderNumber: string;
   orderStatus: string;
+  subtotal: number;
+  shippingTotal: number;
   total: number;
   items: Array<{
     productName: string;
@@ -47,6 +49,15 @@ export type EftPaymentDetail = {
 };
 
 type CheckoutLine = { productId: string; variantId?: string | null; quantity: number };
+
+export type StoreShippingAddress = {
+  address1: string;
+  address2?: string;
+  city: string;
+  region: string;
+  zip: string;
+  country: "ZA";
+};
 
 function errorMessage(error: unknown, data: unknown, fallback: string): string {
   const remote = data as { error?: unknown } | null;
@@ -89,6 +100,7 @@ export async function startStoreEftPayment(input: {
   customerPhone: string;
   cart: CheckoutLine[];
   clientRequestId: string;
+  shippingAddress?: StoreShippingAddress;
 }): Promise<EftPaymentDetail> {
   const payload = { ...input, cart: preserveVariantIdentity(input.cart) };
   const { data, error } = await supabase.functions.invoke("store-eft-checkout", { body: payload });

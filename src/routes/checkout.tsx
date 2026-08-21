@@ -45,6 +45,11 @@ function CheckoutPage() {
   const [acceptedPolicies, setAcceptedPolicies] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [address1, setAddress1] = useState("");
+  const [address2, setAddress2] = useState("");
+  const [city, setCity] = useState("");
+  const [region, setRegion] = useState("");
+  const [zip, setZip] = useState("");
   const [requestId] = useState(newRequestId);
   const [payment, setPayment] = useState<EftPaymentDetail | null>(null);
   const [proof, setProof] = useState<File | null>(null);
@@ -57,12 +62,20 @@ function CheckoutPage() {
     if (!customerName && typeof suggestedName === "string") setCustomerName(suggestedName);
   }, [customerName, session?.user.user_metadata?.display_name, session?.user.user_metadata?.full_name]);
 
+  const hasVariantPhysicalItems = cart.some((line) => Boolean(line.variant_id));
+  const hasDeliveryAddress =
+    address1.trim().length >= 4 &&
+    city.trim().length >= 2 &&
+    region.trim().length >= 2 &&
+    zip.trim().length >= 3;
+
   const canStartPayment =
     Boolean(session?.user) &&
     hydrated &&
     cart.length > 0 &&
     acceptedPolicies &&
     customerName.trim().length >= 2 &&
+    (!hasVariantPhysicalItems || hasDeliveryAddress) &&
     !starting;
 
   async function createPaymentRequest() {
@@ -74,7 +87,21 @@ function CheckoutPage() {
         customerName,
         customerPhone,
         clientRequestId: requestId,
-        cart: cart.map((line) => ({ productId: line.product_id, quantity: line.quantity })),
+        cart: cart.map((line) => ({
+          productId: line.product_id,
+          variantId: line.variant_id,
+          quantity: line.quantity,
+        })),
+        shippingAddress: hasVariantPhysicalItems
+          ? {
+              address1,
+              address2,
+              city,
+              region,
+              zip,
+              country: "ZA",
+            }
+          : undefined,
       });
       setPayment(result);
       clearCart();
@@ -147,18 +174,27 @@ function CheckoutPage() {
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
                   <div>
                     <h2 className="font-display text-lg font-semibold">Order {payment.order.orderNumber}</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">Product details and pricing are fixed before you transfer payment.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Product details, delivery and pricing are fixed before you transfer payment.</p>
                   </div>
                   <span className="font-semibold text-primary">{formatZar(payment.order.total)}</span>
                 </div>
                 <ul className="mt-4 divide-y divide-border rounded-md border border-border">
                   {payment.order.items.map((item) => (
-                    <li key={`${item.sku ?? item.productName}-${item.quantity}`} className="flex items-start justify-between gap-4 px-4 py-3 text-sm">
-                      <span className="min-w-0"><span className="block font-medium">{item.productName}</span><span className="mt-1 block text-xs text-muted-foreground">{item.sku ? `SKU ${item.sku} · ` : ""}Quantity {item.quantity}</span></span>
+                    <li key={`${item.sku ?? item.productName}-${item.variantTitle ?? "base"}-${item.quantity}`} className="flex items-start justify-between gap-4 px-4 py-3 text-sm">
+                      <span className="min-w-0">
+                        <span className="block font-medium">{item.productName}</span>
+                        {item.variantTitle ? <span className="mt-1 block text-xs font-medium text-primary">{item.variantTitle}</span> : null}
+                        <span className="mt-1 block text-xs text-muted-foreground">{item.sku ? `SKU ${item.sku} · ` : ""}Quantity {item.quantity}</span>
+                      </span>
                       <span className="shrink-0 font-medium">{formatZar(item.lineTotal)}</span>
                     </li>
                   ))}
                 </ul>
+                <dl className="mt-4 space-y-2 text-sm">
+                  <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Products</dt><dd>{formatZar(payment.order.subtotal)}</dd></div>
+                  {payment.order.shippingTotal > 0 ? <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Delivery</dt><dd>{formatZar(payment.order.shippingTotal)}</dd></div> : null}
+                  <div className="flex justify-between gap-4 border-t border-border pt-2 font-semibold"><dt>Total</dt><dd>{formatZar(payment.order.total)}</dd></div>
+                </dl>
               </section>
             ) : null}
 
@@ -204,7 +240,7 @@ function CheckoutPage() {
                 <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
                 <div>
                   <h2 className="font-display text-lg font-semibold">Order protection</h2>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Prices, product descriptions and stock eligibility are confirmed on Cossa’s server before the EFT reference is issued. We never ask for a banking password, card PIN or online-banking security code.</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Prices, selected product options, delivery and stock eligibility are confirmed on Cossa’s server before the EFT reference is issued. We never ask for a banking password, card PIN or online-banking security code.</p>
                 </div>
               </div>
             </section>
@@ -225,13 +261,29 @@ function CheckoutPage() {
 
             <section className="rounded-lg border border-border bg-card p-6">
               <h2 className="font-display text-lg font-semibold">Create your EFT order</h2>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Your cart currently has {hydrated ? cart.length : "…"} product{hydrated && cart.length === 1 ? "" : "s"}. The exact total and product description are shown before you pay.</p>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Your cart currently has {hydrated ? cart.length : "…"} product{hydrated && cart.length === 1 ? "" : "s"}. The exact product and delivery total is calculated before you pay.</p>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2"><Label htmlFor="customer-name">Full name</Label><Input id="customer-name" autoComplete="name" required value={customerName} onChange={(event) => setCustomerName(event.target.value)} /></div>
-                <div className="space-y-2"><Label htmlFor="customer-phone">Phone number (optional)</Label><Input id="customer-phone" type="tel" autoComplete="tel" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} /></div>
+                <div className="space-y-2"><Label htmlFor="customer-phone">Phone number</Label><Input id="customer-phone" type="tel" autoComplete="tel" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} /></div>
               </div>
+
+              {hasVariantPhysicalItems ? (
+                <div className="mt-6 rounded-md border border-border bg-background/40 p-4">
+                  <h3 className="font-semibold">South African delivery address</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Printify delivery is quoted from the exact selected product variants and this address before the EFT amount is created.</p>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2 sm:col-span-2"><Label htmlFor="address1">Street address</Label><Input id="address1" autoComplete="address-line1" required value={address1} onChange={(event) => setAddress1(event.target.value)} /></div>
+                    <div className="space-y-2 sm:col-span-2"><Label htmlFor="address2">Complex, unit or additional address (optional)</Label><Input id="address2" autoComplete="address-line2" value={address2} onChange={(event) => setAddress2(event.target.value)} /></div>
+                    <div className="space-y-2"><Label htmlFor="city">City / town</Label><Input id="city" autoComplete="address-level2" required value={city} onChange={(event) => setCity(event.target.value)} /></div>
+                    <div className="space-y-2"><Label htmlFor="region">Province</Label><Input id="region" autoComplete="address-level1" required value={region} onChange={(event) => setRegion(event.target.value)} placeholder="Gauteng" /></div>
+                    <div className="space-y-2"><Label htmlFor="zip">Postal code</Label><Input id="zip" autoComplete="postal-code" inputMode="numeric" required value={zip} onChange={(event) => setZip(event.target.value)} /></div>
+                    <div className="space-y-2"><Label>Country</Label><Input value="South Africa" disabled /></div>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="mt-5 flex flex-wrap gap-3">
-                <Button type="button" size="lg" disabled={!canStartPayment} onClick={() => void createPaymentRequest()}>{starting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}{starting ? "Preparing secure payment…" : "Create EFT payment request"}</Button>
+                <Button type="button" size="lg" disabled={!canStartPayment} onClick={() => void createPaymentRequest()}>{starting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}{starting ? "Calculating delivery…" : "Create EFT payment request"}</Button>
                 <Button asChild variant="outline" size="lg"><Link to="/cart">Back to cart</Link></Button>
               </div>
               {!hydrated || cart.length === 0 ? <p className="mt-3 text-xs text-muted-foreground">Add active Cossa Store products to your cart before creating an EFT payment request.</p> : null}
