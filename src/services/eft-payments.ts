@@ -32,6 +32,7 @@ export type EftOrder = {
   total: number;
   items: Array<{
     productName: string;
+    variantTitle?: string | null;
     sku: string | null;
     quantity: number;
     unitPrice: number;
@@ -62,10 +63,13 @@ async function invoke<T>(body: Record<string, unknown>): Promise<T> {
 export async function startStoreEftPayment(input: {
   customerName: string;
   customerPhone: string;
-  cart: Array<{ productId: string; quantity: number }>;
+  cart: Array<{ productId: string; variantId?: string | null; quantity: number }>;
   clientRequestId: string;
 }): Promise<EftPaymentDetail> {
-  return invoke<EftPaymentDetail>({ action: "start_store_payment", ...input });
+  const { data, error } = await supabase.functions.invoke("store-eft-checkout", { body: input });
+  if (error) throw new Error(errorMessage(error, data, "The secure Store checkout is unavailable."));
+  if (!data) throw new Error("The secure Store checkout returned no result.");
+  return data as EftPaymentDetail;
 }
 
 export async function listMyEftPayments(): Promise<{ payments: EftPaymentDetail[] }> {
