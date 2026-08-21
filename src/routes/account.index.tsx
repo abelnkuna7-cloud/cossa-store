@@ -1,8 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 
-import { NoticeBlock } from "@/components/common/StateBlocks";
 import { Button } from "@/components/ui/button";
-import { AUTH_CONNECTED } from "@/services/account.service";
 import { useProfile, useSession } from "@/lib/auth";
 
 export const Route = createFileRoute("/account/")({
@@ -25,14 +23,14 @@ function AccountOverview() {
             <p className="text-sm text-muted-foreground">{profile.data.business_name}</p>
           ) : null}
           <Button asChild className="mt-4">
-            <Link to="/admin/catalogue">Manage my products</Link>
+            <Link to="/account/orders">View my orders & downloads</Link>
           </Button>
         </div>
       ) : !loading ? (
         <div className="rounded-lg border border-border bg-card p-6">
-          <h2 className="font-display text-lg font-semibold">Sign in to your member account</h2>
+          <h2 className="font-display text-lg font-semibold">Sign in to your Cossa Store account</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Members can list and manage their own products on Cossa Store.
+            Your EFT orders, payment status and approved digital downloads stay linked to the account used at checkout.
           </p>
           <Button asChild className="mt-4">
             <Link to="/auth">Sign in or sign up</Link>
@@ -40,17 +38,10 @@ function AccountOverview() {
         </div>
       ) : null}
 
-      {!AUTH_CONNECTED ? (
-        <NoticeBlock tone="pending" title="Customer accounts are not live yet">
-          Customer order history and saved addresses are not connected yet. Your cart, wishlist and
-          quote basket are stored on this device in the meantime.
-        </NoticeBlock>
-      ) : null}
-
       <div className="grid gap-4 sm:grid-cols-2">
         <Card
-          title="Orders"
-          description="Track order status and delivery updates."
+          title="Orders & downloads"
+          description="Track EFT approval and securely download paid digital purchases."
           to="/account/orders"
           cta="View orders"
         />
