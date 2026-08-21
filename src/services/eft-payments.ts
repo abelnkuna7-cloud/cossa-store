@@ -59,16 +59,36 @@ export type StoreShippingAddress = {
   country: "ZA";
 };
 
-function errorMessage(error: unknown, data: unknown, fallback: string): string {
+async function errorMessage(error: unknown, data: unknown, fallback: string): Promise<string> {
   const remote = data as { error?: unknown } | null;
   if (typeof remote?.error === "string" && remote.error) return remote.error;
+
+  const context =
+    error && typeof error === "object" && "context" in error
+      ? (error as { context?: unknown }).context
+      : null;
+
+  if (typeof Response !== "undefined" && context instanceof Response) {
+    try {
+      const body = (await context.clone().json()) as { error?: unknown } | null;
+      if (typeof body?.error === "string" && body.error.trim()) return body.error.trim();
+    } catch {
+      try {
+        const body = await context.clone().text();
+        if (body.trim()) return body.trim().slice(0, 300);
+      } catch {
+        // Fall through to the SDK error/fallback below.
+      }
+    }
+  }
+
   if (error instanceof Error && error.message) return error.message;
   return fallback;
 }
 
 async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke("eft-payments", { body });
-  if (error) throw new Error(errorMessage(error, data, "The EFT payment service is unavailable."));
+  if (error) throw new Error(await errorMessage(error, data, "The EFT payment service is unavailable."));
   if (!data) throw new Error("The EFT payment service returned no result.");
   return data as T;
 }
@@ -80,14 +100,23 @@ function preserveVariantIdentity(cart: CheckoutLine[]): CheckoutLine[] {
     const raw = window.localStorage.getItem("cossa.commerce.v2");
     if (!raw) return cart;
     const saved = JSON.parse(raw) as { cart?: Array<{ product_id?: unknown; variant_id?: unknown; quantity?: unknown }> };
-    if (!Array.isArray(saved.cart) || saved.cart.length !== cart.length) return cart;
+    if (!Array.isArray(saved.cart)) return cart;
 
-    return cart.map((line, index) => {
-      const stored = saved.cart?.[index];
-      if (!stored || stored.product_id !== line.productId) return line;
+    return cart.map((line) => {
+      // Never overwrite a valid in-memory selection. Browser storage is only a
+      // compatibility fallback for older/stale cart hydration.
+      if (typeof line.variantId === "string" && line.variantId.trim()) return line;
+
+      const matches = saved.cart.filter((stored) => stored?.product_id === line.productId);
+      if (matches.length !== 1) return line;
+
+      const storedVariant = matches[0]?.variant_id;
       return {
         ...line,
-        variantId: typeof stored.variant_id === "string" && stored.variant_id.trim() ? stored.variant_id.trim() : null,
+        variantId:
+          typeof storedVariant === "string" && storedVariant.trim()
+            ? storedVariant.trim()
+            : null,
       };
     });
   } catch {
@@ -104,7 +133,7 @@ export async function startStoreEftPayment(input: {
 }): Promise<EftPaymentDetail> {
   const payload = { ...input, cart: preserveVariantIdentity(input.cart) };
   const { data, error } = await supabase.functions.invoke("store-eft-checkout", { body: payload });
-  if (error) throw new Error(errorMessage(error, data, "The secure Store checkout is unavailable."));
+  if (error) throw new Error(await errorMessage(error, data, "The secure Store checkout is unavailable."));
   if (!data) throw new Error("The secure Store checkout returned no result.");
   return data as EftPaymentDetail;
 }
@@ -124,7 +153,7 @@ export async function submitEftProof(input: {
   body.set("payerNote", input.payerNote);
 
   const { data, error } = await supabase.functions.invoke("eft-payments", { body });
-  if (error) throw new Error(errorMessage(error, data, "Your proof of payment could not be uploaded."));
+  if (error) throw new Error(await errorMessage(error, data, "Your proof of payment could not be uploaded."));
   if (!data) throw new Error("The payment service returned no result.");
   return data as { payment: EftPayment; message: string };
 }
