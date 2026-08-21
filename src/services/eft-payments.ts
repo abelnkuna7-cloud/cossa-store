@@ -46,6 +46,8 @@ export type EftPaymentDetail = {
   order?: EftOrder;
 };
 
+type CheckoutLine = { productId: string; variantId?: string | null; quantity: number };
+
 function errorMessage(error: unknown, data: unknown, fallback: string): string {
   const remote = data as { error?: unknown } | null;
   if (typeof remote?.error === "string" && remote.error) return remote.error;
@@ -60,13 +62,36 @@ async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 
+function preserveVariantIdentity(cart: CheckoutLine[]): CheckoutLine[] {
+  if (typeof window === "undefined") return cart;
+
+  try {
+    const raw = window.localStorage.getItem("cossa.commerce.v2");
+    if (!raw) return cart;
+    const saved = JSON.parse(raw) as { cart?: Array<{ product_id?: unknown; variant_id?: unknown; quantity?: unknown }> };
+    if (!Array.isArray(saved.cart) || saved.cart.length !== cart.length) return cart;
+
+    return cart.map((line, index) => {
+      const stored = saved.cart?.[index];
+      if (!stored || stored.product_id !== line.productId) return line;
+      return {
+        ...line,
+        variantId: typeof stored.variant_id === "string" && stored.variant_id.trim() ? stored.variant_id.trim() : null,
+      };
+    });
+  } catch {
+    return cart;
+  }
+}
+
 export async function startStoreEftPayment(input: {
   customerName: string;
   customerPhone: string;
-  cart: Array<{ productId: string; variantId?: string | null; quantity: number }>;
+  cart: CheckoutLine[];
   clientRequestId: string;
 }): Promise<EftPaymentDetail> {
-  const { data, error } = await supabase.functions.invoke("store-eft-checkout", { body: input });
+  const payload = { ...input, cart: preserveVariantIdentity(input.cart) };
+  const { data, error } = await supabase.functions.invoke("store-eft-checkout", { body: payload });
   if (error) throw new Error(errorMessage(error, data, "The secure Store checkout is unavailable."));
   if (!data) throw new Error("The secure Store checkout returned no result.");
   return data as EftPaymentDetail;
