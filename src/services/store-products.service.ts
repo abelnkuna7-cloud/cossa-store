@@ -1,10 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES } from "@/data/categories";
-import type { FulfilmentType, Product } from "@/types/catalog";
+import type { FulfilmentType, Product, ProductVariantPublic } from "@/types/catalog";
 
-const db = supabase as unknown as {
-  from: (table: string) => any;
-};
+const db = supabase as unknown as { from: (table: string) => any };
 
 export interface ProductQuery {
   category?: string;
@@ -51,8 +49,24 @@ type PublicStoreProductRow = {
   updated_at: string;
 };
 
+type StoreVariantRow = {
+  id: string;
+  product_id: string;
+  provider: string;
+  provider_variant_id: string;
+  sku: string | null;
+  title: string;
+  price_zar: number | string;
+  is_default: boolean;
+  is_available: boolean;
+  sort_order: number;
+};
+
 const PUBLIC_PRODUCT_SELECT =
   "id,name,slug,sku,product_type,status,short_description,description,category,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at,fulfilment_model,partner_name";
+
+const PUBLIC_VARIANT_SELECT =
+  "id,product_id,provider,provider_variant_id,sku,title,price_zar,is_default,is_available,sort_order";
 
 const ALL_PROVINCES = [
   "Gauteng",
@@ -97,17 +111,12 @@ function stockStatusFor(row: PublicStoreProductRow) {
 
 function availabilityFor(row: PublicStoreProductRow) {
   switch (row.fulfilment_model) {
-    case "digital":
-      return "digital_available" as const;
-    case "affiliate":
-      return "partner_offer" as const;
-    case "print_on_demand":
-      return "made_to_order" as const;
-    case "local_supplier":
-      return "available_from_supplier" as const;
+    case "digital": return "digital_available" as const;
+    case "affiliate": return "partner_offer" as const;
+    case "print_on_demand": return "made_to_order" as const;
+    case "local_supplier": return "available_from_supplier" as const;
     case "local_dropshipping":
-    case "international_dropshipping":
-      return "available_to_order" as const;
+    case "international_dropshipping": return "available_to_order" as const;
     case "cossa_stock":
     default:
       if (row.unlimited_stock || !row.track_inventory) return "available_to_order" as const;
@@ -119,46 +128,55 @@ function availabilityFor(row: PublicStoreProductRow) {
 
 function estimatedDeliveryFor(row: PublicStoreProductRow) {
   switch (row.fulfilment_model) {
-    case "digital":
-      return "Digital access after successful payment confirmation.";
-    case "affiliate":
-      return "Delivery and fulfilment are handled by the partner retailer.";
-    case "print_on_demand":
-      return "Made to order. Production and delivery timing is confirmed during checkout.";
-    case "local_supplier":
-      return "Local supplier availability and delivery timing are confirmed before dispatch.";
-    case "local_dropshipping":
-      return "Ships directly from a local fulfilment partner after order confirmation.";
-    case "international_dropshipping":
-      return "International supplier delivery timing and any applicable import handling are confirmed before processing.";
+    case "digital": return "Digital access after successful payment confirmation.";
+    case "affiliate": return "Delivery and fulfilment are handled by the partner retailer.";
+    case "print_on_demand": return "Made to order. Production and delivery timing is confirmed during checkout.";
+    case "local_supplier": return "Local supplier availability and delivery timing are confirmed before dispatch.";
+    case "local_dropshipping": return "Ships directly from a local fulfilment partner after order confirmation.";
+    case "international_dropshipping": return "International supplier delivery timing and any applicable import handling are confirmed before processing.";
     case "cossa_stock":
-    default:
-      return "Delivery timing is confirmed during checkout or before dispatch.";
+    default: return "Delivery timing is confirmed during checkout or before dispatch.";
   }
 }
 
 function storefrontCategory(row: PublicStoreProductRow) {
   const raw = row.category?.trim();
-  if (!raw) {
-    return {
-      slug: "digital-products",
-      name: "Digital Products",
-    };
-  }
-
+  if (!raw) return { slug: "digital-products", name: "Digital Products" };
   const normalized = raw.toLocaleLowerCase();
   const category = CATEGORIES.find(
-    (candidate) =>
-      candidate.slug === normalized ||
-      candidate.name.toLocaleLowerCase() === normalized,
+    (candidate) => candidate.slug === normalized || candidate.name.toLocaleLowerCase() === normalized,
   );
-
-  return category
-    ? { slug: category.slug, name: category.name }
-    : { slug: raw, name: raw };
+  return category ? { slug: category.slug, name: category.name } : { slug: raw, name: raw };
 }
 
-function mapRow(row: PublicStoreProductRow): Product {
+function inferSize(title: string): string | null {
+  const match = title.match(/(?:^|\s|\/|-)(5XL|4XL|3XL|2XL|XXXL|XXL|XL|L|M|S|XS|XXS)(?:$|\s|\/|-)/i);
+  return match?.[1]?.toUpperCase() ?? null;
+}
+
+function mapVariant(row: StoreVariantRow): ProductVariantPublic {
+  return {
+    id: row.id,
+    name: row.title,
+    sku: row.sku,
+    colour: null,
+    size: inferSize(row.title),
+    finish: null,
+    phone_model: null,
+    material: null,
+    retail_price: asNumber(row.price_zar),
+    compare_at_price: null,
+    shipping_estimate: null,
+    is_active: row.is_available,
+    stock_quantity: null,
+  } as unknown as ProductVariantPublic;
+}
+
+function mapRow(row: PublicStoreProductRow, variantRows: StoreVariantRow[] = []): Product {
+  const variants = variantRows
+    .filter((variant) => variant.product_id === row.id && variant.is_available)
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map(mapVariant);
   const sellingPrice = asNumber(row.price);
   const compareAt = row.compare_at_price == null ? null : asNumber(row.compare_at_price);
   const fulfilment = fulfilmentFor(row);
@@ -166,15 +184,9 @@ function mapRow(row: PublicStoreProductRow): Product {
   const stockStatus = stockStatusFor(row);
   const availability = availabilityFor(row);
   const stockAvailable =
-    fulfilment === "digital" ||
-    fulfilment === "affiliate" ||
-    fulfilment === "print_on_demand" ||
-    fulfilment === "local_supplier" ||
-    fulfilment === "local_dropshipping" ||
-    fulfilment === "international_dropshipping" ||
-    row.unlimited_stock ||
-    !row.track_inventory ||
-    row.stock_quantity > 0;
+    fulfilment === "digital" || fulfilment === "affiliate" || fulfilment === "print_on_demand" ||
+    fulfilment === "local_supplier" || fulfilment === "local_dropshipping" ||
+    fulfilment === "international_dropshipping" || row.unlimited_stock || !row.track_inventory || row.stock_quantity > 0;
 
   const images = (row.image_urls ?? []).map((url, index) => ({
     id: `${row.id}-image-${index + 1}`,
@@ -184,15 +196,13 @@ function mapRow(row: PublicStoreProductRow): Product {
     is_primary: index === 0,
   }));
 
-  const affiliate =
-    fulfilment === "affiliate" && row.affiliate_url
-      ? {
-          partner_name: row.partner_name || row.brand || "Partner retailer",
-          tracking_url: row.affiliate_url,
-          disclosure_text:
-            "This is a partner offer. Payment, delivery and returns are handled by the retailer. Cossa Store may earn a commission.",
-        }
-      : null;
+  const affiliate = fulfilment === "affiliate" && row.affiliate_url
+    ? {
+        partner_name: row.partner_name || row.brand || "Partner retailer",
+        tracking_url: row.affiliate_url,
+        disclosure_text: "This is a partner offer. Payment, delivery and returns are handled by the retailer. Cossa Store may earn a commission.",
+      }
+    : null;
 
   return {
     id: row.id,
@@ -206,16 +216,11 @@ function mapRow(row: PublicStoreProductRow): Product {
     product_type: row.product_type === "pod" ? "physical" : row.product_type,
     fulfilment_type: fulfilment,
     catalogue_entry_type:
-      row.product_type === "digital"
-        ? "digital_product"
-        : row.product_type === "affiliate"
-          ? "affiliate_partner_offer"
-          : row.product_type === "pod"
-            ? "print_on_demand_product"
-            : row.product_type === "dropshipping"
-              ? "dropshipping_product"
-              : "cossa_stocked_product",
-    price_display_mode: sellingPrice > 0 ? "fixed" : "quote",
+      row.product_type === "digital" ? "digital_product" :
+      row.product_type === "affiliate" ? "affiliate_partner_offer" :
+      row.product_type === "pod" ? "print_on_demand_product" :
+      row.product_type === "dropshipping" ? "dropshipping_product" : "cossa_stocked_product",
+    price_display_mode: sellingPrice > 0 ? (variants.length > 1 ? "from" : "fixed") : "quote",
     selling_price: sellingPrice,
     compare_at_price: compareAt && compareAt > sellingPrice ? compareAt : null,
     vat_status: "vat_inclusive",
@@ -229,7 +234,7 @@ function mapRow(row: PublicStoreProductRow): Product {
     brand: row.brand,
     collection: null,
     images,
-    variants: [],
+    variants,
     features: [],
     specifications: [],
     attributes: [],
@@ -249,10 +254,7 @@ function mapRow(row: PublicStoreProductRow): Product {
     related_product_ids: [],
     frequently_together_ids: [],
     warranty: null,
-    return_policy:
-      fulfilment === "digital"
-        ? "Digital products are subject to the Cossa Store digital-products and returns terms."
-        : null,
+    return_policy: fulfilment === "digital" ? "Digital products are subject to the Cossa Store digital-products and returns terms." : null,
     seo_title: row.seo_title,
     seo_description: row.seo_description,
     is_featured: row.featured,
@@ -266,22 +268,37 @@ function mapRow(row: PublicStoreProductRow): Product {
   } as unknown as Product;
 }
 
-async function loadRows(): Promise<PublicStoreProductRow[]> {
+async function loadVariants(productIds: string[]): Promise<StoreVariantRow[]> {
+  if (productIds.length === 0) return [];
   const { data, error } = await db
-    .from("store_public_products")
-    .select(PUBLIC_PRODUCT_SELECT)
-    .order("updated_at", { ascending: false });
+    .from("store_product_variants")
+    .select(PUBLIC_VARIANT_SELECT)
+    .in("product_id", productIds)
+    .eq("is_available", true)
+    .order("sort_order", { ascending: true });
+  if (error) {
+    console.error("[Cossa Store] Failed to load product variants", error);
+    throw error;
+  }
+  return (data ?? []) as StoreVariantRow[];
+}
 
+async function loadRows(): Promise<PublicStoreProductRow[]> {
+  const { data, error } = await db.from("store_public_products").select(PUBLIC_PRODUCT_SELECT).order("updated_at", { ascending: false });
   if (error) {
     console.error("[Cossa Store] Failed to load public products", error);
     throw error;
   }
-
   return (data ?? []) as PublicStoreProductRow[];
 }
 
+async function mapRowsWithVariants(rows: PublicStoreProductRow[]): Promise<Product[]> {
+  const variants = await loadVariants(rows.map((row) => row.id));
+  return rows.map((row) => mapRow(row, variants));
+}
+
 export async function listStorefrontProducts(): Promise<Product[]> {
-  return (await loadRows()).map(mapRow);
+  return mapRowsWithVariants(await loadRows());
 }
 
 export async function listFeaturedProducts(limit = 8): Promise<Product[]> {
@@ -291,15 +308,8 @@ export async function listFeaturedProducts(limit = 8): Promise<Product[]> {
 
 export async function listProducts(query: ProductQuery = {}): Promise<Product[]> {
   let products = await listStorefrontProducts();
-
-  if (query.category) {
-    products = products.filter((product) => product.category === query.category);
-  }
-
-  if (query.subcategory) {
-    products = products.filter((product) => product.subcategory === query.subcategory);
-  }
-
+  if (query.category) products = products.filter((product) => product.category === query.category);
+  if (query.subcategory) products = products.filter((product) => product.subcategory === query.subcategory);
   if (query.search?.trim()) {
     const needle = query.search.trim().toLowerCase();
     products = products.filter((product) =>
@@ -308,65 +318,44 @@ export async function listProducts(query: ProductQuery = {}): Promise<Product[]>
         .some((value) => String(value).toLowerCase().includes(needle)),
     );
   }
-
   switch (query.sort) {
-    case "price_asc":
-      products.sort((a, b) => a.selling_price - b.selling_price);
-      break;
-    case "price_desc":
-      products.sort((a, b) => b.selling_price - a.selling_price);
-      break;
-    case "name_asc":
-      products.sort((a, b) => a.name.localeCompare(b.name));
-      break;
-    default:
-      products.sort((a, b) => Number(b.is_featured) - Number(a.is_featured));
+    case "price_asc": products.sort((a, b) => a.selling_price - b.selling_price); break;
+    case "price_desc": products.sort((a, b) => b.selling_price - a.selling_price); break;
+    case "name_asc": products.sort((a, b) => a.name.localeCompare(b.name)); break;
+    default: products.sort((a, b) => Number(b.is_featured) - Number(a.is_featured));
   }
-
   return products;
 }
 
 export async function fetchProductBySlug(slug: string): Promise<Product | null> {
   const normalizedSlug = slug.trim().toLowerCase();
   if (!normalizedSlug) return null;
-
-  const { data, error } = await db
-    .from("store_public_products")
-    .select(PUBLIC_PRODUCT_SELECT)
-    .eq("slug", normalizedSlug)
-    .maybeSingle();
-
+  const { data, error } = await db.from("store_public_products").select(PUBLIC_PRODUCT_SELECT).eq("slug", normalizedSlug).maybeSingle();
   if (error) {
     console.error("[Cossa Store] Failed to load product", error);
     throw error;
   }
-
-  return data ? mapRow(data as PublicStoreProductRow) : null;
+  if (!data) return null;
+  const variants = await loadVariants([data.id]);
+  return mapRow(data as PublicStoreProductRow, variants);
 }
 
 export async function fetchProductsByIds(ids: string[]): Promise<Product[]> {
   const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
   if (uniqueIds.length === 0) return [];
-
-  const { data, error } = await db
-    .from("store_public_products")
-    .select(PUBLIC_PRODUCT_SELECT)
-    .in("id", uniqueIds);
-
+  const { data, error } = await db.from("store_public_products").select(PUBLIC_PRODUCT_SELECT).in("id", uniqueIds);
   if (error) {
     console.error("[Cossa Store] Failed to load products by IDs", error);
     throw error;
   }
-
-  const mapped = (data ?? []).map((row: PublicStoreProductRow) => mapRow(row));
+  const rows = (data ?? []) as PublicStoreProductRow[];
+  const variants = await loadVariants(uniqueIds);
+  const mapped = rows.map((row) => mapRow(row, variants));
   const byId = new Map(mapped.map((product) => [product.id, product]));
   return uniqueIds.map((id) => byId.get(id)).filter((product): product is Product => Boolean(product));
 }
 
 export async function listRelatedProducts(product: Product, limit = 4): Promise<Product[]> {
   const products = await listStorefrontProducts();
-  return products
-    .filter((candidate) => candidate.id !== product.id && candidate.category === product.category)
-    .slice(0, limit);
+  return products.filter((candidate) => candidate.id !== product.id && candidate.category === product.category).slice(0, limit);
 }
-
