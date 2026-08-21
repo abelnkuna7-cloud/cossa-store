@@ -786,9 +786,9 @@ function CartPage() {
                 size="lg"
               >
                 {canCheckout ? (
-                  <Link to="/checkout">
+                  <a href="/checkout">
                     Continue to checkout
-                  </Link>
+                  </a>
                 ) : (
                   <span>
                     Checkout unavailable
