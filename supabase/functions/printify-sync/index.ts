@@ -116,16 +116,13 @@ Deno.serve(async (request) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
     defaultApiKey("SUPABASE_SECRET_KEYS");
   const printifyToken = Deno.env.get("PRINTIFY_API_TOKEN");
-  const requiredConfig = [
-    ["SUPABASE_URL", supabaseUrl],
-    ["SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY", publishableKey],
-    ["SUPABASE_SERVICE_ROLE_KEY", serviceRoleKey],
-    ["PRINTIFY_API_TOKEN", printifyToken],
-  ] as const;
-  const missingConfig = requiredConfig
-    .filter(([, value]) => !value)
-    .map(([name]) => name);
-  if (missingConfig.length) {
+  if (!supabaseUrl || !publishableKey || !serviceRoleKey || !printifyToken) {
+    const missingConfig = [
+      ...(!supabaseUrl ? ["SUPABASE_URL"] : []),
+      ...(!publishableKey ? ["Supabase publishable API key"] : []),
+      ...(!serviceRoleKey ? ["Supabase server API key"] : []),
+      ...(!printifyToken ? ["PRINTIFY_API_TOKEN"] : []),
+    ];
     console.error(JSON.stringify({ event: "printify_sync_missing_config", missingConfig }));
     return json(request, { error: `Printify sync needs server configuration: ${missingConfig.join(", ")}.` }, 503);
   }
