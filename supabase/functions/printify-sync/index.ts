@@ -15,6 +15,35 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:5173",
 ]);
 
+function defaultApiKey(environmentVariable: string): string | undefined {
+  const raw = Deno.env.get(environmentVariable);
+  if (!raw) return undefined;
+  try {
+    const values = JSON.parse(raw) as Record<string, unknown>;
+    return typeof values.default === "string" && values.default ? values.default : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function isNewSupabaseApiKey(value: string): boolean {
+  return value.startsWith("sb_publishable_") || value.startsWith("sb_secret_");
+}
+
+function createSupabaseFetch(apiKey: string): typeof fetch {
+  return (input, init) => {
+    const headers = new Headers(input instanceof Request ? input.headers : undefined);
+    if (init?.headers) {
+      new Headers(init.headers).forEach((value, key) => headers.set(key, value));
+    }
+    if (isNewSupabaseApiKey(apiKey) && headers.get("authorization") === `Bearer ${apiKey}`) {
+      headers.delete("authorization");
+    }
+    headers.set("apikey", apiKey);
+    return fetch(input, { ...init, headers });
+  };
+}
+
 function corsHeaders(request: Request): HeadersInit {
   const origin = request.headers.get("origin");
   return {
@@ -79,25 +108,33 @@ Deno.serve(async (request) => {
   if (origin && !ALLOWED_ORIGINS.has(origin)) return json(request, { error: "Origin not allowed." }, 403);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const publishableKey = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const publishableKey =
+    Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ??
+    Deno.env.get("SUPABASE_ANON_KEY") ??
+    defaultApiKey("SUPABASE_PUBLISHABLE_KEYS");
+  const serviceRoleKey =
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
+    defaultApiKey("SUPABASE_SECRET_KEYS");
   const printifyToken = Deno.env.get("PRINTIFY_API_TOKEN");
-  const requiredConfig = [
-    ["SUPABASE_URL", supabaseUrl],
-    ["SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY", publishableKey],
-    ["SUPABASE_SERVICE_ROLE_KEY", serviceRoleKey],
-    ["PRINTIFY_API_TOKEN", printifyToken],
-  ] as const;
-  const missingConfig = requiredConfig
-    .filter(([, value]) => !value)
-    .map(([name]) => name);
-  if (missingConfig.length) {
+  if (!supabaseUrl || !publishableKey || !serviceRoleKey || !printifyToken) {
+    const missingConfig = [
+      ...(!supabaseUrl ? ["SUPABASE_URL"] : []),
+      ...(!publishableKey ? ["Supabase publishable API key"] : []),
+      ...(!serviceRoleKey ? ["Supabase server API key"] : []),
+      ...(!printifyToken ? ["PRINTIFY_API_TOKEN"] : []),
+    ];
     console.error(JSON.stringify({ event: "printify_sync_missing_config", missingConfig }));
     return json(request, { error: `Printify sync needs server configuration: ${missingConfig.join(", ")}.` }, 503);
   }
 
-  const customerClient = createClient(supabaseUrl, publishableKey, { auth: { autoRefreshToken: false, persistSession: false } });
-  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  const customerClient = createClient(supabaseUrl, publishableKey, {
+    global: { fetch: createSupabaseFetch(publishableKey) },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    global: { fetch: createSupabaseFetch(serviceRoleKey) },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
   try {
     const user = await requireUser(request, customerClient);
     await requireAdmin(admin, user.id);
