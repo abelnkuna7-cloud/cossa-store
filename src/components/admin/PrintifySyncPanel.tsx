@@ -58,7 +58,16 @@ async function invokePrintify<T>(action: "preview" | "reconcile" | "configure_we
     body: { action },
   });
 
-  if (error) throw error;
+  if (error) {
+    const context = (error as { context?: unknown }).context;
+    if (context instanceof Response) {
+      const response = await context.clone().json().catch(() => null);
+      if (response && typeof response === "object" && typeof (response as { error?: unknown }).error === "string") {
+        throw new Error((response as { error: string }).error);
+      }
+    }
+    throw error;
+  }
   if (data?.error) throw new Error(String(data.error));
   return data as T;
 }
@@ -82,8 +91,16 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
   const [previewing, setPreviewing] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [configuringAutomation, setConfiguringAutomation] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
+
+  function showError(error: unknown, fallback: string) {
+    const message = error instanceof Error ? error.message : fallback;
+    setLastError(message);
+    toast.error(message);
+  }
 
   async function previewPrintify() {
+    setLastError(null);
     setPreviewing(true);
     try {
       const result = await invokePrintify<PrintifyPreview>("preview");
@@ -92,13 +109,14 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
         description: `${result.count} Printify product${result.count === 1 ? "" : "s"} found. No Store data was changed.`,
       });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Printify preview failed.");
+      showError(error, "Printify preview failed.");
     } finally {
       setPreviewing(false);
     }
   }
 
   async function reconcileCatalogue() {
+    setLastError(null);
     setSyncing(true);
     try {
       const result = await invokePrintify<PrintifyReconcileResult>("reconcile");
@@ -109,13 +127,14 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
       const refreshed = await invokePrintify<PrintifyPreview>("preview");
       setPreview(refreshed);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Printify sync failed.");
+      showError(error, "Printify sync failed.");
     } finally {
       setSyncing(false);
     }
   }
 
   async function configureAutomation() {
+    setLastError(null);
     setConfiguringAutomation(true);
     try {
       const result = await invokePrintify<PrintifyWebhookResult>("configure_webhooks");
@@ -123,7 +142,7 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
         description: `${result.subscriptions.length} signed product-event subscription${result.subscriptions.length === 1 ? "" : "s"} now point to the secure Cossa receiver.`,
       });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Automatic Printify sync could not be enabled.");
+      showError(error, "Automatic Printify sync could not be enabled.");
     } finally {
       setConfiguringAutomation(false);
     }
@@ -153,6 +172,12 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
           </Button>
         </div>
       </div>
+
+      {lastError ? (
+        <p role="alert" className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {lastError}
+        </p>
+      ) : null}
 
       {preview ? (
         <div className="mt-4 space-y-3">
