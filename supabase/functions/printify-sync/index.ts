@@ -157,6 +157,8 @@ Deno.serve(async (request) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Printify sync failed.";
     console.error(JSON.stringify({ event: "printify_sync_failed", message }));
-    return json(request, { error: message }, 400);
+    // The authenticated admin client consumes this explicit payload and displays its safe message.
+    // A 2xx response is required because supabase-js otherwise hides the response body.
+    return json(request, { error: message });
   }
 });
