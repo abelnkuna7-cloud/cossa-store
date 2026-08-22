@@ -157,6 +157,15 @@ Deno.serve(async (request) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Printify sync failed.";
     console.error(JSON.stringify({ event: "printify_sync_failed", message }));
+    const audit = await admin.from("audit_events").insert({
+      organisation_id: ORG_ID,
+      actor_type: "system",
+      event_type: "printify_sync_failed",
+      entity_type: "store_catalogue",
+      entity_id: "printify",
+      metadata: { message },
+    });
+    if (audit.error) console.error(JSON.stringify({ event: "printify_sync_audit_failed", message: audit.error.message }));
     return json(request, { error: message }, 400);
   }
 });
