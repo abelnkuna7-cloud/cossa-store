@@ -300,28 +300,34 @@ async function upsertVariants(
   now: string,
 ) {
   const variants = product.variants.filter((variant) => variant.isEligible);
-  if (variants.length) {
+  const rows = variants.map((variant) => ({
+    product_id: productId,
+    provider: "Printify",
+    provider_product_id: product.printifyProductId,
+    provider_variant_id: variant.providerVariantId,
+    sku: variant.sku,
+    title: variant.title,
+    option_values: variant.options,
+    source_currency: "USD",
+    source_price: variant.sourcePrice,
+    source_cost: variant.sourceCost,
+    fx_rate_to_zar: USD_ZAR,
+    price_zar: variant.priceZar,
+    cost_zar: variant.costZar,
+    is_default: variant.isDefault,
+    is_available: variant.isAvailable,
+    sort_order: variant.sortOrder,
+    raw_provider_data: variant.raw,
+    updated_at: now,
+  }));
+
+  // For live listings, persist available options before disabling anything.
+  // The database guard therefore always sees a purchasable Printify option.
+  for (const availability of [true, false]) {
+    const batch = rows.filter((variant) => variant.is_available === availability);
+    if (!batch.length) continue;
     const result = await admin.from("store_product_variants").upsert(
-      variants.map((variant) => ({
-        product_id: productId,
-        provider: "Printify",
-        provider_product_id: product.printifyProductId,
-        provider_variant_id: variant.providerVariantId,
-        sku: variant.sku,
-        title: variant.title,
-        option_values: variant.options,
-        source_currency: "USD",
-        source_price: variant.sourcePrice,
-        source_cost: variant.sourceCost,
-        fx_rate_to_zar: USD_ZAR,
-        price_zar: variant.priceZar,
-        cost_zar: variant.costZar,
-        is_default: variant.isDefault,
-        is_available: variant.isAvailable,
-        sort_order: variant.sortOrder,
-        raw_provider_data: variant.raw,
-        updated_at: now,
-      })),
+      batch,
       { onConflict: "product_id,provider,provider_variant_id" },
     );
     if (result.error) throw result.error;
