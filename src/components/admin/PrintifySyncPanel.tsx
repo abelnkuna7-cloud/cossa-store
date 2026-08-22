@@ -60,13 +60,19 @@ async function invokePrintify<T>(action: "preview" | "reconcile" | "configure_we
 
   if (error) {
     const context = (error as { context?: unknown }).context;
-    if (context instanceof Response) {
-      const response = await context.clone().json().catch(() => null);
-      if (response && typeof response === "object" && typeof (response as { error?: unknown }).error === "string") {
-        throw new Error((response as { error: string }).error);
+    const responseLike = context as {
+      clone?: () => { json?: () => Promise<unknown> };
+      json?: () => Promise<unknown>;
+    } | null;
+    const response = typeof responseLike?.clone === "function" ? responseLike.clone() : responseLike;
+    if (typeof response?.json === "function") {
+      const payload = await response.json().catch(() => null);
+      if (payload && typeof payload === "object" && typeof (payload as { error?: unknown }).error === "string") {
+        throw new Error((payload as { error: string }).error);
       }
     }
-    throw error;
+    const message = (error as { message?: unknown }).message;
+    throw new Error(typeof message === "string" && message ? message : "Printify sync failed.");
   }
   if (data?.error) throw new Error(String(data.error));
   return data as T;
@@ -94,7 +100,8 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
   const [lastError, setLastError] = useState<string | null>(null);
 
   function showError(error: unknown, fallback: string) {
-    const message = error instanceof Error ? error.message : fallback;
+    const candidate = (error as { message?: unknown } | null)?.message;
+    const message = typeof candidate === "string" && candidate ? candidate : fallback;
     setLastError(message);
     toast.error(message);
   }
