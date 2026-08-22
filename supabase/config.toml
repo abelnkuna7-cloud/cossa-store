@@ -2,3 +2,8 @@ project_id = "nptyyzyokzgnwnyteeyi"
 
 [functions.printify-webhook]
 verify_jwt = false
+
+[functions.printify-sync]
+# User authentication and administrator authorization are verified in the function.
+# This supports Supabase's current opaque publishable API keys.
+verify_jwt = false
