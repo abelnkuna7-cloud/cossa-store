@@ -300,9 +300,9 @@ async function upsertVariants(
   now: string,
 ) {
   const variants = product.variants.filter((variant) => variant.isEligible);
-  for (const variant of variants) {
+  if (variants.length) {
     const result = await admin.from("store_product_variants").upsert(
-      {
+      variants.map((variant) => ({
         product_id: productId,
         provider: "Printify",
         provider_product_id: product.printifyProductId,
@@ -321,7 +321,7 @@ async function upsertVariants(
         sort_order: variant.sortOrder,
         raw_provider_data: variant.raw,
         updated_at: now,
-      },
+      })),
       { onConflict: "product_id,provider,provider_variant_id" },
     );
     if (result.error) throw result.error;
