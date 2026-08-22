@@ -70,6 +70,11 @@ function actionName(value: unknown) {
   return typeof value === "string" ? value.trim().slice(0, 50) : "";
 }
 
+function errorMessage(error: unknown, fallback = "Printify sync failed.") {
+  const message = (error as { message?: unknown } | null)?.message;
+  return typeof message === "string" && message.trim() ? message.trim() : fallback;
+}
+
 async function requireUser(
   request: Request,
   client: ReturnType<typeof createClient>,
@@ -155,8 +160,17 @@ Deno.serve(async (request) => {
     }
     return json(request, { error: "Unsupported Printify sync action." }, 400);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Printify sync failed.";
+    const message = errorMessage(error);
     console.error(JSON.stringify({ event: "printify_sync_failed", message }));
+    const audit = await admin.from("audit_events").insert({
+      organisation_id: ORG_ID,
+      actor_type: "system",
+      event_type: "printify_sync_failed",
+      entity_type: "store_catalogue",
+      entity_id: "printify",
+      metadata: { message },
+    });
+    if (audit.error) console.error(JSON.stringify({ event: "printify_sync_audit_failed", message: audit.error.message }));
     return json(request, { error: message }, 400);
   }
 });
