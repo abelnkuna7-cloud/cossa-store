@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, RefreshCw } from "lucide-react";
+import { Eye, RefreshCw, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -8,12 +8,14 @@ import { supabase } from "@/integrations/supabase/client";
 type PrintifyPreviewProduct = {
   printifyProductId: string;
   title: string;
-  visibleInPrintify: boolean;
   enabledVariantCount: number;
+  availableVariantCount: number;
   minRetailUsd: number | null;
   minRetailZar: number | null;
   minCostUsd: number | null;
   minCostZar: number | null;
+  valid: boolean;
+  validationReasons: string[];
 };
 
 type CurrencyInfo = {
@@ -33,26 +35,25 @@ type PrintifyPreview = {
   products: PrintifyPreviewProduct[];
 };
 
-type PrintifyStageResult = {
+type PrintifyReconcileResult = {
   shop: {
     id: string;
     title: string;
   };
-  count: number;
-  currency: CurrencyInfo;
-  staged: Array<{
-    id: string;
-    name: string;
-    slug: string;
-    status: string;
-    supplier_product_ref: string;
-    variantCount: number;
-    minRetailUsd: number | null;
-    minRetailZar: number | null;
-  }>;
+  processed: number;
+  createdAsDraft: number;
+  refreshed: number;
+  keptActive: number;
+  demotedToDraft: number;
+  skipped: Array<{ title: string; reasons: string[] }>;
 };
 
-async function invokePrintify<T>(action: "preview" | "stage_drafts"): Promise<T> {
+type PrintifyWebhookResult = {
+  endpoint: string;
+  subscriptions: Array<{ topic: string; id: string; created: boolean }>;
+};
+
+async function invokePrintify<T>(action: "preview" | "reconcile" | "configure_webhooks"): Promise<T> {
   const { data, error } = await supabase.functions.invoke("printify-sync", {
     body: { action },
   });
@@ -80,6 +81,7 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
   const [preview, setPreview] = useState<PrintifyPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [configuringAutomation, setConfiguringAutomation] = useState(false);
 
   async function previewPrintify() {
     setPreviewing(true);
@@ -96,12 +98,12 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
     }
   }
 
-  async function syncDrafts() {
+  async function reconcileCatalogue() {
     setSyncing(true);
     try {
-      const result = await invokePrintify<PrintifyStageResult>("stage_drafts");
-      toast.success("Printify products staged", {
-        description: `${result.count} product${result.count === 1 ? "" : "s"} synced into the Cossa catalogue with variant pricing. New products remain Draft.`,
+      const result = await invokePrintify<PrintifyReconcileResult>("reconcile");
+      toast.success("Printify catalogue reconciled", {
+        description: `${result.processed} products checked; ${result.createdAsDraft} new draft${result.createdAsDraft === 1 ? "" : "s"}, ${result.keptActive} live listing${result.keptActive === 1 ? "" : "s"} safely refreshed.`,
       });
       onSynced?.();
       const refreshed = await invokePrintify<PrintifyPreview>("preview");
@@ -113,23 +115,41 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
     }
   }
 
+  async function configureAutomation() {
+    setConfiguringAutomation(true);
+    try {
+      const result = await invokePrintify<PrintifyWebhookResult>("configure_webhooks");
+      toast.success("Automatic Printify sync enabled", {
+        description: `${result.subscriptions.length} signed product-event subscription${result.subscriptions.length === 1 ? "" : "s"} now point to the secure Cossa receiver.`,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Automatic Printify sync could not be enabled.");
+    } finally {
+      setConfiguringAutomation(false);
+    }
+  }
+
   return (
     <section className="rounded-lg border border-border bg-card p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="font-semibold">Printify POD connection</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Read the real products in the connected Printify shop and stage them in Cossa Store. Printify source prices remain in USD while customer selling prices are stored and displayed in ZAR. New items remain Draft until published.
+            Reconcile genuine products from the connected Printify shop into the existing Cossa catalogue. New or incomplete items stay Draft; only valid existing live listings are refreshed. Customer prices remain ZAR while provider source prices remain USD.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => void previewPrintify()} disabled={previewing || syncing}>
+          <Button type="button" variant="outline" onClick={() => void previewPrintify()} disabled={previewing || syncing || configuringAutomation}>
             <Eye className="mr-2 h-4 w-4" aria-hidden />
             {previewing ? "Checking Printify…" : "Preview Printify"}
           </Button>
-          <Button type="button" onClick={() => void syncDrafts()} disabled={previewing || syncing}>
+          <Button type="button" onClick={() => void reconcileCatalogue()} disabled={previewing || syncing || configuringAutomation}>
             <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} aria-hidden />
-            {syncing ? "Syncing drafts…" : "Sync Printify drafts"}
+            {syncing ? "Reconciling…" : "Reconcile catalogue"}
+          </Button>
+          <Button type="button" variant="secondary" onClick={() => void configureAutomation()} disabled={previewing || syncing || configuringAutomation}>
+            <Zap className="mr-2 h-4 w-4" aria-hidden />
+            {configuringAutomation ? "Enabling…" : "Enable automatic sync"}
           </Button>
         </div>
       </div>
@@ -149,7 +169,8 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
                   <tr>
                     <th className="px-3 py-2">Printify product</th>
                     <th className="px-3 py-2">Variants</th>
-                    <th className="px-3 py-2">Visible</th>
+                    <th className="px-3 py-2">Available variants</th>
+                    <th className="px-3 py-2">Ready</th>
                     <th className="px-3 py-2">Lowest retail USD</th>
                     <th className="px-3 py-2">Store retail ZAR</th>
                     <th className="px-3 py-2">Lowest cost USD</th>
@@ -163,7 +184,8 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
                         <div className="font-mono text-[11px] text-muted-foreground">{product.printifyProductId}</div>
                       </td>
                       <td className="px-3 py-2">{product.enabledVariantCount}</td>
-                      <td className="px-3 py-2">{product.visibleInPrintify ? "Yes" : "No"}</td>
+                      <td className="px-3 py-2">{product.availableVariantCount}</td>
+                      <td className="px-3 py-2">{product.valid ? "Yes" : product.validationReasons.join(", ")}</td>
                       <td className="px-3 py-2">{usd(product.minRetailUsd)}</td>
                       <td className="px-3 py-2 font-medium">{zar(product.minRetailZar)}</td>
                       <td className="px-3 py-2">{usd(product.minCostUsd)}</td>
@@ -176,7 +198,7 @@ export function PrintifySyncPanel({ onSynced }: { onSynced?: () => void }) {
             <p className="text-sm text-muted-foreground">No products were returned by Printify.</p>
           )}
           <p className="text-xs text-muted-foreground">
-            Printify remains the USD source of truth. Cossa Store stores the matching ZAR retail price for each enabled variant, and checkout validates the selected variant server-side.
+            Printify remains the USD source of truth. Cossa Store stores matching ZAR retail prices per option and checkout validates the selected variant server-side. Automatic sync only accepts signed Printify product events.
           </p>
         </div>
       ) : null}
