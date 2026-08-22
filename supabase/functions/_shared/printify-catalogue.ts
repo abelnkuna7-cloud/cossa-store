@@ -251,7 +251,7 @@ function stableSlug(product: PrintifyProductSummary) {
 async function findExistingProduct(admin: AdminClient, providerProductId: string) {
   const result = await admin
     .from("store_products")
-    .select("id,slug,status,category,seo_title,seo_description")
+    .select("id,slug,sku,status,category,seo_title,seo_description")
     .eq("organisation_id", ORG_ID)
     .eq("supplier_name", "Printify")
     .eq("supplier_product_ref", providerProductId)
@@ -260,6 +260,7 @@ async function findExistingProduct(admin: AdminClient, providerProductId: string
   return result.data as {
     id: string;
     slug: string;
+    sku: string | null;
     status: string;
     category: string | null;
     seo_title: string | null;
@@ -380,7 +381,7 @@ export async function syncOnePrintifyProduct(
     organisation_id: ORG_ID,
     name: product.title,
     slug: existing?.slug || stableSlug(product),
-    sku: null,
+    sku: existing?.sku || `PRT-${product.printifyProductId.toUpperCase()}`,
     product_type: "pod",
     fulfilment_model: "print_on_demand",
     status,
