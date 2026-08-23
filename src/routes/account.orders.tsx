@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, LoaderCircle, PackageCheck, ReceiptText } from "lucide-react";
+import {
+  CheckCircle2,
+  Download,
+  LoaderCircle,
+  MapPin,
+  PackageCheck,
+  ReceiptText,
+  Truck,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -33,6 +41,18 @@ type OrderItem = {
   line_total: number | string;
 };
 
+type SupplierFulfilment = {
+  id: string;
+  store_order_id: string;
+  supplier: string;
+  status: string;
+  logistics_method: string | null;
+  origin_country_code: string | null;
+  destination_country_code: string | null;
+  tracking_number: string | null;
+  updated_at: string;
+};
+
 type CustomerOrder = {
   id: string;
   order_number: string;
@@ -44,6 +64,7 @@ type CustomerOrder = {
   created_at: string;
   store_order_items: OrderItem[] | null;
   store_digital_entitlements: DigitalEntitlement[] | null;
+  supplier_fulfilments: SupplierFulfilment[];
 };
 
 export const Route = createFileRoute("/account/orders")({
@@ -52,7 +73,8 @@ export const Route = createFileRoute("/account/orders")({
       { title: "My orders & downloads | Cossa Store" },
       {
         name: "description",
-        content: "View your Cossa Store order status and access approved digital purchases securely.",
+        content:
+          "View your Cossa Store order status, supplier fulfilment tracking and approved digital purchases securely.",
       },
       { name: "robots", content: "noindex" },
     ],
@@ -77,6 +99,33 @@ function statusLabel(status: string) {
   }
 }
 
+function fulfilmentLabel(status: string) {
+  switch (status) {
+    case "creating":
+    case "submitted":
+    case "paid":
+    case "processing":
+      return "Processing with supplier";
+    case "action_required":
+      return "Supplier processing pending";
+    case "shipped":
+      return "Shipped";
+    case "delivered":
+      return "Delivered";
+    case "failed":
+      return "Fulfilment needs attention";
+    default:
+      return status.replace(/_/g, " ");
+  }
+}
+
+function fulfilmentTone(status: string) {
+  if (status === "delivered") return "text-emerald-500";
+  if (status === "failed") return "text-destructive";
+  if (status === "shipped") return "text-primary";
+  return "text-muted-foreground";
+}
+
 function formatDate(value: string | null | undefined) {
   if (!value) return "—";
   const date = new Date(value);
@@ -90,7 +139,11 @@ function formatDate(value: string | null | undefined) {
 function entitlementAvailable(entitlement: DigitalEntitlement) {
   if (entitlement.revoked_at) return false;
   if (entitlement.downloads_used >= entitlement.download_limit) return false;
-  if (entitlement.expires_at && new Date(entitlement.expires_at).getTime() <= Date.now()) return false;
+  if (
+    entitlement.expires_at &&
+    new Date(entitlement.expires_at).getTime() <= Date.now()
+  )
+    return false;
   return true;
 }
 
@@ -112,23 +165,59 @@ function OrdersPage() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return (data ?? []) as CustomerOrder[];
+
+      const orderRows = (data ?? []) as Omit<
+        CustomerOrder,
+        "supplier_fulfilments"
+      >[];
+      const orderIds = orderRows.map((order) => order.id);
+
+      if (!orderIds.length) return [];
+
+      const { data: fulfilmentRows, error: fulfilmentError } = await db
+        .from("supplier_fulfilment_orders")
+        .select(
+          "id,store_order_id,supplier,status,logistics_method,origin_country_code,destination_country_code,tracking_number,updated_at",
+        )
+        .in("store_order_id", orderIds)
+        .order("updated_at", { ascending: false });
+
+      if (fulfilmentError) throw fulfilmentError;
+
+      const fulfilmentsByOrder = new Map<string, SupplierFulfilment[]>();
+      for (const fulfilment of (fulfilmentRows ?? []) as SupplierFulfilment[]) {
+        const current = fulfilmentsByOrder.get(fulfilment.store_order_id) ?? [];
+        current.push(fulfilment);
+        fulfilmentsByOrder.set(fulfilment.store_order_id, current);
+      }
+
+      return orderRows.map((order) => ({
+        ...order,
+        supplier_fulfilments: fulfilmentsByOrder.get(order.id) ?? [],
+      }));
     },
   });
 
   async function downloadEntitlement(entitlement: DigitalEntitlement) {
     setDownloadingId(entitlement.id);
     try {
-      const { data, error } = await supabase.functions.invoke("digital-download", {
-        body: { entitlementId: entitlement.id },
-      });
+      const { data, error } = await supabase.functions.invoke(
+        "digital-download",
+        {
+          body: { entitlementId: entitlement.id },
+        },
+      );
 
       if (error) throw error;
-      if (!data?.url) throw new Error(data?.error || "The download could not be prepared.");
+      if (!data?.url)
+        throw new Error(data?.error || "The download could not be prepared.");
 
       const link = document.createElement("a");
       link.href = data.url;
-      link.download = typeof data.fileName === "string" ? data.fileName : "Cossa-digital-product";
+      link.download =
+        typeof data.fileName === "string"
+          ? data.fileName
+          : "Cossa-digital-product";
       link.rel = "noopener";
       document.body.appendChild(link);
       link.click();
@@ -141,7 +230,9 @@ function OrdersPage() {
             : "Your signed download link expires shortly.",
       });
 
-      await queryClient.invalidateQueries({ queryKey: ["customer-store-orders", user?.id] });
+      await queryClient.invalidateQueries({
+        queryKey: ["customer-store-orders", user?.id],
+      });
     } catch (error) {
       toast.error("Download unavailable", {
         description:
@@ -165,8 +256,12 @@ function OrdersPage() {
   if (!user) {
     return (
       <NoticeBlock tone="pending" title="Sign in to view your orders">
-        Your EFT orders and approved digital downloads are tied to the account used at checkout. {" "}
-        <Link to="/auth" className="font-medium text-primary underline underline-offset-2">
+        Your EFT orders and approved digital downloads are tied to the account
+        used at checkout. {" "}
+        <Link
+          to="/auth"
+          className="font-medium text-primary underline underline-offset-2"
+        >
           Sign in or create your account
         </Link>
         .
@@ -185,7 +280,8 @@ function OrdersPage() {
   if (orders.isError) {
     return (
       <NoticeBlock tone="pending" title="Your orders could not be loaded">
-        We could not read your order history securely. Refresh the page or contact Cossa support if the problem continues.
+        We could not read your order history securely. Refresh the page or
+        contact Cossa support if the problem continues.
       </NoticeBlock>
     );
   }
@@ -208,42 +304,133 @@ function OrdersPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display text-2xl font-semibold">Orders & digital downloads</h2>
+        <h2 className="font-display text-2xl font-semibold">
+          Orders & digital downloads
+        </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          EFT orders remain pending until Cossa approves the payment. Paid digital files appear here as controlled downloads.
+          Track physical orders from payment through delivery. Approved digital
+          files appear here as controlled downloads.
         </p>
       </div>
 
       {orders.data.map((order) => {
         const items = order.store_order_items ?? [];
         const entitlements = order.store_digital_entitlements ?? [];
-        const entitlementByItem = new Map(entitlements.map((entry) => [entry.order_item_id, entry]));
-        const approved = ["paid", "processing", "completed"].includes(order.status);
+        const entitlementByItem = new Map(
+          entitlements.map((entry) => [entry.order_item_id, entry]),
+        );
+        const approved = ["paid", "processing", "completed"].includes(
+          order.status,
+        );
 
         return (
-          <section key={order.id} className="overflow-hidden rounded-xl border border-border bg-card">
+          <section
+            key={order.id}
+            className="overflow-hidden rounded-xl border border-border bg-card"
+          >
             <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">{order.order_number}</p>
-                <h3 className="mt-1 font-display text-lg font-semibold">{statusLabel(order.status)}</h3>
-                <p className="mt-1 text-xs text-muted-foreground">Created {formatDate(order.created_at)}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+                  {order.order_number}
+                </p>
+                <h3 className="mt-1 font-display text-lg font-semibold">
+                  {statusLabel(order.status)}
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Created {formatDate(order.created_at)}
+                </p>
                 {order.paid_at ? (
-                  <p className="mt-1 text-xs text-muted-foreground">Payment approved {formatDate(order.paid_at)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Payment approved {formatDate(order.paid_at)}
+                  </p>
                 ) : null}
               </div>
               <div className="sm:text-right">
-                <p className="font-semibold text-primary">{formatZar(Number(order.total))}</p>
+                <p className="font-semibold text-primary">
+                  {formatZar(Number(order.total))}
+                </p>
                 {order.payment_reference ? (
-                  <p className="mt-1 text-xs text-muted-foreground">Reference {order.payment_reference}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Reference {order.payment_reference}
+                  </p>
                 ) : null}
               </div>
             </div>
+
+            {order.supplier_fulfilments.length ? (
+              <div className="space-y-3 border-b border-border bg-muted/20 p-5">
+                {order.supplier_fulfilments.map((fulfilment) => (
+                  <div
+                    key={fulfilment.id}
+                    className="rounded-lg border border-border bg-background/60 p-4"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          {fulfilment.status === "delivered" ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          ) : (
+                            <Truck className="h-4 w-4 text-primary" />
+                          )}
+                          <p className="text-sm font-semibold">
+                            {fulfilment.supplier === "CJ Dropshipping"
+                              ? "International fulfilment"
+                              : "Supplier fulfilment"}
+                          </p>
+                        </div>
+                        <p
+                          className={`mt-2 text-sm font-medium ${fulfilmentTone(fulfilment.status)}`}
+                        >
+                          {fulfilmentLabel(fulfilment.status)}
+                        </p>
+                        {fulfilment.logistics_method ? (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Delivery method: {fulfilment.logistics_method}
+                          </p>
+                        ) : null}
+                        {fulfilment.origin_country_code ||
+                        fulfilment.destination_country_code ? (
+                          <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            <MapPin className="h-3.5 w-3.5" />
+                            {fulfilment.origin_country_code || "International"}
+                            {" → "}
+                            {fulfilment.destination_country_code || "ZA"}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="sm:text-right">
+                        {fulfilment.tracking_number ? (
+                          <>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              Tracking number
+                            </p>
+                            <p className="mt-1 break-all font-mono text-sm font-semibold text-primary">
+                              {fulfilment.tracking_number}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Tracking will appear here after dispatch.
+                          </p>
+                        )}
+                        <p className="mt-2 text-[11px] text-muted-foreground">
+                          Updated {formatDate(fulfilment.updated_at)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
             <ul className="divide-y divide-border">
               {items.map((item) => {
                 const entitlement = entitlementByItem.get(item.id);
                 const isDigital = item.product_type === "digital";
-                const available = entitlement ? entitlementAvailable(entitlement) : false;
+                const available = entitlement
+                  ? entitlementAvailable(entitlement)
+                  : false;
 
                 return (
                   <li key={item.id} className="p-5">
@@ -251,7 +438,9 @@ function OrdersPage() {
                       <div className="min-w-0">
                         <p className="font-medium">{item.product_name}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {item.sku ? `SKU ${item.sku} · ` : ""}Quantity {item.quantity} · {formatZar(Number(item.line_total))}
+                          {item.sku ? `SKU ${item.sku} · ` : ""}Quantity {item.quantity}
+                          {" · "}
+                          {formatZar(Number(item.line_total))}
                         </p>
 
                         {isDigital && !approved ? (
@@ -262,14 +451,22 @@ function OrdersPage() {
 
                         {isDigital && approved && !entitlement ? (
                           <p className="mt-3 text-sm text-destructive">
-                            Payment is approved but this digital entitlement is missing. Contact Cossa support with order {order.order_number}.
+                            Payment is approved but this digital entitlement is
+                            missing. Contact Cossa support with order {order.order_number}.
                           </p>
                         ) : null}
 
                         {entitlement ? (
                           <p className="mt-3 text-xs text-muted-foreground">
-                            {Math.max(0, entitlement.download_limit - entitlement.downloads_used)} of {entitlement.download_limit} downloads remaining
-                            {entitlement.expires_at ? ` · Access expires ${formatDate(entitlement.expires_at)}` : ""}
+                            {Math.max(
+                              0,
+                              entitlement.download_limit -
+                                entitlement.downloads_used,
+                            )}{" "}
+                            of {entitlement.download_limit} downloads remaining
+                            {entitlement.expires_at
+                              ? ` · Access expires ${formatDate(entitlement.expires_at)}`
+                              : ""}
                           </p>
                         ) : null}
                       </div>
@@ -277,7 +474,9 @@ function OrdersPage() {
                       {isDigital && entitlement ? (
                         <Button
                           type="button"
-                          disabled={!available || downloadingId === entitlement.id}
+                          disabled={
+                            !available || downloadingId === entitlement.id
+                          }
                           onClick={() => void downloadEntitlement(entitlement)}
                           className="shrink-0"
                         >
@@ -286,11 +485,13 @@ function OrdersPage() {
                           ) : (
                             <Download className="mr-2 h-4 w-4" />
                           )}
-                          {available ? "Download securely" : "Download unavailable"}
+                          {available
+                            ? "Download securely"
+                            : "Download unavailable"}
                         </Button>
                       ) : !isDigital && approved ? (
                         <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-primary/30 px-3 py-1.5 text-xs text-primary">
-                          <PackageCheck className="h-4 w-4" /> Ready for fulfilment
+                          <PackageCheck className="h-4 w-4" /> Order confirmed
                         </span>
                       ) : null}
                     </div>
