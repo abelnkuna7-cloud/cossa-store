@@ -5,6 +5,7 @@ import { Copy, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { CatalogueShell } from "@/components/admin/CatalogueShell";
+import { CjProductSyncPanel } from "@/components/admin/CjProductSyncPanel";
 import { PrintifySyncPanel } from "@/components/admin/PrintifySyncPanel";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/common/StateBlocks";
 import { Button } from "@/components/ui/button";
@@ -157,14 +158,15 @@ function CatalogueTable() {
   if (products.isPending) return <LoadingBlock label="Loading the catalogue…" />;
   if (products.isError) return <ErrorBlock description="The catalogue could not be loaded from cossa-growth." />;
 
+  const invalidateCatalogue = () => {
+    queryClient.invalidateQueries({ queryKey: ["admin", "store-products"] });
+    queryClient.invalidateQueries({ queryKey: ["products"] });
+  };
+
   return (
     <div className="space-y-5">
-      <PrintifySyncPanel
-        onSynced={() => {
-          queryClient.invalidateQueries({ queryKey: ["admin", "store-products"] });
-          queryClient.invalidateQueries({ queryKey: ["products"] });
-        }}
-      />
+      <PrintifySyncPanel onSynced={invalidateCatalogue} />
+      <CjProductSyncPanel onSynced={invalidateCatalogue} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Input placeholder="Search product or code" value={search} onChange={(event) => setSearch(event.target.value)} className="lg:col-span-2" />
