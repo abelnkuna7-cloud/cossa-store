@@ -31,6 +31,33 @@ type CjAvailabilityResult = {
   }>;
 };
 
+type CjCommercialProduct = {
+  productId: string;
+  title: string;
+  status: "active" | "draft";
+  availableVariants?: number;
+  shippingOrigin?: string;
+  shippingCarrier?: string;
+  shippingAging?: string;
+  shippingUsd?: number;
+  minCostZar?: number;
+  fromPriceZar?: number;
+  reason?: string;
+};
+
+type CjCommercialResult = {
+  processed: number;
+  activated: number;
+  keptDraft: number;
+  pricing: {
+    fxZarPerUsd: number;
+    riskBufferRate: number;
+    fixedOrderBufferZar: number;
+    targetGrossMargin: number;
+  };
+  products: CjCommercialProduct[];
+};
+
 async function invokeFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke(name, { body });
 
@@ -63,9 +90,27 @@ async function invokeCjAvailability(): Promise<CjAvailabilityResult> {
   return invokeFunction<CjAvailabilityResult>("cj-availability-sync", { action: "refresh" });
 }
 
+async function invokeCjCommercial(): Promise<CjCommercialResult> {
+  return invokeFunction<CjCommercialResult>("cj-commercial-sync", { action: "price_and_publish" });
+}
+
+function zar(value?: number): string {
+  if (value == null) return "—";
+  return new Intl.NumberFormat("en-ZA", {
+    style: "currency",
+    currency: "ZAR",
+    minimumFractionDigits: 2,
+  }).format(value);
+}
+
+function usd(value?: number): string {
+  return value == null ? "—" : `US$ ${value.toFixed(2)}`;
+}
+
 export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
   const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState<CjSyncResult | null>(null);
+  const [commercial, setCommercial] = useState<CjCommercialResult | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
 
   async function syncCjProducts() {
@@ -89,8 +134,11 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
         }),
       };
       setResult(merged);
-      toast.success("CJ catalogue and availability synced", {
-        description: `${next.createdAsDraft} new draft${next.createdAsDraft === 1 ? "" : "s"}, ${next.refreshed} refreshed; live CJ availability checked for ${availability.processed} product${availability.processed === 1 ? "" : "s"}.`,
+
+      const commercialResult = await invokeCjCommercial();
+      setCommercial(commercialResult);
+      toast.success("CJ catalogue is commercially ready", {
+        description: `${commercialResult.activated} product${commercialResult.activated === 1 ? "" : "s"} priced and published; ${commercialResult.keptDraft} kept Draft because shipping or availability could not be verified.`,
       });
       onSynced?.();
     } catch (error) {
@@ -109,12 +157,12 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
         <div>
           <h2 className="font-semibold">CJ Dropshipping connection</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Pull a small controlled batch of real CJ products into the existing Cossa catalogue. New CJ products stay Draft until Cossa pricing and publication are approved. Variant availability is refreshed from CJ immediately after each sync.
+            Sync a controlled batch of real CJ products, verify live variant stock, calculate a South Africa freight quote, apply protected Cossa pricing, and publish only products that pass all checks. Unavailable or unshippable products remain Draft.
           </p>
         </div>
         <Button type="button" onClick={() => void syncCjProducts()} disabled={syncing}>
           <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} aria-hidden />
-          {syncing ? "Syncing CJ…" : "Sync CJ Products"}
+          {syncing ? "Syncing & pricing CJ…" : "Sync & Price CJ Products"}
         </Button>
       </div>
 
@@ -159,8 +207,48 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
               </table>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {commercial ? (
+        <div className="mt-5 space-y-3 text-sm">
+          <div className="flex flex-wrap gap-x-6 gap-y-1">
+            <span><strong>Published:</strong> {commercial.activated}</span>
+            <span><strong>Kept Draft:</strong> {commercial.keptDraft}</span>
+            <span><strong>Protected FX:</strong> US$1 = R{commercial.pricing.fxZarPerUsd.toFixed(2)}</span>
+            <span><strong>Target margin:</strong> {(commercial.pricing.targetGrossMargin * 100).toFixed(0)}%</span>
+          </div>
+          <div className="overflow-x-auto rounded-md border border-border">
+            <table className="w-full min-w-[980px] text-left text-sm">
+              <thead className="bg-secondary/60 text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2">Product</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">ZA freight</th>
+                  <th className="px-3 py-2">ETA</th>
+                  <th className="px-3 py-2">Protected cost</th>
+                  <th className="px-3 py-2">From price</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {commercial.products.map((product) => (
+                  <tr key={product.productId}>
+                    <td className="px-3 py-2">
+                      <div className="font-medium">{product.title}</div>
+                      {product.reason ? <div className="text-xs text-muted-foreground">{product.reason.replace(/_/g, " ")}</div> : null}
+                    </td>
+                    <td className="px-3 py-2 capitalize">{product.status}</td>
+                    <td className="px-3 py-2">{product.shippingCarrier ? `${product.shippingCarrier} · ${usd(product.shippingUsd)}` : "—"}</td>
+                    <td className="px-3 py-2">{product.shippingAging || "—"}</td>
+                    <td className="px-3 py-2">{zar(product.minCostZar)}</td>
+                    <td className="px-3 py-2 font-medium">{zar(product.fromPriceZar)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <p className="text-xs text-muted-foreground">
-            CJ supplier costs remain source data only. Cossa selling prices are not invented or auto-published by this sync.
+            Only products with live CJ stock and a valid South Africa freight quote are published. Pricing includes supplier cost, quoted freight, a protective FX rate, a risk buffer, and Cossa margin protection.
           </p>
         </div>
       ) : null}
