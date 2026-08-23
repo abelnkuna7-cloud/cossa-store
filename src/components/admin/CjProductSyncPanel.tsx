@@ -10,6 +10,7 @@ type CjSyncProduct = {
   title: string;
   variants: number;
   availableVariants: number;
+  totalInventory?: number;
 };
 
 type CjSyncResult = {
@@ -20,10 +21,18 @@ type CjSyncResult = {
   products: CjSyncProduct[];
 };
 
-async function invokeCjSync(): Promise<CjSyncResult> {
-  const { data, error } = await supabase.functions.invoke("cj-product-sync", {
-    body: { action: "sync" },
-  });
+type CjAvailabilityResult = {
+  processed: number;
+  products: Array<{
+    productId: string;
+    title: string;
+    availableVariants: number;
+    totalInventory: number;
+  }>;
+};
+
+async function invokeFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(name, { body });
 
   if (error) {
     const context = (error as { context?: unknown }).context;
@@ -39,11 +48,19 @@ async function invokeCjSync(): Promise<CjSyncResult> {
       }
     }
     const message = (error as { message?: unknown }).message;
-    throw new Error(typeof message === "string" && message ? message : "CJ catalogue sync failed.");
+    throw new Error(typeof message === "string" && message ? message : `${name} failed.`);
   }
 
   if (data?.error) throw new Error(String(data.error));
-  return data as CjSyncResult;
+  return data as T;
+}
+
+async function invokeCjSync(): Promise<CjSyncResult> {
+  return invokeFunction<CjSyncResult>("cj-product-sync", { action: "sync" });
+}
+
+async function invokeCjAvailability(): Promise<CjAvailabilityResult> {
+  return invokeFunction<CjAvailabilityResult>("cj-availability-sync", { action: "refresh" });
 }
 
 export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
@@ -56,9 +73,24 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
     setSyncing(true);
     try {
       const next = await invokeCjSync();
-      setResult(next);
-      toast.success("CJ catalogue synced", {
-        description: `${next.createdAsDraft} new draft${next.createdAsDraft === 1 ? "" : "s"}, ${next.refreshed} refreshed, ${next.skipped} skipped.`,
+      const availability = await invokeCjAvailability();
+      const availabilityByProduct = new Map(availability.products.map((product) => [product.productId, product]));
+      const merged: CjSyncResult = {
+        ...next,
+        products: next.products.map((product) => {
+          const live = availabilityByProduct.get(product.productId);
+          return live
+            ? {
+                ...product,
+                availableVariants: live.availableVariants,
+                totalInventory: live.totalInventory,
+              }
+            : product;
+        }),
+      };
+      setResult(merged);
+      toast.success("CJ catalogue and availability synced", {
+        description: `${next.createdAsDraft} new draft${next.createdAsDraft === 1 ? "" : "s"}, ${next.refreshed} refreshed; live CJ availability checked for ${availability.processed} product${availability.processed === 1 ? "" : "s"}.`,
       });
       onSynced?.();
     } catch (error) {
@@ -77,7 +109,7 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
         <div>
           <h2 className="font-semibold">CJ Dropshipping connection</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Pull a small controlled batch of real CJ products into the existing Cossa catalogue. New CJ products stay Draft until Cossa pricing and publication are approved.
+            Pull a small controlled batch of real CJ products into the existing Cossa catalogue. New CJ products stay Draft until Cossa pricing and publication are approved. Variant availability is refreshed from CJ immediately after each sync.
           </p>
         </div>
         <Button type="button" onClick={() => void syncCjProducts()} disabled={syncing}>
@@ -102,12 +134,13 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
           </div>
           {result.products.length ? (
             <div className="overflow-x-auto rounded-md border border-border">
-              <table className="w-full min-w-[680px] text-left text-sm">
+              <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="bg-secondary/60 text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2">CJ product</th>
                     <th className="px-3 py-2">Variants</th>
                     <th className="px-3 py-2">Available variants</th>
+                    <th className="px-3 py-2">CJ inventory</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -119,6 +152,7 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
                       </td>
                       <td className="px-3 py-2">{product.variants}</td>
                       <td className="px-3 py-2">{product.availableVariants}</td>
+                      <td className="px-3 py-2">{product.totalInventory ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
