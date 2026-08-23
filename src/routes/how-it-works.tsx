@@ -28,7 +28,7 @@ export const Route = createFileRoute("/how-it-works")({
 const RETAIL_STEPS = [
   ["Browse or start from a project", "Search the ranges, or pick the job you need to do and let the project kit build the list for you."],
   ["Check the honest detail", "Every product shows its fulfilment route, stock status and realistic delivery window before you add it."],
-  ["Pay securely", "PayFast for cards and Ozow for instant EFT, side by side at checkout. VAT-inclusive rand pricing throughout."],
+  ["Pay securely", "Use the secure EFT payment-request flow currently available at checkout. Card and instant-EFT gateway options are activated only after merchant approval and live integration verification. VAT-inclusive rand pricing throughout."],
   ["Track and receive", "Order confirmation, dispatch notice and tracking. Inspect on delivery and report issues the same day."],
 ];
 
