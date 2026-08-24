@@ -31,7 +31,7 @@ type CjSyncResult = {
 type CjCommercialProduct = {
   productId: string;
   title: string;
-  status: "active" | "draft";
+  status: "active" | "draft" | "archived";
   availableVariants?: number;
   shippingOrigin?: string;
   shippingCarrier?: string;
@@ -46,6 +46,7 @@ type CjCommercialResult = {
   processed: number;
   activated: number;
   keptDraft: number;
+  archived: number;
   pricing: {
     fxZarPerUsd: number;
     riskBufferRate: number;
@@ -163,7 +164,7 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
       const next = await invokeCjCommercial();
       setCommercial(next);
       toast.success("CJ pricing review completed", {
-        description: `${next.activated} eligible product${next.activated === 1 ? "" : "s"} published; ${next.keptDraft} retained as Draft.`,
+        description: `${next.activated} eligible product${next.activated === 1 ? "" : "s"} published; ${next.archived} non-viable product${next.archived === 1 ? "" : "s"} archived; ${next.keptDraft} retained as Draft.`,
       });
       onSynced?.();
     } catch (error) {
@@ -194,12 +195,18 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
       setCommercial(priced);
       const item = priced.products[0];
       toast.success(
-        item?.status === "active" ? "CJ product published" : "CJ product kept as Draft",
+        item?.status === "active"
+          ? "CJ product published"
+          : item?.status === "archived"
+            ? "CJ product archived"
+            : "CJ product kept as Draft",
         {
           description:
             item?.status === "active"
               ? "The exact CJ product passed stock, South Africa shipping, and pricing checks."
-              : "The exact CJ product needs review because stock, shipping, or pricing could not be approved.",
+              : item?.status === "archived"
+                ? "The exact CJ product failed a confirmed commercial check and was removed from the working catalogue."
+                : "The exact CJ product needs review because CJ could not complete a temporary check.",
         },
       );
       setRequestedProduct("");
@@ -345,6 +352,9 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
             </span>
             <span>
               <strong>Kept Draft:</strong> {commercial.keptDraft}
+            </span>
+            <span>
+              <strong>Archived:</strong> {commercial.archived}
             </span>
             <span>
               <strong>Protected FX:</strong> US$1 = R{commercial.pricing.fxZarPerUsd.toFixed(2)}

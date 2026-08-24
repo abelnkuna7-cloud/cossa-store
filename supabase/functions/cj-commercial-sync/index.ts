@@ -219,6 +219,15 @@ async function draft(a: Admin, id: string) {
     .eq("organisation_id", ORG_ID)
     .eq("supplier_name", "CJ Dropshipping");
 }
+async function archive(a: Admin, id: string) {
+  const { error } = await a
+    .from("store_products")
+    .update({ status: "archived", updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("organisation_id", ORG_ID)
+    .eq("supplier_name", "CJ Dropshipping");
+  if (error) throw error;
+}
 Deno.serve(async (r) => {
   if (r.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(r) });
   if (r.method !== "POST") return json(r, { error: "Method not allowed." }, 405);
@@ -294,11 +303,11 @@ Deno.serve(async (r) => {
       if (ve) throw ve;
       const available = (variants ?? []) as Variant[];
       if (!available.length) {
-        if (p.status === "active") await draft(a, p.id);
+        await archive(a, p.id);
         results.push({
           productId: p.supplier_product_ref,
           title: p.name,
-          status: "draft",
+          status: "archived",
           reason: "variant_inventory_unresolved",
         });
         continue;
@@ -320,22 +329,22 @@ Deno.serve(async (r) => {
         continue;
       }
       if (!fq.quote) {
-        if (p.status === "active") await draft(a, p.id);
+        await archive(a, p.id);
         results.push({
           productId: p.supplier_product_ref,
           title: p.name,
-          status: "draft",
+          status: "archived",
           reason: "no_za_shipping_method",
         });
         continue;
       }
       const q = fq.quote;
       if (q.maxDays !== null && q.maxDays > MAX_DAYS) {
-        if (p.status === "active") await draft(a, p.id);
+        await archive(a, p.id);
         results.push({
           productId: p.supplier_product_ref,
           title: p.name,
-          status: "draft",
+          status: "archived",
           reason: "delivery_too_slow",
           shippingCarrier: q.carrier,
           shippingUsd: q.usd,
@@ -344,11 +353,11 @@ Deno.serve(async (r) => {
         continue;
       }
       if (q.usd > MAX_SHIP_USD) {
-        if (p.status === "active") await draft(a, p.id);
+        await archive(a, p.id);
         results.push({
           productId: p.supplier_product_ref,
           title: p.name,
-          status: "draft",
+          status: "archived",
           reason: "freight_too_high",
           shippingCarrier: q.carrier,
           shippingUsd: q.usd,
@@ -399,11 +408,11 @@ Deno.serve(async (r) => {
         if (up.error) throw up.error;
       }
       if (!count || !Number.isFinite(minRetail)) {
-        if (p.status === "active") await draft(a, p.id);
+        await archive(a, p.id);
         results.push({
           productId: p.supplier_product_ref,
           title: p.name,
-          status: "draft",
+          status: "archived",
           reason: "retail_not_commercially_viable",
           shippingCarrier: q.carrier,
           shippingUsd: q.usd,
@@ -453,7 +462,8 @@ Deno.serve(async (r) => {
     }
   }
   const active = results.filter((x) => x.status === "active").length,
-    kept = results.length - active;
+    archived = results.filter((x) => x.status === "archived").length,
+    kept = results.length - active - archived;
   await a.from("audit_events").insert({
     organisation_id: ORG_ID,
     actor_type: "user",
@@ -465,6 +475,7 @@ Deno.serve(async (r) => {
       processed: results.length,
       active,
       kept_draft: kept,
+      archived,
       fx: FX,
       product_ref: requestedRef || undefined,
     },
@@ -473,6 +484,7 @@ Deno.serve(async (r) => {
     processed: results.length,
     activated: active,
     keptDraft: kept,
+    archived,
     pricing: {
       fxZarPerUsd: FX,
       riskBufferRate: RISK,
