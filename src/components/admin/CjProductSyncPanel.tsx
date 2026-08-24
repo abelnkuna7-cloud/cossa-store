@@ -65,7 +65,17 @@ type CjCommercialResult = {
 };
 
 async function invokeFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke(name, { body });
+  // The generated client uses an opaque publishable key. Pass the current user
+  // token explicitly so the Edge Function can enforce its server-side admin check.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error("Please sign in again to run CJ catalogue sync.");
+
+  const { data, error } = await supabase.functions.invoke(name, {
+    body,
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
 
   if (error) {
     const context = (error as { context?: unknown }).context;
