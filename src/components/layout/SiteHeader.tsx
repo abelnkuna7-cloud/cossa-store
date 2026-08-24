@@ -1,4 +1,6 @@
 import {
+  useEffect,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
@@ -120,6 +122,9 @@ export function SiteHeader() {
     setDepartmentsOpen,
   ] = useState(false);
 
+  const departmentsMenuRef =
+    useRef<HTMLDivElement>(null);
+
   const [
     mobileDepartment,
     setMobileDepartment,
@@ -152,6 +157,53 @@ export function SiteHeader() {
       0,
       DESKTOP_PRIMARY_DEPARTMENT_LIMIT,
     );
+
+  useEffect(() => {
+    if (!departmentsOpen) {
+      return;
+    }
+
+    function closeOnOutsideClick(
+      event: MouseEvent,
+    ) {
+      if (
+        departmentsMenuRef.current &&
+        !departmentsMenuRef.current.contains(
+          event.target as Node,
+        )
+      ) {
+        setDepartmentsOpen(false);
+      }
+    }
+
+    function closeOnEscape(
+      event: KeyboardEvent,
+    ) {
+      if (event.key === "Escape") {
+        setDepartmentsOpen(false);
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      closeOnOutsideClick,
+    );
+    document.addEventListener(
+      "keydown",
+      closeOnEscape,
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        closeOnOutsideClick,
+      );
+      document.removeEventListener(
+        "keydown",
+        closeOnEscape,
+      );
+    };
+  }, [departmentsOpen]);
 
   /* ---------------------------------------------------------------------- */
   /* AUTH                                                                   */
@@ -561,7 +613,13 @@ export function SiteHeader() {
 
           {/* ALL DEPARTMENTS */}
 
-          <div className="relative shrink-0">
+          <div
+            ref={departmentsMenuRef}
+            className="relative shrink-0"
+            onMouseLeave={() =>
+              setDepartmentsOpen(false)
+            }
+          >
             <button
               type="button"
               aria-haspopup="true"
