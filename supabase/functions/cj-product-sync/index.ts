@@ -148,13 +148,17 @@ function category(cat: string, title: string, description = "") {
   const x = `${title} ${cat} ${description}`.toLowerCase();
   // Specific product functions take precedence over generic words such as "car",
   // "men" or "outdoor" in CJ marketing copy.
-  if (/humidifier|air purifier|shower head|kitchen|bathroom storage|home lighting/.test(x))
+  if (
+    /humidifier|air purifier|shower head|night light|kitchen|bathroom storage|home lighting|sofa|slipcover|living room/.test(
+      x,
+    )
+  )
     return "home-living";
   if (/resistance band|knee pad|skipping rope|exercise|fitness|gym|yoga/.test(x))
     return "sports-fitness";
   if (/beauty|makeup|cosmetic|nail|skincare|blackhead|facial|hair care|grooming/.test(x))
     return "beauty-grooming";
-  if (/pet|dog|cat/.test(x)) return "pet-supplies";
+  if (/\b(pet|dog|cat)\b/.test(x)) return "pet-supplies";
   if (/car scratch|car wash|car care|automotive|vehicle|motorcycle|dash cam/.test(x))
     return "automotive";
   if (/phone case|screen protector|mobile charger|charging cable|phone holder/.test(x))
