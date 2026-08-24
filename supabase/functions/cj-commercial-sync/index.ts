@@ -61,7 +61,8 @@ function cors(r: Request): HeadersInit {
   const o = r.headers.get("origin");
   return {
     "Access-Control-Allow-Origin": o && ORIGINS.has(o) ? o : "",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, x-cossa-automation-token",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Credentials": "true",
     Vary: "Origin",
@@ -107,6 +108,22 @@ async function admin(a: Admin, u: string) {
     a.from("user_roles").select("role").eq("user_id", u).eq("role", "admin"),
   ]);
   if (m.error || rr.error || (!(m.data ?? []).length && !(rr.data ?? []).length)) throw 0;
+}
+async function scheduledAutomation(a: Admin, r: Request) {
+  const value = r.headers.get("x-cossa-automation-token")?.trim() ?? "";
+  if (!/^[a-f0-9]{64}$/i.test(value)) return false;
+  const bytes = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
+  );
+  const hash = [...bytes].map((x) => x.toString(16).padStart(2, "0")).join("");
+  const { data, error } = await a
+    .from("supplier_automation_tokens")
+    .select("id")
+    .eq("provider", "CJ Dropshipping")
+    .eq("token_hash", hash)
+    .eq("active", true)
+    .maybeSingle();
+  return !error && Boolean(data);
 }
 async function token(k: string) {
   const r = await fetch(`${CJ_API_BASE}/authentication/getAccessToken`, {
@@ -253,12 +270,15 @@ Deno.serve(async (r) => {
       global: { fetch: sf(srv) },
       auth: { autoRefreshToken: false, persistSession: false },
     });
-  let u: User;
-  try {
-    u = await user(r, uc);
-    await admin(a, u.id);
-  } catch {
-    return json(r, { error: "An authorised Cossa Store administrator is required." }, 401);
+  let u: User | null = null;
+  const automated = await scheduledAutomation(a, r);
+  if (!automated) {
+    try {
+      u = await user(r, uc);
+      await admin(a, u.id);
+    } catch {
+      return json(r, { error: "An authorised Cossa Store administrator is required." }, 401);
+    }
   }
   const body = await r.json().catch(() => ({}));
   const requestedRef = productRef(
@@ -466,8 +486,8 @@ Deno.serve(async (r) => {
     kept = results.length - active - archived;
   await a.from("audit_events").insert({
     organisation_id: ORG_ID,
-    actor_type: "user",
-    actor_user_id: u.id,
+    actor_type: automated ? "system" : "user",
+    actor_user_id: u?.id ?? null,
     event_type: "cj_commercial_sync_succeeded",
     entity_type: "store_catalogue",
     entity_id: "cj_dropshipping",
