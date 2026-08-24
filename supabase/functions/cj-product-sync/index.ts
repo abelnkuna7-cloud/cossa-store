@@ -446,8 +446,13 @@ Deno.serve(async (r) => {
         (existingRows ?? []).map((x: any) => String(x.supplier_product_ref ?? "")).filter(Boolean),
       ),
       seen = new Set<string>(),
-      pool: Candidate[] = [];
-    for (let page = 1; page <= DISCOVERY_PAGES; page++) {
+      pool: Candidate[] = [],
+      // Do not repeatedly start at the highest-ranked CJ page after it has
+      // already been exhausted by earlier controlled imports. The official
+      // listV2 endpoint uses one-based pages, so advance through fresh pages
+      // as the existing CJ catalogue grows without introducing new state.
+      startPage = Math.floor(existing.size / DISCOVERY_SIZE) + 1;
+    for (let page = startPage; page < startPage + DISCOVERY_PAGES; page++) {
       const q = new URLSearchParams({
         page: String(page),
         size: String(DISCOVERY_SIZE),
@@ -470,7 +475,7 @@ Deno.serve(async (r) => {
       products: [],
       rejections: { blocked: 0, incomplete: 0, noInventory: 0, noAvailableVariants: 0, failed: 0 },
       rejectionDetails: [],
-      discovery: { candidatePool: pool.length, existingFiltered: existing.size },
+      discovery: { candidatePool: pool.length, existingFiltered: existing.size, startPage },
     };
     for (const c of chosen) {
       let insertedProductId: string | null = null;
