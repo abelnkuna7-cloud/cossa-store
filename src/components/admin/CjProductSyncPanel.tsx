@@ -69,7 +69,9 @@ async function invokeFunction<T>(name: string, body: Record<string, unknown>): P
   // token explicitly so the Edge Function can enforce its server-side admin check.
   const {
     data: { session },
-  } = await supabase.auth.getSession();
+    error: sessionError,
+  } = await supabase.auth.refreshSession();
+  if (sessionError) throw new Error("Please sign in again to run CJ catalogue sync.");
   if (!session?.access_token) throw new Error("Please sign in again to run CJ catalogue sync.");
 
   const { data, error } = await supabase.functions.invoke(name, {
