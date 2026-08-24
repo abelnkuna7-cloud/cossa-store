@@ -620,16 +620,30 @@ Deno.serve(async (r) => {
             .eq("supplier_name", "CJ Dropshipping");
         }
         const message = error instanceof Error ? error.message : "unknown";
+        const providerCode =
+          error && typeof error === "object" && "code" in error
+            ? String((error as { code?: unknown }).code ?? "")
+            : "";
         const reason = message.includes("cj_request_failed")
           ? "cj_product_query_failed"
-          : message.includes("store_product_variants")
-            ? "variant_write_failed"
-            : message.includes("store_products")
-              ? "product_write_failed"
-              : "import_failed";
+          : providerCode === "23505"
+            ? "duplicate"
+            : providerCode === "21000"
+              ? "duplicate_variant_id"
+              : providerCode === "23514"
+                ? "catalogue_validation_failed"
+                : message.includes("store_product_variants")
+                  ? "variant_write_failed"
+                  : message.includes("store_products")
+                    ? "product_write_failed"
+                    : "import_failed";
         summary.skipped++;
         summary.rejections.failed++;
-        summary.rejectionDetails.push({ productId: c.id, reason });
+        summary.rejectionDetails.push({
+          productId: c.id,
+          reason,
+          diagnosticCode: providerCode || undefined,
+        });
       }
     }
     await a.from("audit_events").insert({
