@@ -113,6 +113,10 @@ async function invokeCjAvailability(): Promise<CjAvailabilityResult> {
   return invokeFunction<CjAvailabilityResult>("cj-availability-sync", { action: "refresh" });
 }
 
+async function invokeCjCommercial(): Promise<CjCommercialResult> {
+  return invokeFunction<CjCommercialResult>("cj-commercial-sync", { action: "price_and_publish" });
+}
+
 function zar(value?: number): string {
   if (value == null) return "—";
   return new Intl.NumberFormat("en-ZA", {
@@ -172,6 +176,27 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
     }
   }
 
+  async function priceEligibleDrafts() {
+    setLastError(null);
+    setSyncing(true);
+    try {
+      const next = await invokeCjCommercial();
+      setCommercial(next);
+      toast.success("CJ pricing review completed", {
+        description: `${next.activated} eligible product${next.activated === 1 ? "" : "s"} published; ${next.keptDraft} retained as Draft.`,
+      });
+      onSynced?.();
+    } catch (error) {
+      const candidate = (error as { message?: unknown } | null)?.message;
+      const message =
+        typeof candidate === "string" && candidate ? candidate : "CJ pricing review failed.";
+      setLastError(message);
+      toast.error(message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <section className="rounded-lg border border-border bg-card p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -183,10 +208,20 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
             unavailable products are skipped safely.
           </p>
         </div>
-        <Button type="button" onClick={() => void syncCjProducts()} disabled={syncing}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} aria-hidden />
-          {syncing ? "Importing CJ Drafts…" : "Import 25 CJ Draft Products"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" onClick={() => void syncCjProducts()} disabled={syncing}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} aria-hidden />
+            {syncing ? "Working…" : "Import 25 CJ Draft Products"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void priceEligibleDrafts()}
+            disabled={syncing}
+          >
+            Price & publish eligible CJ drafts
+          </Button>
+        </div>
       </div>
 
       {lastError ? (
