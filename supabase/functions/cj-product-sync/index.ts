@@ -6,7 +6,11 @@ const ORG_ID = "00000000-0000-4000-8000-000000000001",
   // workflow manageable while allowing balanced department acquisition.
   MAX_PRODUCTS = 25,
   DISCOVERY_SIZE = 100,
-  DISCOVERY_PAGES = 4,
+  // Scan a broader, still bounded window of CJ's trending catalogue on each
+  // administrator-triggered run. Four pages could be exhausted after several
+  // imports and incorrectly look like "no products" even when later pages
+  // contained suitable, unseen items.
+  DISCOVERY_PAGES = 8,
   REQUEST_GAP_MS = 1100;
 const ORIGINS = new Set([
   "https://store.cossanexusholdings.co.za",
@@ -482,6 +486,9 @@ Deno.serve(async (r) => {
       // already been exhausted by earlier controlled imports. The official
       // listV2 endpoint uses one-based pages, so advance through fresh pages
       // as the existing CJ catalogue grows without introducing new state.
+      // Eight 100-item result pages is deliberately bounded: it gives the
+      // importer a practical fallback window without turning this into a
+      // continuous or catalogue-wide poll.
       startPage = manualProductId ? null : Math.floor(existing.size / DISCOVERY_SIZE) + 1;
     if (!manualProductId) {
       for (let page = startPage!; page < startPage! + DISCOVERY_PAGES; page++) {
@@ -510,7 +517,12 @@ Deno.serve(async (r) => {
       products: [],
       rejections: { blocked: 0, incomplete: 0, noInventory: 0, noAvailableVariants: 0, failed: 0 },
       rejectionDetails: [],
-      discovery: { candidatePool: pool.length, existingFiltered: existing.size, startPage },
+      discovery: {
+        candidatePool: pool.length,
+        existingFiltered: existing.size,
+        startPage,
+        pagesScanned: manualProductId ? 0 : DISCOVERY_PAGES,
+      },
     };
     for (const c of chosen) {
       let insertedProductId: string | null = null;
