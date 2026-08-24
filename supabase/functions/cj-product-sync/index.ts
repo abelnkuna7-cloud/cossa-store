@@ -11,7 +11,33 @@ const ORG_ID = "00000000-0000-4000-8000-000000000001",
   // imports and incorrectly look like "no products" even when later pages
   // contained suitable, unseen items.
   DISCOVERY_PAGES = 8,
+  // Rotate through a bounded official CJ discovery window. Archived products
+  // remain for audit and duplicate protection, so catalogue size cannot safely
+  // determine which result pages have been exhausted.
+  DISCOVERY_CYCLE_MS = 2 * 60 * 60 * 1000,
   REQUEST_GAP_MS = 1100;
+const DISCOVERY_TERMS = [
+  "power tools",
+  "home organization",
+  "cleaning tools",
+  "phone case",
+  "smart home",
+  "car accessories",
+  "beauty tools",
+  "mens accessories",
+  "womens fashion",
+  "baby products",
+  "pet supplies",
+  "garden tools",
+  "fitness equipment",
+  "office supplies",
+  "gaming accessories",
+  "travel accessories",
+  "security camera",
+  "kitchen tools",
+  "school supplies",
+  "outdoor equipment",
+];
 const ORIGINS = new Set([
   "https://store.cossanexusholdings.co.za",
   "https://growth.cossanexusholdings.co.za",
@@ -527,28 +553,28 @@ Deno.serve(async (r) => {
       ),
       seen = new Set<string>(),
       pool: Candidate[] = [],
-      // Do not repeatedly start at the highest-ranked CJ page after it has
-      // already been exhausted by earlier controlled imports. The official
-      // listV2 endpoint uses one-based pages, so advance through fresh pages
-      // as the existing CJ catalogue grows without introducing new state.
-      // Eight 100-item result pages is deliberately bounded: it gives the
-      // importer a practical fallback window without turning this into a
-      // continuous or catalogue-wide poll.
-      startPage = manualProductId ? null : Math.floor(existing.size / DISCOVERY_SIZE) + 1;
+      // A size-based page offset became stuck once rejected products were
+      // archived: they still count as existing but cannot be re-imported.
+      // Rotate safely every two hours instead, without a catalogue-wide crawl
+      // or extra supplier-state table.
+      startPage = manualProductId ? null : 1;
     if (!manualProductId) {
-      for (let page = startPage!; page < startPage! + DISCOVERY_PAGES; page++) {
+      const cycle = Math.floor(Date.now() / DISCOVERY_CYCLE_MS);
+      for (let offset = 0; offset < DISCOVERY_PAGES; offset++) {
+        const keyWord = DISCOVERY_TERMS[(cycle + offset) % DISCOVERY_TERMS.length],
+          // A keyword result set often has only one or a few pages. Always
+          // start at its first page; term rotation supplies fresh coverage.
+          page = 1;
+        // `/product/list` returns the canonical `pid`, which is the same
+        // identifier accepted by CJ's detail, inventory and freight APIs.
+        // The V2 keyword response can contain search-document IDs that CJ's
+        // product-query endpoint rejects, causing a false all-failed batch.
         const q = new URLSearchParams({
-          page: String(page),
-          size: String(DISCOVERY_SIZE),
-          productFlag: "0",
-          startWarehouseInventory: "1",
-          verifiedWarehouse: "1",
-          orderBy: "4",
-          sort: "desc",
+          pageNum: String(page),
+          pageSize: String(DISCOVERY_SIZE),
+          productNameEn: keyWord,
         });
-        q.append("features", "enable_description");
-        q.append("features", "enable_category");
-        pool.push(...collect(await cj(`/product/listV2?${q}`), existing, seen));
+        pool.push(...collect(await cj(`/product/list?${q}`), existing, seen));
       }
     }
     const chosen = manualProductId
@@ -567,6 +593,11 @@ Deno.serve(async (r) => {
         existingFiltered: existing.size,
         startPage,
         pagesScanned: manualProductId ? 0 : DISCOVERY_PAGES,
+        searchTerms: manualProductId
+          ? []
+          : Array.from({ length: DISCOVERY_PAGES }, (_, offset) =>
+              DISCOVERY_TERMS[(Math.floor(Date.now() / DISCOVERY_CYCLE_MS) + offset) % DISCOVERY_TERMS.length],
+            ),
       },
     };
     for (const c of chosen) {
