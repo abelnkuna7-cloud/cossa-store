@@ -9,7 +9,10 @@ const FX = 16.5,
   MAX_DAYS = 60,
   MAX_SHIP_USD = 35,
   MAX_RETAIL = 3000,
-  LIMIT = 50;
+  // Each candidate requires a live CJ freight request. Keep one admin run safely
+  // below the Edge Runtime execution ceiling; the action can be run again for
+  // the next controlled batch.
+  LIMIT = 25;
 const ORIGINS = new Set([
   "https://store.cossanexusholdings.co.za",
   "https://growth.cossanexusholdings.co.za",
