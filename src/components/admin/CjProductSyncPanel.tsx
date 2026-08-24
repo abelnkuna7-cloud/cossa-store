@@ -3,6 +3,7 @@ import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 
 type CjSyncProduct = {
@@ -105,16 +106,22 @@ async function invokeFunction<T>(name: string, body: Record<string, unknown>): P
   return data as T;
 }
 
-async function invokeCjSync(): Promise<CjSyncResult> {
-  return invokeFunction<CjSyncResult>("cj-product-sync", { action: "sync" });
+async function invokeCjSync(productRef?: string): Promise<CjSyncResult> {
+  return invokeFunction<CjSyncResult>("cj-product-sync", {
+    action: "sync",
+    ...(productRef ? { productRef } : {}),
+  });
 }
 
 async function invokeCjAvailability(): Promise<CjAvailabilityResult> {
   return invokeFunction<CjAvailabilityResult>("cj-availability-sync", { action: "refresh" });
 }
 
-async function invokeCjCommercial(): Promise<CjCommercialResult> {
-  return invokeFunction<CjCommercialResult>("cj-commercial-sync", { action: "price_and_publish" });
+async function invokeCjCommercial(productRef?: string): Promise<CjCommercialResult> {
+  return invokeFunction<CjCommercialResult>("cj-commercial-sync", {
+    action: "price_and_publish",
+    ...(productRef ? { productRef } : {}),
+  });
 }
 
 function zar(value?: number): string {
@@ -135,6 +142,7 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
   const [result, setResult] = useState<CjSyncResult | null>(null);
   const [commercial, setCommercial] = useState<CjCommercialResult | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [requestedProduct, setRequestedProduct] = useState("");
 
   async function syncCjProducts() {
     setLastError(null);
@@ -197,6 +205,44 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
     }
   }
 
+  async function addRequestedProduct() {
+    const reference = requestedProduct.trim();
+    if (!reference) {
+      setLastError("Paste a CJ product ID or product link first.");
+      return;
+    }
+    setLastError(null);
+    setSyncing(true);
+    try {
+      const imported = await invokeCjSync(reference);
+      setResult(imported);
+      const productId = imported.products[0]?.productId;
+      if (!productId) throw new Error("CJ could not import that product for commercial review.");
+      const priced = await invokeCjCommercial(productId);
+      setCommercial(priced);
+      const item = priced.products[0];
+      toast.success(
+        item?.status === "active" ? "CJ product published" : "CJ product kept as Draft",
+        {
+          description:
+            item?.status === "active"
+              ? "The exact CJ product passed stock, South Africa shipping, and pricing checks."
+              : "The exact CJ product needs review because stock, shipping, or pricing could not be approved.",
+        },
+      );
+      setRequestedProduct("");
+      onSynced?.();
+    } catch (error) {
+      const candidate = (error as { message?: unknown } | null)?.message;
+      const message =
+        typeof candidate === "string" && candidate ? candidate : "CJ product import failed.";
+      setLastError(message);
+      toast.error(message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <section className="rounded-lg border border-border bg-card p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -206,6 +252,27 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
             Import a controlled, department-balanced batch of real CJ products with live variant
             stock. Every product enters Cossa Store as Draft for pricing and catalogue approval;
             unavailable products are skipped safely.
+          </p>
+          <div className="mt-3 flex max-w-3xl flex-col gap-2 sm:flex-row">
+            <Input
+              value={requestedProduct}
+              onChange={(event) => setRequestedProduct(event.target.value)}
+              placeholder="Paste a CJ product ID or CJ product link"
+              aria-label="CJ product ID or link"
+              disabled={syncing}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void addRequestedProduct()}
+              disabled={syncing || !requestedProduct.trim()}
+            >
+              Add, price & publish
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Exact products are imported from CJ and published only after live stock, South Africa
+            freight, and protected pricing checks pass. Otherwise they remain Draft.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

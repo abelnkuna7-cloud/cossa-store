@@ -81,6 +81,10 @@ function pos(v: unknown) {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
+function productRef(v: unknown) {
+  const value = typeof v === "string" ? v.trim() : "";
+  return /^[A-Za-z0-9_-]{6,200}$/.test(value) ? value : "";
+}
 async function user(r: Request, c: ReturnType<typeof createClient>): Promise<User> {
   const t = r.headers
     .get("authorization")
@@ -247,6 +251,12 @@ Deno.serve(async (r) => {
   } catch {
     return json(r, { error: "An authorised Cossa Store administrator is required." }, 401);
   }
+  const body = await r.json().catch(() => ({}));
+  const requestedRef = productRef(
+    body && typeof body === "object" ? (body as any).productRef : undefined,
+  );
+  if (body && typeof body === "object" && (body as any).productRef && !requestedRef)
+    return json(r, { error: "The CJ product reference is invalid." }, 400);
   let t: string;
   try {
     t = await token(ck);
@@ -260,15 +270,16 @@ Deno.serve(async (r) => {
     .eq("supplier_name", "CJ Dropshipping")
     .eq("status", "active")
     .lte("stock_quantity", 0);
-  const { data: products, error } = await a
+  let productQuery = a
     .from("store_products")
     .select("id,name,status,supplier_product_ref,stock_quantity")
     .eq("organisation_id", ORG_ID)
     .eq("supplier_name", "CJ Dropshipping")
     .neq("status", "archived")
     .gt("stock_quantity", 0)
-    .order("updated_at", { ascending: false })
-    .limit(LIMIT);
+    .order("updated_at", { ascending: false });
+  if (requestedRef) productQuery = productQuery.eq("supplier_product_ref", requestedRef);
+  const { data: products, error } = await productQuery.limit(requestedRef ? 1 : LIMIT);
   if (error)
     return json(r, { error: "Cossa catalogue data could not be loaded for CJ pricing." }, 502);
   const results: any[] = [];
@@ -450,7 +461,13 @@ Deno.serve(async (r) => {
     event_type: "cj_commercial_sync_succeeded",
     entity_type: "store_catalogue",
     entity_id: "cj_dropshipping",
-    metadata: { processed: results.length, active, kept_draft: kept, fx: FX },
+    metadata: {
+      processed: results.length,
+      active,
+      kept_draft: kept,
+      fx: FX,
+      product_ref: requestedRef || undefined,
+    },
   });
   return json(r, {
     processed: results.length,

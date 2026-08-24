@@ -87,6 +87,28 @@ function ident(v: unknown) {
   const x = text(v, 200);
   return /^[A-Za-z0-9_-]{1,200}$/.test(x) ? x : "";
 }
+function requestedProductId(v: unknown) {
+  const raw = text(v, 1000);
+  if (!raw) return "";
+  // Never fetch a pasted URL. Extract a CJ product identifier locally, then use
+  // only the official CJ product-query endpoint with that identifier.
+  const direct = ident(raw);
+  if (direct && direct.length >= 6) return direct;
+  try {
+    const u = new URL(raw);
+    for (const key of ["pid", "productId", "product_id"]) {
+      const id = ident(u.searchParams.get(key));
+      if (id && id.length >= 6) return id;
+    }
+    const uuid = u.href.match(/[A-Za-z0-9]{8}(?:-[A-Za-z0-9]{4}){3}-[A-Za-z0-9]{12}/);
+    if (uuid) return uuid[0];
+    const numeric = u.href.match(/\d{12,}/);
+    if (numeric) return numeric[0];
+  } catch {
+    // A bare CJ product ID was already handled above.
+  }
+  return "";
+}
 function num(v: unknown) {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
@@ -435,6 +457,15 @@ Deno.serve(async (r) => {
     return json(r, { error: "An authorised Cossa Store administrator is required." }, 401);
   }
   try {
+    const body = await r.json().catch(() => ({}));
+    const suppliedRef = body && typeof body === "object" ? (body as any).productRef : undefined;
+    const manualProductId = requestedProductId(suppliedRef);
+    if (suppliedRef && !manualProductId)
+      return json(
+        r,
+        { error: "Paste a CJ product ID or a CJ product link containing its product ID." },
+        400,
+      );
     const cj = client(await token(ck));
     const { data: existingRows, error: ee } = await a
       .from("store_products")
@@ -451,22 +482,26 @@ Deno.serve(async (r) => {
       // already been exhausted by earlier controlled imports. The official
       // listV2 endpoint uses one-based pages, so advance through fresh pages
       // as the existing CJ catalogue grows without introducing new state.
-      startPage = Math.floor(existing.size / DISCOVERY_SIZE) + 1;
-    for (let page = startPage; page < startPage + DISCOVERY_PAGES; page++) {
-      const q = new URLSearchParams({
-        page: String(page),
-        size: String(DISCOVERY_SIZE),
-        productFlag: "0",
-        startWarehouseInventory: "1",
-        verifiedWarehouse: "1",
-        orderBy: "4",
-        sort: "desc",
-      });
-      q.append("features", "enable_description");
-      q.append("features", "enable_category");
-      pool.push(...collect(await cj(`/product/listV2?${q}`), existing, seen));
+      startPage = manualProductId ? null : Math.floor(existing.size / DISCOVERY_SIZE) + 1;
+    if (!manualProductId) {
+      for (let page = startPage!; page < startPage! + DISCOVERY_PAGES; page++) {
+        const q = new URLSearchParams({
+          page: String(page),
+          size: String(DISCOVERY_SIZE),
+          productFlag: "0",
+          startWarehouseInventory: "1",
+          verifiedWarehouse: "1",
+          orderBy: "4",
+          sort: "desc",
+        });
+        q.append("features", "enable_description");
+        q.append("features", "enable_category");
+        pool.push(...collect(await cj(`/product/listV2?${q}`), existing, seen));
+      }
     }
-    const chosen = select(pool);
+    const chosen = manualProductId
+      ? [{ id: manualProductId, title: "Requested CJ product", category: "", score: 0 }]
+      : select(pool);
     const summary: any = {
       requested: chosen.length,
       createdAsDraft: 0,
@@ -480,6 +515,16 @@ Deno.serve(async (r) => {
     for (const c of chosen) {
       let insertedProductId: string | null = null;
       try {
+        if (existing.has(c.id)) {
+          summary.refreshed++;
+          summary.products.push({
+            productId: c.id,
+            title: "Already in Cossa catalogue",
+            variants: 0,
+            availableVariants: 0,
+          });
+          continue;
+        }
         const p = (await cj(`/product/query?pid=${encodeURIComponent(c.id)}`))?.data ?? {},
           pid = ident(p.pid),
           name = text(p.productNameEn, 220),
