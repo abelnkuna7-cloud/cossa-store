@@ -28,16 +28,6 @@ type CjSyncResult = {
   }>;
 };
 
-type CjAvailabilityResult = {
-  processed: number;
-  products: Array<{
-    productId: string;
-    title: string;
-    availableVariants: number;
-    totalInventory: number;
-  }>;
-};
-
 type CjCommercialProduct = {
   productId: string;
   title: string;
@@ -113,10 +103,6 @@ async function invokeCjSync(productRef?: string): Promise<CjSyncResult> {
   });
 }
 
-async function invokeCjAvailability(): Promise<CjAvailabilityResult> {
-  return invokeFunction<CjAvailabilityResult>("cj-availability-sync", { action: "refresh" });
-}
-
 async function invokeCjCommercial(productRef?: string): Promise<CjCommercialResult> {
   return invokeFunction<CjCommercialResult>("cj-commercial-sync", {
     action: "price_and_publish",
@@ -149,24 +135,10 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
     setSyncing(true);
     try {
       const next = await invokeCjSync();
-      const availability = await invokeCjAvailability();
-      const availabilityByProduct = new Map(
-        availability.products.map((product) => [product.productId, product]),
-      );
-      const merged: CjSyncResult = {
-        ...next,
-        products: next.products.map((product) => {
-          const live = availabilityByProduct.get(product.productId);
-          return live
-            ? {
-                ...product,
-                availableVariants: live.availableVariants,
-                totalInventory: live.totalInventory,
-              }
-            : product;
-        }),
-      };
-      setResult(merged);
+      // cj-product-sync performs its own live per-product availability check.
+      // Do not add a second full-catalogue refresh here: it can exceed the Edge
+      // runtime limit after a successful import and incorrectly look like a failure.
+      setResult(next);
 
       setCommercial(null);
       toast.success("CJ Draft products imported", {
