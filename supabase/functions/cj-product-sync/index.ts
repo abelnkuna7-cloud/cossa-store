@@ -563,7 +563,9 @@ Deno.serve(async (r) => {
               source_currency: "USD",
               source_price: source,
               source_cost: source,
-              fx_rate_to_zar: null,
+              // Drafts retain the CJ USD source cost. The commercial sync replaces
+              // this required catalogue metadata only after its pricing checks pass.
+              fx_rate_to_zar: 1,
               price_zar: 0,
               cost_zar: null,
               is_default: i === 0,
