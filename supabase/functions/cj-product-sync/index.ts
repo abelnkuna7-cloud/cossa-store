@@ -285,6 +285,27 @@ async function scheduledAutomation(a: Admin, r: Request) {
     .maybeSingle();
   return !error && Boolean(data);
 }
+async function automationAlert(
+  a: Admin,
+  kind: string,
+  severity: "warning" | "error",
+  message: string,
+  details: unknown,
+) {
+  const day = new Date().toISOString().slice(0, 10);
+  await a.from("supplier_automation_alerts").upsert(
+    {
+      organisation_id: ORG_ID,
+      provider: "CJ Dropshipping",
+      alert_kind: kind,
+      severity,
+      message,
+      details,
+      dedupe_key: `cj:${kind}:${day}`,
+    },
+    { onConflict: "dedupe_key", ignoreDuplicates: true },
+  );
+}
 async function token(k: string) {
   const r = await fetch(`${CJ_API_BASE}/authentication/getAccessToken`, {
     method: "POST",
@@ -766,8 +787,24 @@ Deno.serve(async (r) => {
         rejections: summary.rejections,
       },
     });
+    if (automated && summary.rejections.failed > 0)
+      await automationAlert(
+        a,
+        "import_failed_products",
+        "warning",
+        `CJ automatic import needs attention: ${summary.rejections.failed} product${summary.rejections.failed === 1 ? "" : "s"} could not be imported.`,
+        { requested: summary.requested, created: summary.createdAsDraft, skipped: summary.skipped },
+      );
     return json(r, summary);
   } catch {
+    if (automated)
+      await automationAlert(
+        a,
+        "import_job_failed",
+        "error",
+        "CJ automatic import failed safely; no incomplete customer-facing product was published.",
+        {},
+      );
     return json(
       r,
       {

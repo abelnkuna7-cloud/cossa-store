@@ -106,6 +106,27 @@ async function scheduledAutomation(a: Admin, r: Request) {
     .maybeSingle();
   return !error && Boolean(data);
 }
+async function automationAlert(
+  a: Admin,
+  kind: string,
+  severity: "warning" | "error",
+  message: string,
+  details: unknown,
+) {
+  const day = new Date().toISOString().slice(0, 10);
+  await a.from("supplier_automation_alerts").upsert(
+    {
+      organisation_id: ORG_ID,
+      provider: "CJ Dropshipping",
+      alert_kind: kind,
+      severity,
+      message,
+      details,
+      dedupe_key: `cj:${kind}:${day}`,
+    },
+    { onConflict: "dedupe_key", ignoreDuplicates: true },
+  );
+}
 async function token(k: string) {
   const r = await fetch(`${CJ_API_BASE}/authentication/getAccessToken`, {
     method: "POST",
@@ -336,6 +357,14 @@ Deno.serve(async (r) => {
         reason: e instanceof Error ? e.message : "unknown",
       }),
     );
+    if (automated)
+      await automationAlert(
+        a,
+        "availability_job_failed",
+        "error",
+        "CJ automatic stock refresh failed safely; no unavailable product was published.",
+        {},
+      );
     return json(
       r,
       { error: "CJ availability refresh failed safely. No products were published." },

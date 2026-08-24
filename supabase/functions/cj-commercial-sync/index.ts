@@ -125,6 +125,27 @@ async function scheduledAutomation(a: Admin, r: Request) {
     .maybeSingle();
   return !error && Boolean(data);
 }
+async function automationAlert(
+  a: Admin,
+  kind: string,
+  severity: "warning" | "error",
+  message: string,
+  details: unknown,
+) {
+  const day = new Date().toISOString().slice(0, 10);
+  await a.from("supplier_automation_alerts").upsert(
+    {
+      organisation_id: ORG_ID,
+      provider: "CJ Dropshipping",
+      alert_kind: kind,
+      severity,
+      message,
+      details,
+      dedupe_key: `cj:${kind}:${day}`,
+    },
+    { onConflict: "dedupe_key", ignoreDuplicates: true },
+  );
+}
 async function token(k: string) {
   const r = await fetch(`${CJ_API_BASE}/authentication/getAccessToken`, {
     method: "POST",
@@ -500,6 +521,17 @@ Deno.serve(async (r) => {
       product_ref: requestedRef || undefined,
     },
   });
+  const pricingFailures = results.filter(
+    (x) => x.reason === "freight_api_error" || x.reason === "pricing_failed",
+  ).length;
+  if (automated && (archived > 0 || pricingFailures > 0))
+    await automationAlert(
+      a,
+      "pricing_review_needed",
+      archived > 0 ? "warning" : "error",
+      `CJ automatic pricing needs review: ${archived} product${archived === 1 ? "" : "s"} archived and ${pricingFailures} pricing check${pricingFailures === 1 ? "" : "s"} failed.`,
+      { processed: results.length, activated: active, archived, pricingFailures },
+    );
   return json(r, {
     processed: results.length,
     activated: active,
