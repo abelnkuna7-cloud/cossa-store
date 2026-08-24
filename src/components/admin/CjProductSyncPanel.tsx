@@ -19,6 +19,7 @@ type CjSyncResult = {
   refreshed: number;
   skipped: number;
   products: CjSyncProduct[];
+  rejectionDetails?: Array<{ productId: string; reason: string }>;
 };
 
 type CjAvailabilityResult = {
@@ -67,10 +68,15 @@ async function invokeFunction<T>(name: string, body: Record<string, unknown>): P
       clone?: () => { json?: () => Promise<unknown> };
       json?: () => Promise<unknown>;
     } | null;
-    const response = typeof responseLike?.clone === "function" ? responseLike.clone() : responseLike;
+    const response =
+      typeof responseLike?.clone === "function" ? responseLike.clone() : responseLike;
     if (typeof response?.json === "function") {
       const payload = await response.json().catch(() => null);
-      if (payload && typeof payload === "object" && typeof (payload as { error?: unknown }).error === "string") {
+      if (
+        payload &&
+        typeof payload === "object" &&
+        typeof (payload as { error?: unknown }).error === "string"
+      ) {
         throw new Error((payload as { error: string }).error);
       }
     }
@@ -119,7 +125,9 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
     try {
       const next = await invokeCjSync();
       const availability = await invokeCjAvailability();
-      const availabilityByProduct = new Map(availability.products.map((product) => [product.productId, product]));
+      const availabilityByProduct = new Map(
+        availability.products.map((product) => [product.productId, product]),
+      );
       const merged: CjSyncResult = {
         ...next,
         products: next.products.map((product) => {
@@ -143,7 +151,8 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
       onSynced?.();
     } catch (error) {
       const candidate = (error as { message?: unknown } | null)?.message;
-      const message = typeof candidate === "string" && candidate ? candidate : "CJ catalogue sync failed.";
+      const message =
+        typeof candidate === "string" && candidate ? candidate : "CJ catalogue sync failed.";
       setLastError(message);
       toast.error(message);
     } finally {
@@ -157,7 +166,9 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
         <div>
           <h2 className="font-semibold">CJ Dropshipping connection</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Sync a controlled batch of real CJ products, verify live variant stock, calculate a South Africa freight quote, apply protected Cossa pricing, and publish only products that pass all checks. Unavailable or unshippable products remain Draft.
+            Sync a controlled batch of real CJ products, verify live variant stock, calculate a
+            South Africa freight quote, apply protected Cossa pricing, and publish only products
+            that pass all checks. Unavailable or unshippable products remain Draft.
           </p>
         </div>
         <Button type="button" onClick={() => void syncCjProducts()} disabled={syncing}>
@@ -167,7 +178,10 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
       </div>
 
       {lastError ? (
-        <p role="alert" className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p
+          role="alert"
+          className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
           {lastError}
         </p>
       ) : null}
@@ -175,10 +189,18 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
       {result ? (
         <div className="mt-4 space-y-3 text-sm">
           <div className="flex flex-wrap gap-x-6 gap-y-1">
-            <span><strong>Requested:</strong> {result.requested}</span>
-            <span><strong>New drafts:</strong> {result.createdAsDraft}</span>
-            <span><strong>Refreshed:</strong> {result.refreshed}</span>
-            <span><strong>Skipped:</strong> {result.skipped}</span>
+            <span>
+              <strong>Requested:</strong> {result.requested}
+            </span>
+            <span>
+              <strong>New drafts:</strong> {result.createdAsDraft}
+            </span>
+            <span>
+              <strong>Refreshed:</strong> {result.refreshed}
+            </span>
+            <span>
+              <strong>Skipped:</strong> {result.skipped}
+            </span>
           </div>
           {result.products.length ? (
             <div className="overflow-x-auto rounded-md border border-border">
@@ -196,7 +218,9 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
                     <tr key={product.productId}>
                       <td className="px-3 py-2">
                         <div className="font-medium">{product.title}</div>
-                        <div className="font-mono text-[11px] text-muted-foreground">{product.productId}</div>
+                        <div className="font-mono text-[11px] text-muted-foreground">
+                          {product.productId}
+                        </div>
                       </td>
                       <td className="px-3 py-2">{product.variants}</td>
                       <td className="px-3 py-2">{product.availableVariants}</td>
@@ -207,16 +231,40 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
               </table>
             </div>
           ) : null}
+          {result.rejectionDetails?.length ? (
+            <details className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
+              <summary className="cursor-pointer font-medium text-foreground">
+                Show import rejections
+              </summary>
+              <ul className="mt-2 space-y-1">
+                {result.rejectionDetails.map((rejection) => (
+                  <li key={rejection.productId}>
+                    <span className="font-mono">{rejection.productId}</span>:{" "}
+                    {rejection.reason.replace(/_/g, " ")}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
         </div>
       ) : null}
 
       {commercial ? (
         <div className="mt-5 space-y-3 text-sm">
           <div className="flex flex-wrap gap-x-6 gap-y-1">
-            <span><strong>Published:</strong> {commercial.activated}</span>
-            <span><strong>Kept Draft:</strong> {commercial.keptDraft}</span>
-            <span><strong>Protected FX:</strong> US$1 = R{commercial.pricing.fxZarPerUsd.toFixed(2)}</span>
-            <span><strong>Target margin:</strong> {(commercial.pricing.targetGrossMargin * 100).toFixed(0)}%</span>
+            <span>
+              <strong>Published:</strong> {commercial.activated}
+            </span>
+            <span>
+              <strong>Kept Draft:</strong> {commercial.keptDraft}
+            </span>
+            <span>
+              <strong>Protected FX:</strong> US$1 = R{commercial.pricing.fxZarPerUsd.toFixed(2)}
+            </span>
+            <span>
+              <strong>Target margin:</strong>{" "}
+              {(commercial.pricing.targetGrossMargin * 100).toFixed(0)}%
+            </span>
           </div>
           <div className="overflow-x-auto rounded-md border border-border">
             <table className="w-full min-w-[980px] text-left text-sm">
@@ -235,10 +283,18 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
                   <tr key={product.productId}>
                     <td className="px-3 py-2">
                       <div className="font-medium">{product.title}</div>
-                      {product.reason ? <div className="text-xs text-muted-foreground">{product.reason.replace(/_/g, " ")}</div> : null}
+                      {product.reason ? (
+                        <div className="text-xs text-muted-foreground">
+                          {product.reason.replace(/_/g, " ")}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-3 py-2 capitalize">{product.status}</td>
-                    <td className="px-3 py-2">{product.shippingCarrier ? `${product.shippingCarrier} · ${usd(product.shippingUsd)}` : "—"}</td>
+                    <td className="px-3 py-2">
+                      {product.shippingCarrier
+                        ? `${product.shippingCarrier} · ${usd(product.shippingUsd)}`
+                        : "—"}
+                    </td>
                     <td className="px-3 py-2">{product.shippingAging || "—"}</td>
                     <td className="px-3 py-2">{zar(product.minCostZar)}</td>
                     <td className="px-3 py-2 font-medium">{zar(product.fromPriceZar)}</td>
@@ -248,7 +304,9 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
             </table>
           </div>
           <p className="text-xs text-muted-foreground">
-            Only products with live CJ stock and a valid South Africa freight quote are published. Pricing includes supplier cost, quoted freight, a protective FX rate, a risk buffer, and Cossa margin protection.
+            Only products with live CJ stock and a valid South Africa freight quote are published.
+            Pricing includes supplier cost, quoted freight, a protective FX rate, a risk buffer, and
+            Cossa margin protection.
           </p>
         </div>
       ) : null}
