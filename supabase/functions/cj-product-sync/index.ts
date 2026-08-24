@@ -409,7 +409,12 @@ Deno.serve(async (r) => {
   if (!url || !pub || !srv || !ck)
     return json(r, { error: "CJ catalogue sync is not configured." }, 503);
   const uc = createClient(url, pub, {
-      global: { fetch: sf(pub) },
+      // Preserve the per-request user JWT alongside the opaque publishable key.
+      // Supabase Auth validates this JWT; the provider key stays in `apikey`.
+      global: {
+        fetch: sf(pub),
+        headers: { Authorization: r.headers.get("authorization") ?? "" },
+      },
       auth: { autoRefreshToken: false, persistSession: false },
     }),
     a = createClient(url, srv, {
