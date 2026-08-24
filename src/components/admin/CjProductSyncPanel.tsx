@@ -113,10 +113,6 @@ async function invokeCjAvailability(): Promise<CjAvailabilityResult> {
   return invokeFunction<CjAvailabilityResult>("cj-availability-sync", { action: "refresh" });
 }
 
-async function invokeCjCommercial(): Promise<CjCommercialResult> {
-  return invokeFunction<CjCommercialResult>("cj-commercial-sync", { action: "price_and_publish" });
-}
-
 function zar(value?: number): string {
   if (value == null) return "—";
   return new Intl.NumberFormat("en-ZA", {
@@ -160,10 +156,9 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
       };
       setResult(merged);
 
-      const commercialResult = await invokeCjCommercial();
-      setCommercial(commercialResult);
-      toast.success("CJ catalogue is commercially ready", {
-        description: `${commercialResult.activated} product${commercialResult.activated === 1 ? "" : "s"} priced and published; ${commercialResult.keptDraft} kept Draft because shipping or availability could not be verified.`,
+      setCommercial(null);
+      toast.success("CJ Draft products imported", {
+        description: `${next.createdAsDraft} real CJ product${next.createdAsDraft === 1 ? "" : "s"} added for catalogue and pricing review.`,
       });
       onSynced?.();
     } catch (error) {
@@ -183,14 +178,14 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
         <div>
           <h2 className="font-semibold">CJ Dropshipping connection</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Sync a controlled batch of real CJ products, verify live variant stock, calculate a
-            South Africa freight quote, apply protected Cossa pricing, and publish only products
-            that pass all checks. Unavailable or unshippable products remain Draft.
+            Import a controlled, department-balanced batch of real CJ products with live variant
+            stock. Every product enters Cossa Store as Draft for pricing and catalogue approval;
+            unavailable products are skipped safely.
           </p>
         </div>
         <Button type="button" onClick={() => void syncCjProducts()} disabled={syncing}>
           <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} aria-hidden />
-          {syncing ? "Syncing & pricing CJ…" : "Sync & Price CJ Products"}
+          {syncing ? "Importing CJ Drafts…" : "Import 25 CJ Draft Products"}
         </Button>
       </div>
 

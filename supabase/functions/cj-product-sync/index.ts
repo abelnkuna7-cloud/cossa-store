@@ -2,7 +2,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type User } from "https://esm.sh/@supabase/supabase-js@2";
 const ORG_ID = "00000000-0000-4000-8000-000000000001",
   CJ_API_BASE = "https://developers.cjdropshipping.com/api2.0/v1",
-  MAX_PRODUCTS = 5,
+  // A bounded, admin-triggered batch keeps the CJ API and catalogue review
+  // workflow manageable while allowing balanced department acquisition.
+  MAX_PRODUCTS = 25,
   DISCOVERY_SIZE = 100,
   DISCOVERY_PAGES = 4,
   REQUEST_GAP_MS = 1100;
