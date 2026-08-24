@@ -329,13 +329,20 @@ Deno.serve(async (r) => {
     .select("id,name,status,supplier_product_ref,stock_quantity,category,updated_at")
     .eq("organisation_id", ORG_ID)
     .eq("supplier_name", "CJ Dropshipping")
-    // A successful product remains active. New commercial work should focus
-    // on unapproved drafts so previously approved items cannot crowd out the
-    // rest of the Cossa departments on each scheduled run.
-    .eq("status", "draft")
     .gt("stock_quantity", 0)
     .order("updated_at", { ascending: false });
-  if (requestedRef) productQuery = productQuery.eq("supplier_product_ref", requestedRef);
+  if (requestedRef) {
+    // A pasted, already-approved CJ product is a deliberate re-check. Allow it
+    // through so the caller gets its current live commercial result instead of
+    // a misleading empty "Draft" outcome.
+    productQuery = productQuery
+      .eq("supplier_product_ref", requestedRef)
+      .neq("status", "archived");
+  } else {
+    // Routine and scheduled work should focus only on unapproved drafts so
+    // previously approved items do not crowd out under-filled departments.
+    productQuery = productQuery.eq("status", "draft");
+  }
   const { data: productRows, error } = await productQuery.limit(requestedRef ? 1 : LIMIT * 8);
   if (error)
     return json(r, { error: "Cossa catalogue data could not be loaded for CJ pricing." }, 502);
