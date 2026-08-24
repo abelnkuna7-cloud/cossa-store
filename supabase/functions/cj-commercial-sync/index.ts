@@ -9,6 +9,10 @@ const FX = 16.5,
   MAX_DAYS = 60,
   MAX_SHIP_USD = 35,
   MAX_RETAIL = 3000,
+  // Build the public catalogue evenly. This is a target, not a promise to
+  // publish unsuitable CJ products: every candidate must still pass the live
+  // stock, South African freight, and price checks below.
+  ACTIVE_TARGET_PER_CATEGORY = 12,
   // Each candidate requires a live CJ freight request. Keep one admin run safely
   // below the Edge Runtime execution ceiling; the action can be run again for
   // the next controlled batch.
@@ -322,16 +326,62 @@ Deno.serve(async (r) => {
     .lte("stock_quantity", 0);
   let productQuery = a
     .from("store_products")
-    .select("id,name,status,supplier_product_ref,stock_quantity")
+    .select("id,name,status,supplier_product_ref,stock_quantity,category,updated_at")
     .eq("organisation_id", ORG_ID)
     .eq("supplier_name", "CJ Dropshipping")
-    .neq("status", "archived")
+    // A successful product remains active. New commercial work should focus
+    // on unapproved drafts so previously approved items cannot crowd out the
+    // rest of the Cossa departments on each scheduled run.
+    .eq("status", "draft")
     .gt("stock_quantity", 0)
     .order("updated_at", { ascending: false });
   if (requestedRef) productQuery = productQuery.eq("supplier_product_ref", requestedRef);
-  const { data: products, error } = await productQuery.limit(requestedRef ? 1 : LIMIT);
+  const { data: productRows, error } = await productQuery.limit(requestedRef ? 1 : LIMIT * 8);
   if (error)
     return json(r, { error: "Cossa catalogue data could not be loaded for CJ pricing." }, 502);
+  const { data: activeRows, error: activeError } = await a
+    .from("store_products")
+    .select("category")
+    .eq("organisation_id", ORG_ID)
+    .eq("supplier_name", "CJ Dropshipping")
+    .eq("status", "active");
+  if (activeError)
+    return json(r, { error: "Cossa catalogue categories could not be loaded for CJ pricing." }, 502);
+  const activeByCategory = new Map<string, number>();
+  for (const row of activeRows ?? []) {
+    const key = typeof (row as any).category === "string" ? (row as any).category : "other";
+    activeByCategory.set(key, (activeByCategory.get(key) ?? 0) + 1);
+  }
+  const candidates = (productRows ?? []) as Array<Record<string, any>>;
+  const products = requestedRef
+    ? candidates.slice(0, 1)
+    : (() => {
+        const buckets = new Map<string, Array<Record<string, any>>>();
+        for (const product of candidates) {
+          const key = typeof product.category === "string" && product.category ? product.category : "other";
+          const bucket = buckets.get(key) ?? [];
+          bucket.push(product);
+          buckets.set(key, bucket);
+        }
+        const categories = [...buckets.keys()].sort((left, right) => {
+          const leftGap = ACTIVE_TARGET_PER_CATEGORY - (activeByCategory.get(left) ?? 0);
+          const rightGap = ACTIVE_TARGET_PER_CATEGORY - (activeByCategory.get(right) ?? 0);
+          return rightGap - leftGap || left.localeCompare(right);
+        });
+        const selected: Array<Record<string, any>> = [];
+        for (let index = 0; selected.length < LIMIT; index++) {
+          let added = false;
+          for (const key of categories) {
+            const candidate = buckets.get(key)?.[index];
+            if (!candidate) continue;
+            selected.push(candidate);
+            added = true;
+            if (selected.length === LIMIT) break;
+          }
+          if (!added) break;
+        }
+        return selected;
+      })();
   const results: any[] = [];
   for (const p of products ?? []) {
     try {

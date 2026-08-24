@@ -164,7 +164,7 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
       const next = await invokeCjCommercial();
       setCommercial(next);
       toast.success("CJ pricing review completed", {
-        description: `${next.activated} eligible product${next.activated === 1 ? "" : "s"} published; ${next.archived} non-viable product${next.archived === 1 ? "" : "s"} archived; ${next.keptDraft} retained as Draft.`,
+        description: `${next.activated} approved product${next.activated === 1 ? "" : "s"} published. Products that did not pass were kept out of the storefront.`,
       });
       onSynced?.();
     } catch (error) {
@@ -229,8 +229,8 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
           <h2 className="font-semibold">CJ Dropshipping connection</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Import a controlled, department-balanced batch of real CJ products with live variant
-            stock. Every product enters Cossa Store as Draft for pricing and catalogue approval;
-            unavailable products are skipped safely.
+            stock. Qualification prioritises categories with fewer approved CJ products. Only
+            products that pass stock, South Africa freight, and protected pricing become public.
           </p>
           <div className="mt-3 flex max-w-3xl flex-col gap-2 sm:flex-row">
             <Input
@@ -351,10 +351,7 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
               <strong>Published:</strong> {commercial.activated}
             </span>
             <span>
-              <strong>Kept Draft:</strong> {commercial.keptDraft}
-            </span>
-            <span>
-              <strong>Archived:</strong> {commercial.archived}
+              <strong>Not approved:</strong> {commercial.keptDraft + commercial.archived}
             </span>
             <span>
               <strong>Protected FX:</strong> US$1 = R{commercial.pricing.fxZarPerUsd.toFixed(2)}
@@ -377,7 +374,7 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {commercial.products.map((product) => (
+                {commercial.products.filter((product) => product.status === "active").map((product) => (
                   <tr key={product.productId}>
                     <td className="px-3 py-2">
                       <div className="font-medium">{product.title}</div>
@@ -402,9 +399,10 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
             </table>
           </div>
           <p className="text-xs text-muted-foreground">
-            Only products with live CJ stock and a valid South Africa freight quote are published.
-            Pricing includes supplier cost, quoted freight, a protective FX rate, a risk buffer, and
-            Cossa margin protection.
+            This list shows approved, public products only. Products without live CJ stock, a valid
+            South Africa freight quote, or commercially viable pricing are excluded from the
+            storefront. Pricing includes supplier cost, quoted freight, a protective FX rate, a risk
+            buffer, and Cossa margin protection.
           </p>
         </div>
       ) : null}
