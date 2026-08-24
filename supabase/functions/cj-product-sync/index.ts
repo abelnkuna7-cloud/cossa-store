@@ -542,7 +542,7 @@ Deno.serve(async (r) => {
         const saved = await a.from("store_products").insert(row).select("id").single();
         if (saved.error) throw saved.error;
         insertedProductId = saved.data.id;
-        const rows = variants
+        const candidateRows = variants
           .map((v: any, i: number) => {
             const vid = ident(v.vid),
               source = num(v.variantSellPrice);
@@ -579,6 +579,17 @@ Deno.serve(async (r) => {
             };
           })
           .filter(Boolean);
+        // CJ can repeat a variant in product detail responses. A single upsert
+        // cannot contain duplicate conflict keys, so retain one authoritative row
+        // per CJ variant ID before writing the catalogue.
+        const rows = Array.from(
+          new Map(
+            (candidateRows as Array<{ provider_variant_id: string }>).map((row) => [
+              row.provider_variant_id,
+              row,
+            ]),
+          ).values(),
+        );
         if (!rows.some((x: any) => x.is_available)) {
           await a.from("store_products").delete().eq("id", saved.data.id);
           summary.skipped++;
