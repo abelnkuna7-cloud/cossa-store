@@ -19,7 +19,12 @@ type CjSyncResult = {
   refreshed: number;
   skipped: number;
   products: CjSyncProduct[];
-  rejectionDetails?: Array<{ productId: string; reason: string; diagnosticCode?: string }>;
+  rejectionDetails?: Array<{
+    productId: string;
+    reason: string;
+    diagnosticCode?: string;
+    missingField?: string;
+  }>;
 };
 
 type CjAvailabilityResult = {
@@ -242,6 +247,7 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
                     <span className="font-mono">{rejection.productId}</span>:{" "}
                     {rejection.reason.replace(/_/g, " ")}
                     {rejection.diagnosticCode ? ` (${rejection.diagnosticCode})` : ""}
+                    {rejection.missingField ? ` — missing ${rejection.missingField}` : ""}
                   </li>
                 ))}
               </ul>

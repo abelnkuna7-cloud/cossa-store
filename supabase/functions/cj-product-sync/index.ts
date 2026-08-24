@@ -624,6 +624,10 @@ Deno.serve(async (r) => {
           error && typeof error === "object" && "code" in error
             ? String((error as { code?: unknown }).code ?? "")
             : "";
+        const missingField =
+          providerCode === "23502"
+            ? message.match(/null value in column "([a-z_]+)"/i)?.[1]
+            : undefined;
         const reason = message.includes("cj_request_failed")
           ? "cj_product_query_failed"
           : providerCode === "23505"
@@ -643,6 +647,7 @@ Deno.serve(async (r) => {
           productId: c.id,
           reason,
           diagnosticCode: providerCode || undefined,
+          missingField,
         });
       }
     }
