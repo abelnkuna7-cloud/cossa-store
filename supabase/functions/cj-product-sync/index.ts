@@ -132,7 +132,7 @@ function blocked(v: string) {
   )
     return "weapon";
   if (
-    /\b(spy camera|hidden camera|micro camera|mini hidden camera|covert camera|camera jammer|gps jammer|signal jammer)\b/.test(
+    /\b(spy camera|hidden camera|micro camera|mini hidden camera|covert camera|a9 wifi camera|wireless network camera|camera jammer|gps jammer|signal jammer)\b/.test(
       t,
     )
   )
@@ -144,10 +144,19 @@ function blocked(v: string) {
     return "unsafe_claim";
   return null;
 }
-function category(cat: string, title: string) {
-  const x = `${title} ${cat}`.toLowerCase();
+function category(cat: string, title: string, description = "") {
+  const x = `${title} ${cat} ${description}`.toLowerCase();
+  // Specific product functions take precedence over generic words such as "car",
+  // "men" or "outdoor" in CJ marketing copy.
+  if (/humidifier|air purifier|shower head|kitchen|bathroom storage|home lighting/.test(x))
+    return "home-living";
+  if (/resistance band|knee pad|skipping rope|exercise|fitness|gym|yoga/.test(x))
+    return "sports-fitness";
+  if (/beauty|makeup|cosmetic|nail|skincare|blackhead|facial|hair care|grooming/.test(x))
+    return "beauty-grooming";
   if (/pet|dog|cat/.test(x)) return "pet-supplies";
-  if (/car|automotive|vehicle|motorcycle|dash cam/.test(x)) return "automotive";
+  if (/car scratch|car wash|car care|automotive|vehicle|motorcycle|dash cam/.test(x))
+    return "automotive";
   if (/phone case|screen protector|mobile charger|charging cable|phone holder/.test(x))
     return "mobile-accessories";
   if (/security|alarm|doorbell|smart lock|motion sensor/.test(x)) return "security-smart-home";
@@ -163,7 +172,6 @@ function category(cat: string, title: string) {
   if (/speaker|earbud|computer|electronic|wifi|antenna|camera|usb|bluetooth/.test(x))
     return "technology-electronics";
   if (/office|business|stationery|workspace|packaging/.test(x)) return "office-business";
-  if (/beauty|makeup|cosmetic|nail|skincare|hair|grooming/.test(x)) return "beauty-grooming";
   if (/oral care|toothbrush|personal care|hygiene|wellness/.test(x)) return "health-personal-care";
   if (/sport|fitness|exercise|gym|yoga|resistance band|knee pad|skipping rope/.test(x))
     return "sports-fitness";
@@ -460,7 +468,7 @@ Deno.serve(async (r) => {
           pid = ident(p.pid),
           name = text(p.productNameEn, 220),
           description = clean(p.description),
-          cat = category(text(p.categoryName, 700), name) ?? c.category,
+          cat = category(text(p.categoryName, 700), name, description) ?? c.category,
           images = [p.bigImage, ...(Array.isArray(p.productImageSet) ? p.productImageSet : [])]
             .filter(isUrl)
             .filter((x: string, i: number, a: string[]) => a.indexOf(x) === i)
