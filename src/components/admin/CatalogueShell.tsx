@@ -53,9 +53,14 @@ export function CatalogueShell({
         <div className="flex flex-wrap items-center gap-2">
           {actions}
           {access.isAdmin ? (
-            <Button asChild size="sm" variant="outline">
-              <Link to="/admin/approvals">Approvals</Link>
-            </Button>
+            <>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/admin/email-operations">Email operations</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/admin/approvals">Approvals</Link>
+              </Button>
+            </>
           ) : null}
           {access.email ? (
             <Button

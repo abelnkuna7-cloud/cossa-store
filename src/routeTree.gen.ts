@@ -9,122 +9,47 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TermsRouteImport } from './routes/terms'
-import { Route as SupplierApplicationRouteImport } from './routes/supplier-application'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as ShopByProjectRouteImport } from './routes/shop-by-project'
-import { Route as ShopRouteImport } from './routes/shop'
-import { Route as SearchRouteImport } from './routes/search'
-import { Route as ReturnsRouteImport } from './routes/returns'
-import { Route as RequestAQuoteRouteImport } from './routes/request-a-quote'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as HowItWorksRouteImport } from './routes/how-it-works'
-import { Route as DeliveryRouteImport } from './routes/delivery'
-import { Route as ContactRouteImport } from './routes/contact'
-import { Route as CheckoutRouteImport } from './routes/checkout'
-import { Route as CartRouteImport } from './routes/cart'
-import { Route as BusinessAccountRouteImport } from './routes/business-account'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AccountRouteImport } from './routes/account'
-import { Route as AboutRouteImport } from './routes/about'
-import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as AccountRouteImport } from './routes/account'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as BusinessAccountRouteImport } from './routes/business-account'
+import { Route as CartRouteImport } from './routes/cart'
+import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as ContactRouteImport } from './routes/contact'
+import { Route as DeliveryRouteImport } from './routes/delivery'
+import { Route as HowItWorksRouteImport } from './routes/how-it-works'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as RequestAQuoteRouteImport } from './routes/request-a-quote'
+import { Route as ReturnsRouteImport } from './routes/returns'
+import { Route as SearchRouteImport } from './routes/search'
+import { Route as ShopRouteImport } from './routes/shop'
+import { Route as ShopByProjectRouteImport } from './routes/shop-by-project'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as SupplierApplicationRouteImport } from './routes/supplier-application'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AccountIndexRouteImport } from './routes/account.index'
-import { Route as ProjectSlugRouteImport } from './routes/project.$slug'
-import { Route as ProductSlugRouteImport } from './routes/product.$slug'
-import { Route as DevCatalogueRouteImport } from './routes/dev.catalogue'
-import { Route as CategorySlugRouteImport } from './routes/category.$slug'
-import { Route as AccountWishlistRouteImport } from './routes/account.wishlist'
-import { Route as AccountProjectsRouteImport } from './routes/account.projects'
 import { Route as AccountOrdersRouteImport } from './routes/account.orders'
+import { Route as AccountProjectsRouteImport } from './routes/account.projects'
+import { Route as AccountWishlistRouteImport } from './routes/account.wishlist'
+import { Route as CategorySlugRouteImport } from './routes/category.$slug'
+import { Route as DevCatalogueRouteImport } from './routes/dev.catalogue'
+import { Route as ProductSlugRouteImport } from './routes/product.$slug'
+import { Route as ProjectSlugRouteImport } from './routes/project.$slug'
 import { Route as AuthenticatedAdminApprovalsRouteImport } from './routes/_authenticated/admin.approvals'
+import { Route as AuthenticatedAdminEmailOperationsRouteImport } from './routes/_authenticated/admin.email-operations'
 import { Route as AuthenticatedAdminCatalogueIndexRouteImport } from './routes/_authenticated/admin.catalogue.index'
-import { Route as AuthenticatedAdminCatalogueNewRouteImport } from './routes/_authenticated/admin.catalogue.new'
 import { Route as AuthenticatedAdminCatalogueIdRouteImport } from './routes/_authenticated/admin.catalogue.$id'
+import { Route as AuthenticatedAdminCatalogueNewRouteImport } from './routes/_authenticated/admin.catalogue.new'
 
-const TermsRoute = TermsRouteImport.update({
-  id: '/terms',
-  path: '/terms',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SupplierApplicationRoute = SupplierApplicationRouteImport.update({
-  id: '/supplier-application',
-  path: '/supplier-application',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ShopByProjectRoute = ShopByProjectRouteImport.update({
-  id: '/shop-by-project',
-  path: '/shop-by-project',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ShopRoute = ShopRouteImport.update({
-  id: '/shop',
-  path: '/shop',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SearchRoute = SearchRouteImport.update({
-  id: '/search',
-  path: '/search',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReturnsRoute = ReturnsRouteImport.update({
-  id: '/returns',
-  path: '/returns',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RequestAQuoteRoute = RequestAQuoteRouteImport.update({
-  id: '/request-a-quote',
-  path: '/request-a-quote',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HowItWorksRoute = HowItWorksRouteImport.update({
-  id: '/how-it-works',
-  path: '/how-it-works',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DeliveryRoute = DeliveryRouteImport.update({
-  id: '/delivery',
-  path: '/delivery',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ContactRoute = ContactRouteImport.update({
-  id: '/contact',
-  path: '/contact',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CheckoutRoute = CheckoutRouteImport.update({
-  id: '/checkout',
-  path: '/checkout',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CartRoute = CartRouteImport.update({
-  id: '/cart',
-  path: '/cart',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BusinessAccountRoute = BusinessAccountRouteImport.update({
-  id: '/business-account',
-  path: '/business-account',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AccountRoute = AccountRouteImport.update({
-  id: '/account',
-  path: '/account',
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AboutRoute = AboutRouteImport.update({
@@ -132,13 +57,89 @@ const AboutRoute = AboutRouteImport.update({
   path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BusinessAccountRoute = BusinessAccountRouteImport.update({
+  id: '/business-account',
+  path: '/business-account',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CartRoute = CartRouteImport.update({
+  id: '/cart',
+  path: '/cart',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutRoute = CheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeliveryRoute = DeliveryRouteImport.update({
+  id: '/delivery',
+  path: '/delivery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HowItWorksRoute = HowItWorksRouteImport.update({
+  id: '/how-it-works',
+  path: '/how-it-works',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RequestAQuoteRoute = RequestAQuoteRouteImport.update({
+  id: '/request-a-quote',
+  path: '/request-a-quote',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReturnsRoute = ReturnsRouteImport.update({
+  id: '/returns',
+  path: '/returns',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShopRoute = ShopRouteImport.update({
+  id: '/shop',
+  path: '/shop',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShopByProjectRoute = ShopByProjectRouteImport.update({
+  id: '/shop-by-project',
+  path: '/shop-by-project',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupplierApplicationRoute = SupplierApplicationRouteImport.update({
+  id: '/supplier-application',
+  path: '/supplier-application',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountIndexRoute = AccountIndexRouteImport.update({
@@ -146,29 +147,9 @@ const AccountIndexRoute = AccountIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AccountRoute,
 } as any)
-const ProjectSlugRoute = ProjectSlugRouteImport.update({
-  id: '/project/$slug',
-  path: '/project/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProductSlugRoute = ProductSlugRouteImport.update({
-  id: '/product/$slug',
-  path: '/product/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DevCatalogueRoute = DevCatalogueRouteImport.update({
-  id: '/dev/catalogue',
-  path: '/dev/catalogue',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CategorySlugRoute = CategorySlugRouteImport.update({
-  id: '/category/$slug',
-  path: '/category/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AccountWishlistRoute = AccountWishlistRouteImport.update({
-  id: '/wishlist',
-  path: '/wishlist',
+const AccountOrdersRoute = AccountOrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
   getParentRoute: () => AccountRoute,
 } as any)
 const AccountProjectsRoute = AccountProjectsRouteImport.update({
@@ -176,15 +157,41 @@ const AccountProjectsRoute = AccountProjectsRouteImport.update({
   path: '/projects',
   getParentRoute: () => AccountRoute,
 } as any)
-const AccountOrdersRoute = AccountOrdersRouteImport.update({
-  id: '/orders',
-  path: '/orders',
+const AccountWishlistRoute = AccountWishlistRouteImport.update({
+  id: '/wishlist',
+  path: '/wishlist',
   getParentRoute: () => AccountRoute,
+} as any)
+const CategorySlugRoute = CategorySlugRouteImport.update({
+  id: '/category/$slug',
+  path: '/category/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevCatalogueRoute = DevCatalogueRouteImport.update({
+  id: '/dev/catalogue',
+  path: '/dev/catalogue',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductSlugRoute = ProductSlugRouteImport.update({
+  id: '/product/$slug',
+  path: '/product/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectSlugRoute = ProjectSlugRouteImport.update({
+  id: '/project/$slug',
+  path: '/project/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminApprovalsRoute =
   AuthenticatedAdminApprovalsRouteImport.update({
     id: '/admin/approvals',
     path: '/admin/approvals',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminEmailOperationsRoute =
+  AuthenticatedAdminEmailOperationsRouteImport.update({
+    id: '/admin/email-operations',
+    path: '/admin/email-operations',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminCatalogueIndexRoute =
@@ -193,16 +200,16 @@ const AuthenticatedAdminCatalogueIndexRoute =
     path: '/admin/catalogue/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedAdminCatalogueNewRoute =
-  AuthenticatedAdminCatalogueNewRouteImport.update({
-    id: '/admin/catalogue/new',
-    path: '/admin/catalogue/new',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedAdminCatalogueIdRoute =
   AuthenticatedAdminCatalogueIdRouteImport.update({
     id: '/admin/catalogue/$id',
     path: '/admin/catalogue/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminCatalogueNewRoute =
+  AuthenticatedAdminCatalogueNewRouteImport.update({
+    id: '/admin/catalogue/new',
+    path: '/admin/catalogue/new',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
@@ -235,6 +242,7 @@ export interface FileRoutesByFullPath {
   '/project/$slug': typeof ProjectSlugRoute
   '/account/': typeof AccountIndexRoute
   '/admin/approvals': typeof AuthenticatedAdminApprovalsRoute
+  '/admin/email-operations': typeof AuthenticatedAdminEmailOperationsRoute
   '/admin/catalogue/$id': typeof AuthenticatedAdminCatalogueIdRoute
   '/admin/catalogue/new': typeof AuthenticatedAdminCatalogueNewRoute
   '/admin/catalogue/': typeof AuthenticatedAdminCatalogueIndexRoute
@@ -267,6 +275,7 @@ export interface FileRoutesByTo {
   '/project/$slug': typeof ProjectSlugRoute
   '/account': typeof AccountIndexRoute
   '/admin/approvals': typeof AuthenticatedAdminApprovalsRoute
+  '/admin/email-operations': typeof AuthenticatedAdminEmailOperationsRoute
   '/admin/catalogue/$id': typeof AuthenticatedAdminCatalogueIdRoute
   '/admin/catalogue/new': typeof AuthenticatedAdminCatalogueNewRoute
   '/admin/catalogue': typeof AuthenticatedAdminCatalogueIndexRoute
@@ -302,6 +311,7 @@ export interface FileRoutesById {
   '/project/$slug': typeof ProjectSlugRoute
   '/account/': typeof AccountIndexRoute
   '/_authenticated/admin/approvals': typeof AuthenticatedAdminApprovalsRoute
+  '/_authenticated/admin/email-operations': typeof AuthenticatedAdminEmailOperationsRoute
   '/_authenticated/admin/catalogue/$id': typeof AuthenticatedAdminCatalogueIdRoute
   '/_authenticated/admin/catalogue/new': typeof AuthenticatedAdminCatalogueNewRoute
   '/_authenticated/admin/catalogue/': typeof AuthenticatedAdminCatalogueIndexRoute
@@ -337,6 +347,7 @@ export interface FileRouteTypes {
     | '/project/$slug'
     | '/account/'
     | '/admin/approvals'
+    | '/admin/email-operations'
     | '/admin/catalogue/$id'
     | '/admin/catalogue/new'
     | '/admin/catalogue/'
@@ -369,6 +380,7 @@ export interface FileRouteTypes {
     | '/project/$slug'
     | '/account'
     | '/admin/approvals'
+    | '/admin/email-operations'
     | '/admin/catalogue/$id'
     | '/admin/catalogue/new'
     | '/admin/catalogue'
@@ -403,6 +415,7 @@ export interface FileRouteTypes {
     | '/project/$slug'
     | '/account/'
     | '/_authenticated/admin/approvals'
+    | '/_authenticated/admin/email-operations'
     | '/_authenticated/admin/catalogue/$id'
     | '/_authenticated/admin/catalogue/new'
     | '/_authenticated/admin/catalogue/'
@@ -437,130 +450,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/supplier-application': {
-      id: '/supplier-application'
-      path: '/supplier-application'
-      fullPath: '/supplier-application'
-      preLoaderRoute: typeof SupplierApplicationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/shop-by-project': {
-      id: '/shop-by-project'
-      path: '/shop-by-project'
-      fullPath: '/shop-by-project'
-      preLoaderRoute: typeof ShopByProjectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/shop': {
-      id: '/shop'
-      path: '/shop'
-      fullPath: '/shop'
-      preLoaderRoute: typeof ShopRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/search': {
-      id: '/search'
-      path: '/search'
-      fullPath: '/search'
-      preLoaderRoute: typeof SearchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/returns': {
-      id: '/returns'
-      path: '/returns'
-      fullPath: '/returns'
-      preLoaderRoute: typeof ReturnsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/request-a-quote': {
-      id: '/request-a-quote'
-      path: '/request-a-quote'
-      fullPath: '/request-a-quote'
-      preLoaderRoute: typeof RequestAQuoteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/how-it-works': {
-      id: '/how-it-works'
-      path: '/how-it-works'
-      fullPath: '/how-it-works'
-      preLoaderRoute: typeof HowItWorksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/delivery': {
-      id: '/delivery'
-      path: '/delivery'
-      fullPath: '/delivery'
-      preLoaderRoute: typeof DeliveryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/contact': {
-      id: '/contact'
-      path: '/contact'
-      fullPath: '/contact'
-      preLoaderRoute: typeof ContactRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/checkout': {
-      id: '/checkout'
-      path: '/checkout'
-      fullPath: '/checkout'
-      preLoaderRoute: typeof CheckoutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cart': {
-      id: '/cart'
-      path: '/cart'
-      fullPath: '/cart'
-      preLoaderRoute: typeof CartRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/business-account': {
-      id: '/business-account'
-      path: '/business-account'
-      fullPath: '/business-account'
-      preLoaderRoute: typeof BusinessAccountRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/account': {
-      id: '/account'
-      path: '/account'
-      fullPath: '/account'
-      preLoaderRoute: typeof AccountRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -570,11 +464,130 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/business-account': {
+      id: '/business-account'
+      path: '/business-account'
+      fullPath: '/business-account'
+      preLoaderRoute: typeof BusinessAccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cart': {
+      id: '/cart'
+      path: '/cart'
+      fullPath: '/cart'
+      preLoaderRoute: typeof CartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout': {
+      id: '/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/delivery': {
+      id: '/delivery'
+      path: '/delivery'
+      fullPath: '/delivery'
+      preLoaderRoute: typeof DeliveryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/how-it-works': {
+      id: '/how-it-works'
+      path: '/how-it-works'
+      fullPath: '/how-it-works'
+      preLoaderRoute: typeof HowItWorksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/request-a-quote': {
+      id: '/request-a-quote'
+      path: '/request-a-quote'
+      fullPath: '/request-a-quote'
+      preLoaderRoute: typeof RequestAQuoteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/returns': {
+      id: '/returns'
+      path: '/returns'
+      fullPath: '/returns'
+      preLoaderRoute: typeof ReturnsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shop': {
+      id: '/shop'
+      path: '/shop'
+      fullPath: '/shop'
+      preLoaderRoute: typeof ShopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shop-by-project': {
+      id: '/shop-by-project'
+      path: '/shop-by-project'
+      fullPath: '/shop-by-project'
+      preLoaderRoute: typeof ShopByProjectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/supplier-application': {
+      id: '/supplier-application'
+      path: '/supplier-application'
+      fullPath: '/supplier-application'
+      preLoaderRoute: typeof SupplierApplicationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/account/': {
@@ -584,39 +597,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountIndexRouteImport
       parentRoute: typeof AccountRoute
     }
-    '/project/$slug': {
-      id: '/project/$slug'
-      path: '/project/$slug'
-      fullPath: '/project/$slug'
-      preLoaderRoute: typeof ProjectSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/product/$slug': {
-      id: '/product/$slug'
-      path: '/product/$slug'
-      fullPath: '/product/$slug'
-      preLoaderRoute: typeof ProductSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dev/catalogue': {
-      id: '/dev/catalogue'
-      path: '/dev/catalogue'
-      fullPath: '/dev/catalogue'
-      preLoaderRoute: typeof DevCatalogueRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/category/$slug': {
-      id: '/category/$slug'
-      path: '/category/$slug'
-      fullPath: '/category/$slug'
-      preLoaderRoute: typeof CategorySlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/account/wishlist': {
-      id: '/account/wishlist'
-      path: '/wishlist'
-      fullPath: '/account/wishlist'
-      preLoaderRoute: typeof AccountWishlistRouteImport
+    '/account/orders': {
+      id: '/account/orders'
+      path: '/orders'
+      fullPath: '/account/orders'
+      preLoaderRoute: typeof AccountOrdersRouteImport
       parentRoute: typeof AccountRoute
     }
     '/account/projects': {
@@ -626,18 +611,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountProjectsRouteImport
       parentRoute: typeof AccountRoute
     }
-    '/account/orders': {
-      id: '/account/orders'
-      path: '/orders'
-      fullPath: '/account/orders'
-      preLoaderRoute: typeof AccountOrdersRouteImport
+    '/account/wishlist': {
+      id: '/account/wishlist'
+      path: '/wishlist'
+      fullPath: '/account/wishlist'
+      preLoaderRoute: typeof AccountWishlistRouteImport
       parentRoute: typeof AccountRoute
+    }
+    '/category/$slug': {
+      id: '/category/$slug'
+      path: '/category/$slug'
+      fullPath: '/category/$slug'
+      preLoaderRoute: typeof CategorySlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/catalogue': {
+      id: '/dev/catalogue'
+      path: '/dev/catalogue'
+      fullPath: '/dev/catalogue'
+      preLoaderRoute: typeof DevCatalogueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/product/$slug': {
+      id: '/product/$slug'
+      path: '/product/$slug'
+      fullPath: '/product/$slug'
+      preLoaderRoute: typeof ProductSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/project/$slug': {
+      id: '/project/$slug'
+      path: '/project/$slug'
+      fullPath: '/project/$slug'
+      preLoaderRoute: typeof ProjectSlugRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/approvals': {
       id: '/_authenticated/admin/approvals'
       path: '/admin/approvals'
       fullPath: '/admin/approvals'
       preLoaderRoute: typeof AuthenticatedAdminApprovalsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/email-operations': {
+      id: '/_authenticated/admin/email-operations'
+      path: '/admin/email-operations'
+      fullPath: '/admin/email-operations'
+      preLoaderRoute: typeof AuthenticatedAdminEmailOperationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin/catalogue/': {
@@ -647,13 +667,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminCatalogueIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/admin/catalogue/new': {
-      id: '/_authenticated/admin/catalogue/new'
-      path: '/admin/catalogue/new'
-      fullPath: '/admin/catalogue/new'
-      preLoaderRoute: typeof AuthenticatedAdminCatalogueNewRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/admin/catalogue/$id': {
       id: '/_authenticated/admin/catalogue/$id'
       path: '/admin/catalogue/$id'
@@ -661,11 +674,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminCatalogueIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/catalogue/new': {
+      id: '/_authenticated/admin/catalogue/new'
+      path: '/admin/catalogue/new'
+      fullPath: '/admin/catalogue/new'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogueNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminApprovalsRoute: typeof AuthenticatedAdminApprovalsRoute
+  AuthenticatedAdminEmailOperationsRoute: typeof AuthenticatedAdminEmailOperationsRoute
   AuthenticatedAdminCatalogueIdRoute: typeof AuthenticatedAdminCatalogueIdRoute
   AuthenticatedAdminCatalogueNewRoute: typeof AuthenticatedAdminCatalogueNewRoute
   AuthenticatedAdminCatalogueIndexRoute: typeof AuthenticatedAdminCatalogueIndexRoute
@@ -673,6 +694,8 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminApprovalsRoute: AuthenticatedAdminApprovalsRoute,
+  AuthenticatedAdminEmailOperationsRoute:
+    AuthenticatedAdminEmailOperationsRoute,
   AuthenticatedAdminCatalogueIdRoute: AuthenticatedAdminCatalogueIdRoute,
   AuthenticatedAdminCatalogueNewRoute: AuthenticatedAdminCatalogueNewRoute,
   AuthenticatedAdminCatalogueIndexRoute: AuthenticatedAdminCatalogueIndexRoute,
@@ -727,3 +750,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
