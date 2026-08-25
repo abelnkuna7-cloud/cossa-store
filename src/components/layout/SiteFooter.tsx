@@ -183,14 +183,14 @@ export function SiteFooter() {
           {/* CONTACT */}
           <div className="mt-5 space-y-2.5 text-sm">
             <a
-              href={`mailto:${SITE.email}`}
+              href={`mailto:${SITE.supportEmail}`}
               onClick={() =>
                 trackEvent("email_clicked", { trigger: "footer" })
               }
               className="flex items-center gap-2 font-medium hover:underline"
             >
               <Mail className="h-4 w-4 text-primary" aria-hidden />
-              {SITE.email}
+              {SITE.supportEmail}
             </a>
 
             <a

@@ -622,7 +622,7 @@ function DeliveryPage() {
               </strong>
             </p>
 
-            <p>Email: {SITE.email}</p>
+            <p>Email: {SITE.supportEmail}</p>
             <p>Phone / WhatsApp: {SITE.phoneDisplay}</p>
 
             <p>

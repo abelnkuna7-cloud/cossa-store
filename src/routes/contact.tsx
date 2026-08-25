@@ -117,8 +117,8 @@ function ContactPage() {
           <h2 className="font-display text-lg font-semibold">Direct contact</h2>
           <p className="text-muted-foreground">{SITE.parent}</p>
           <p>
-            <a href={`mailto:${SITE.email}`} className="underline">
-              {SITE.email}
+            <a href={`mailto:${SITE.supportEmail}`} className="underline">
+              {SITE.supportEmail}
             </a>
           </p>
           <p>

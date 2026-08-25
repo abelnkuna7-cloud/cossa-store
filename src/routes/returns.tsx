@@ -335,7 +335,7 @@ function ReturnsPage() {
                 Cossa Nexus Holdings (Pty) Ltd — Cossa Store
               </strong>
             </p>
-            <p>Email: cossa@cossanexusholdings.co.za</p>
+            <p>Email: {SITE.supportEmail}</p>
             <p>Phone / WhatsApp: {SITE.phoneDisplay}</p>
             <p>
               Registered address: Ext 27 Olivenoutbouch 163, 163 Centurion

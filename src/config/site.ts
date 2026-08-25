@@ -127,6 +127,15 @@ export const SITE = {
   email: "cossa@cossanexusholdings.co.za",
 
   /**
+   * Public Cossa Store customer-support mailbox.
+   *
+   * Use for orders, delivery, returns and ordinary Store enquiries.
+   * Keep the central company email above for legal, privacy, merchant and
+   * corporate administration.
+   */
+  supportEmail: "store@cossanexusholdings.co.za",
+
+  /**
    * Official central phone / WhatsApp number.
    */
   phoneDisplay: "067 801 1907",
