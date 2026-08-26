@@ -92,7 +92,7 @@ export const companyConfig = {
     phoneHref: SITE.phoneHref,
     whatsappNumber: SITE.whatsappNumber,
 
-    logo: "/assets/logos/cossa-store.png",
+    logo: "/assets/logos/cossa-store-brand.jpg",
 
     logoAlt:
       "Cossa Store — project commerce and hybrid e-commerce platform",

@@ -391,7 +391,7 @@ export function SiteHeader() {
             height={52}
             fetchPriority="high"
             decoding="async"
-            className="h-8 w-auto max-w-[130px] object-contain sm:h-10 sm:max-w-[155px] lg:h-11 lg:max-w-none"
+            className="h-8 w-[130px] object-cover object-center sm:h-10 sm:w-[155px] lg:h-11 lg:w-[170px]"
           />
         </Link>
 

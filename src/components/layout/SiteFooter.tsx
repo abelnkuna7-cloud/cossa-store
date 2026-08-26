@@ -101,7 +101,7 @@ export function SiteFooter() {
             height={60}
             loading="lazy"
             decoding="async"
-            className="h-11 w-auto object-contain"
+            className="h-11 w-[200px] object-cover object-center"
           />
 
           <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">

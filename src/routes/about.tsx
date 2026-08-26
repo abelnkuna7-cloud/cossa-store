@@ -54,7 +54,7 @@ function About() {
               height={60}
               loading="lazy"
               decoding="async"
-              className="h-12 w-auto object-contain"
+              className="h-12 w-[200px] object-cover object-center"
             />
             <img
               src={companyConfig.parentCompany.logo}
