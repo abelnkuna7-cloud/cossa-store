@@ -79,6 +79,17 @@ export const SITE = {
   storeWebsite: "https://store.cossanexusholdings.co.za",
 
   /**
+   * Approved Cossa Store brand asset.
+   *
+   * This absolute URL is used wherever a browser, search engine or social
+   * platform needs the Store identity outside the rendered application.
+   */
+  logoUrl:
+    "https://store.cossanexusholdings.co.za/assets/logos/cossa-store-brand.jpg",
+  logoAlt:
+    "Cossa Store — Shop Smarter. Live Better. Build More.",
+
+  /**
    * Related public Cossa digital platforms.
    *
    * These remain secondary to Cossa Store in the

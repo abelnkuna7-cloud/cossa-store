@@ -145,6 +145,9 @@ const ROOT_STRUCTURED_DATA = {
 
       url: SITE_URL,
 
+      logo: SITE.logoUrl,
+      image: SITE.logoUrl,
+
       description: SITE.description,
 
       email: SITE.email,
@@ -322,6 +325,16 @@ export const Route = createRootRouteWithContext<{
         content: "en_ZA",
       },
 
+      {
+        property: "og:image",
+        content: SITE.logoUrl,
+      },
+
+      {
+        property: "og:image:alt",
+        content: SITE.logoAlt,
+      },
+
       /*
        * X / Twitter fallback metadata.
        *
@@ -341,6 +354,16 @@ export const Route = createRootRouteWithContext<{
       {
         name: "twitter:description",
         content: ROOT_DESCRIPTION,
+      },
+
+      {
+        name: "twitter:image",
+        content: SITE.logoUrl,
+      },
+
+      {
+        name: "twitter:image:alt",
+        content: SITE.logoAlt,
       },
     ],
 
@@ -388,8 +411,8 @@ export const Route = createRootRouteWithContext<{
 
       {
         rel: "icon",
-        href: "/favicon.png",
-        type: "image/png",
+        href: "/assets/logos/cossa-store-brand.jpg",
+        type: "image/jpeg",
       },
     ],
 
