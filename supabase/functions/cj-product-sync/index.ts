@@ -542,16 +542,22 @@ Deno.serve(async (r) => {
         400,
       );
     const cj = client(await token(ck));
-    const { data: existingRows, error: ee } = await a
-      .from("store_products")
-      .select("supplier_product_ref")
-      .eq("organisation_id", ORG_ID)
-      .eq("supplier_name", "CJ Dropshipping");
-    if (ee) throw ee;
-    const existing = new Set(
-        (existingRows ?? []).map((x: any) => String(x.supplier_product_ref ?? "")).filter(Boolean),
-      ),
-      seen = new Set<string>(),
+    const existing = new Set<string>();
+    for (let from = 0; ; from += 1000) {
+      const { data: existingRows, error: ee } = await a
+        .from("store_products")
+        .select("supplier_product_ref")
+        .eq("organisation_id", ORG_ID)
+        .eq("supplier_name", "CJ Dropshipping")
+        .range(from, from + 999);
+      if (ee) throw ee;
+      for (const row of existingRows ?? []) {
+        const ref = String((row as any).supplier_product_ref ?? "").trim();
+        if (ref) existing.add(ref);
+      }
+      if ((existingRows ?? []).length < 1000) break;
+    }
+    const seen = new Set<string>(),
       pool: Candidate[] = [],
       // A size-based page offset became stuck once rejected products were
       // archived: they still count as existing but cannot be re-imported.
@@ -586,7 +592,23 @@ Deno.serve(async (r) => {
       refreshed: 0,
       skipped: 0,
       products: [],
-      rejections: { blocked: 0, incomplete: 0, noInventory: 0, noAvailableVariants: 0, failed: 0 },
+      rejections: {
+        blocked: 0,
+        incomplete: 0,
+        noInventory: 0,
+        noAvailableVariants: 0,
+        duplicate: 0,
+        failed: 0,
+      },
+      incompleteByField: {
+        productId: 0,
+        name: 0,
+        description: 0,
+        category: 0,
+        images: 0,
+        variants: 0,
+        costs: 0,
+      },
       rejectionDetails: [],
       discovery: {
         candidatePool: pool.length,
@@ -615,33 +637,68 @@ Deno.serve(async (r) => {
         }
         const p = (await cj(`/product/query?pid=${encodeURIComponent(c.id)}`))?.data ?? {},
           pid = ident(p.pid),
-          name = text(p.productNameEn, 220),
-          description = clean(p.description),
-          cat = category(text(p.categoryName, 700), name, description) ?? c.category,
-          images = [p.bigImage, ...(Array.isArray(p.productImageSet) ? p.productImageSet : [])]
+          name = text(p.productNameEn ?? p.productName ?? p.nameEn ?? p.name ?? c.title, 220),
+          description = clean(
+            p.description ??
+              p.productDescription ??
+              p.productDesc ??
+              p.descriptionEn ??
+              p.productNameEn ??
+              p.productName ??
+              c.title,
+          ),
+          cat =
+            category(
+              text(
+                p.categoryName ??
+                  [p.oneCategoryName, p.twoCategoryName, p.threeCategoryName]
+                    .filter(Boolean)
+                    .join(" / "),
+                700,
+              ),
+              name,
+              description,
+            ) ?? c.category,
+          variants = Array.isArray(p.variants) ? p.variants : [],
+          variantImages = variants.flatMap((v: any) =>
+            [v.variantImage, v.variantImageUrl, v.image, v.imageUrl].filter(isUrl),
+          ),
+          images = [
+            p.bigImage,
+            p.productImage,
+            p.productImageUrl,
+            ...(Array.isArray(p.productImageSet) ? p.productImageSet : []),
+            ...variantImages,
+          ]
             .filter(isUrl)
             .filter((x: string, i: number, a: string[]) => a.indexOf(x) === i)
             .slice(0, 12),
-          variants = Array.isArray(p.variants) ? p.variants : [],
           costs = variants
-            .map((v: any) => num(v.variantSellPrice))
+            .map((v: any) => num(v.variantSellPrice ?? v.variantPrice ?? v.sellPrice))
             .filter((x: any): x is number => x !== null);
         if (blocked(`${name} ${description.slice(0, 500)}`)) {
           summary.skipped++;
           summary.rejections.blocked++;
           continue;
         }
-        if (
-          !pid ||
-          !name ||
-          description.length < 40 ||
-          !cat ||
-          !images.length ||
-          !variants.length ||
-          !costs.length
-        ) {
+        const missingFields = [
+          !pid ? "productId" : null,
+          !name ? "name" : null,
+          description.length < 40 ? "description" : null,
+          !cat ? "category" : null,
+          !images.length ? "images" : null,
+          !variants.length ? "variants" : null,
+          !costs.length ? "costs" : null,
+        ].filter(Boolean) as Array<keyof typeof summary.incompleteByField>;
+        if (missingFields.length) {
           summary.skipped++;
           summary.rejections.incomplete++;
+          for (const field of missingFields) summary.incompleteByField[field]++;
+          summary.rejectionDetails.push({
+            productId: c.id,
+            reason: "incomplete_supplier_metadata",
+            missingFields,
+          });
           continue;
         }
         const live = await availability(cj, pid, p);
@@ -694,7 +751,7 @@ Deno.serve(async (r) => {
         const candidateRows = variants
           .map((v: any, i: number) => {
             const vid = ident(v.vid),
-              source = num(v.variantSellPrice);
+              source = num(v.variantSellPrice ?? v.variantPrice ?? v.sellPrice);
             if (!vid || !source) return null;
             const known = live.totals.has(vid),
               n = live.totals.get(vid) ?? 0,
@@ -793,7 +850,8 @@ Deno.serve(async (r) => {
                     ? "product_write_failed"
                     : "import_failed";
         summary.skipped++;
-        summary.rejections.failed++;
+        if (reason === "duplicate") summary.rejections.duplicate++;
+        else summary.rejections.failed++;
         summary.rejectionDetails.push({
           productId: c.id,
           reason,
@@ -816,6 +874,8 @@ Deno.serve(async (r) => {
         batch_size: MAX_PRODUCTS,
         candidate_pool: pool.length,
         rejections: summary.rejections,
+        incomplete_by_field: summary.incompleteByField,
+        rejection_details: summary.rejectionDetails.slice(0, 25),
       },
     });
     if (automated && summary.rejections.failed > 0)
