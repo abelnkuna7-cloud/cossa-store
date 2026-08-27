@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { AliExpressAffiliatePanel } from "@/components/admin/AliExpressAffiliatePanel";
 import { CatalogueShell } from "@/components/admin/CatalogueShell";
 import { CjProductSyncPanel } from "@/components/admin/CjProductSyncPanel";
 import { PrintifySyncPanel } from "@/components/admin/PrintifySyncPanel";
@@ -167,6 +168,7 @@ function CatalogueTable() {
     <div className="space-y-5">
       <PrintifySyncPanel onSynced={invalidateCatalogue} />
       <CjProductSyncPanel onSynced={invalidateCatalogue} />
+      <AliExpressAffiliatePanel />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Input placeholder="Search product or code" value={search} onChange={(event) => setSearch(event.target.value)} className="lg:col-span-2" />
@@ -215,7 +217,7 @@ function CatalogueTable() {
                   <td className="px-3 py-2 capitalize text-muted-foreground">{row.product_type.replace(/_/g, " ")}</td>
                   <td className="px-3 py-2 capitalize text-muted-foreground">{row.fulfilment_model.replace(/_/g, " ")}</td>
                   <td className="px-3 py-2">{formatZar(Number(row.price ?? 0))}</td>
-                  <td className="px-3 py-2">{row.unlimited_stock ? "Unlimited" : row.stock_quantity}</td>
+                  <td className="px-3 py-2">{row.product_type === "affiliate" ? "Partner" : row.unlimited_stock ? "Unlimited" : row.stock_quantity}</td>
                   <td className="px-3 py-2">
                     <span className="rounded-full border border-border px-2 py-0.5 text-[11px] capitalize">{row.status}</span>
                   </td>
