@@ -137,7 +137,11 @@ export function buildSections(products: Product[], now = Date.now()): Merchandis
       id: "physical-stock",
       title: "In stock now",
       description: "Held in Cossa stock with real available quantities.",
-      products: cap(products.filter((p) => p.stock_available)),
+      products: cap(
+        products.filter(
+          (p) => p.fulfilment_type === "cossa_stock" && p.stock_available,
+        ),
+      ),
     },
     {
       id: "affiliate",
