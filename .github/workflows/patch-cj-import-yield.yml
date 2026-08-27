@@ -1,0 +1,188 @@
+name: Patch CJ import yield safely
+
+on:
+  push:
+    branches:
+      - fix/cj-inventory-provenance-20260827
+    paths:
+      - .github/workflows/patch-cj-import-yield.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/cj-inventory-provenance-20260827
+          fetch-depth: 0
+
+      - name: Apply targeted CJ importer corrections
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('supabase/functions/cj-product-sync/index.ts')
+          s = p.read_text()
+          marker = 'incompleteByField'
+          if marker in s:
+              print('CJ importer patch already present; nothing to do.')
+              raise SystemExit(0)
+
+          old_summary = '''      rejections: { blocked: 0, incomplete: 0, noInventory: 0, noAvailableVariants: 0, failed: 0 },
+      rejectionDetails: [],'''
+          new_summary = '''      rejections: { blocked: 0, incomplete: 0, noInventory: 0, noAvailableVariants: 0, failed: 0 },
+      incompleteByField: {
+        productId: 0,
+        name: 0,
+        description: 0,
+        category: 0,
+        images: 0,
+        variants: 0,
+        costs: 0,
+      },
+      rejectionDetails: [],'''
+          if old_summary not in s:
+              raise SystemExit('Expected summary block not found; refusing unsafe patch.')
+          s = s.replace(old_summary, new_summary, 1)
+
+          old_fields = '''        const p = (await cj(`/product/query?pid=${encodeURIComponent(c.id)}`))?.data ?? {},
+          pid = ident(p.pid),
+          name = text(p.productNameEn, 220),
+          description = clean(p.description),
+          cat = category(text(p.categoryName, 700), name, description) ?? c.category,
+          images = [p.bigImage, ...(Array.isArray(p.productImageSet) ? p.productImageSet : [])]
+            .filter(isUrl)
+            .filter((x: string, i: number, a: string[]) => a.indexOf(x) === i)
+            .slice(0, 12),
+          variants = Array.isArray(p.variants) ? p.variants : [],
+          costs = variants
+            .map((v: any) => num(v.variantSellPrice))
+            .filter((x: any): x is number => x !== null);'''
+          new_fields = '''        const p = (await cj(`/product/query?pid=${encodeURIComponent(c.id)}`))?.data ?? {},
+          pid = ident(p.pid),
+          name = text(p.productNameEn ?? p.productName ?? p.nameEn ?? p.name ?? c.title, 220),
+          description = clean(
+            p.description ??
+              p.productDescription ??
+              p.productDesc ??
+              p.descriptionEn ??
+              p.productNameEn ??
+              p.productName ??
+              c.title,
+          ),
+          cat =
+            category(
+              text(
+                p.categoryName ??
+                  [p.oneCategoryName, p.twoCategoryName, p.threeCategoryName]
+                    .filter(Boolean)
+                    .join(" / "),
+                700,
+              ),
+              name,
+              description,
+            ) ?? c.category,
+          variants = Array.isArray(p.variants) ? p.variants : [],
+          variantImages = variants.flatMap((v: any) =>
+            [v.variantImage, v.variantImageUrl, v.image, v.imageUrl].filter(isUrl),
+          ),
+          images = [
+            p.bigImage,
+            p.productImage,
+            p.productImageUrl,
+            ...(Array.isArray(p.productImageSet) ? p.productImageSet : []),
+            ...variantImages,
+          ]
+            .filter(isUrl)
+            .filter((x: string, i: number, a: string[]) => a.indexOf(x) === i)
+            .slice(0, 12),
+          costs = variants
+            .map((v: any) => num(v.variantSellPrice ?? v.variantPrice ?? v.sellPrice))
+            .filter((x: any): x is number => x !== null);'''
+          if old_fields not in s:
+              raise SystemExit('Expected CJ detail block not found; refusing unsafe patch.')
+          s = s.replace(old_fields, new_fields, 1)
+
+          old_incomplete = '''        if (
+          !pid ||
+          !name ||
+          description.length < 40 ||
+          !cat ||
+          !images.length ||
+          !variants.length ||
+          !costs.length
+        ) {
+          summary.skipped++;
+          summary.rejections.incomplete++;
+          continue;
+        }'''
+          new_incomplete = '''        const missingFields = [
+          !pid ? "productId" : null,
+          !name ? "name" : null,
+          description.length < 8 ? "description" : null,
+          !cat ? "category" : null,
+          !images.length ? "images" : null,
+          !variants.length ? "variants" : null,
+          !costs.length ? "costs" : null,
+        ].filter(Boolean) as Array<keyof typeof summary.incompleteByField>;
+        if (missingFields.length) {
+          summary.skipped++;
+          summary.rejections.incomplete++;
+          for (const field of missingFields) summary.incompleteByField[field]++;
+          summary.rejectionDetails.push({
+            productId: c.id,
+            reason: "incomplete_supplier_metadata",
+            missingFields,
+          });
+          continue;
+        }'''
+          if old_incomplete not in s:
+              raise SystemExit('Expected incomplete validator not found; refusing unsafe patch.')
+          s = s.replace(old_incomplete, new_incomplete, 1)
+
+          old_variant_source = '''            const vid = ident(v.vid),
+              source = num(v.variantSellPrice);'''
+          new_variant_source = '''            const vid = ident(v.vid),
+              source = num(v.variantSellPrice ?? v.variantPrice ?? v.sellPrice);'''
+          if old_variant_source not in s:
+              raise SystemExit('Expected variant source-price block not found; refusing unsafe patch.')
+          s = s.replace(old_variant_source, new_variant_source, 1)
+
+          old_audit = '''        rejections: summary.rejections,
+      },'''
+          new_audit = '''        rejections: summary.rejections,
+        incomplete_by_field: summary.incompleteByField,
+        rejection_details: summary.rejectionDetails.slice(0, 25),
+      },'''
+          if old_audit not in s:
+              raise SystemExit('Expected audit metadata block not found; refusing unsafe patch.')
+          s = s.replace(old_audit, new_audit, 1)
+
+          p.write_text(s)
+
+      - name: Guard safety filters
+        run: |
+          grep -q 'vape|e-cig|cigarette|nicotine|tobacco' supabase/functions/cj-product-sync/index.ts
+          grep -q 'gun|rifle|pistol|ammo|ammunition' supabase/functions/cj-product-sync/index.ts
+          grep -q 'dildo|vibrator|sex toy|adult toy' supabase/functions/cj-product-sync/index.ts
+          grep -q 'noInventory' supabase/functions/cj-product-sync/index.ts
+          grep -q 'noAvailableVariants' supabase/functions/cj-product-sync/index.ts
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Commit targeted patch
+        run: |
+          if git diff --quiet; then
+            echo 'No source changes to commit.'
+            exit 0
+          fi
+          git config user.name 'cossa-preview-bot'
+          git config user.email 'cossa-preview-bot@users.noreply.github.com'
+          git add supabase/functions/cj-product-sync/index.ts
+          git commit -m 'fix(store): improve qualified CJ import yield'
+          git push origin HEAD:fix/cj-inventory-provenance-20260827
