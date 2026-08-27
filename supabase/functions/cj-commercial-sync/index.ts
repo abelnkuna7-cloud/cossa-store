@@ -210,15 +210,15 @@ function options(p: any, origin: string): Quote[] {
 }
 function choose(a: Quote[]) {
   if (!a.length) return null;
+  const eligible = a.filter((x) => x.maxDays === null || x.maxDays <= MAX_DAYS);
+  if (!eligible.length) return null;
   return (
-    [...a].sort((x, y) => {
-      const xa = x.maxDays !== null && x.maxDays <= 30 ? 0 : 1,
-        ya = y.maxDays !== null && y.maxDays <= 30 ? 0 : 1;
-      if (xa !== ya) return xa - ya;
-      const xm = x.maxDays ?? 999,
-        ym = y.maxDays ?? 999;
+    [...eligible].sort((x, y) => {
+      if (x.usd !== y.usd) return x.usd - y.usd;
+      const xm = x.maxDays ?? MAX_DAYS,
+        ym = y.maxDays ?? MAX_DAYS;
       if (xm !== ym) return xm - ym;
-      return x.usd - y.usd;
+      return (x.minDays ?? MAX_DAYS) - (y.minDays ?? MAX_DAYS);
     })[0] ?? null
   );
 }
