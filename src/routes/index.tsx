@@ -7,10 +7,15 @@ import {
   Calculator,
   CheckCircle2,
   FileText,
+  Landmark,
   MessageCircle,
   PackageSearch,
+  Receipt,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
+  Truck,
+  Undo2,
   Wrench,
 } from "lucide-react";
 
@@ -20,7 +25,7 @@ import { ProductCarousel } from "@/components/shop/ProductCarousel";
 import { ProductImage } from "@/components/shop/ProductImage";
 import { GroupSolutionsSection } from "@/components/shop/GroupSolutionsSection";
 import { CATEGORIES, PROJECTS } from "@/data/categories";
-import { SITE, whatsappLink } from "@/config/site";
+import { SITE, STORE_SUPPORT_PATHWAYS, whatsappLink } from "@/config/site";
 import { publicCollectionsQuery, storefrontProductsQuery } from "@/lib/queries";
 import { buildSections } from "@/lib/merchandising";
 import { ContactStrip } from "@/components/support/ContactStrip";
@@ -124,13 +129,14 @@ function Home() {
         <Button asChild variant="outline" className="mt-6"><Link to="/shop-by-project">Explore all projects</Link></Button>
       </Section>
 
-      <Section title="Buying for a business" description="Procurement support for larger quantities, project requirements and repeat purchasing.">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Section title="Buying for a business" description="Cossa Store supports bulk buying, formal quotations, repeat purchasing and product sourcing — not only once-off retail orders.">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {[
-            [Building2, "Bulk orders", "Request pricing for larger quantities and recurring requirements."],
-            [FileText, "Formal quotations", "Request written quotations for procurement and project approval."],
-            [PackageSearch, "Product sourcing", "Ask Cossa Store to help source a specific product or requirement."],
-            [MessageCircle, "Human support", "Speak to the Store team when your requirement needs assistance."],
+            [Building2, "Bulk orders", "Request pricing for larger quantities, project requirements and recurring supply."],
+            [FileText, "Formal quotations", "Request written quotations for procurement, projects and purchasing approval."],
+            [Receipt, "Business documentation", "Transaction and order documents are provided according to the applicable requirements."],
+            [RefreshCw, "Repeat purchasing", "Reorder recurring products and consumables without rebuilding the requirement every time."],
+            [PackageSearch, "Product sourcing", "Ask Cossa Store to help source a specific lawful product or business requirement."],
           ].map(([Icon, title, body]) => {
             const CardIcon = Icon as typeof Building2;
             return <div key={String(title)} className="rounded-xl border border-border bg-card p-5"><CardIcon className="h-6 w-6 text-primary" /><h3 className="mt-3 text-base font-semibold">{String(title)}</h3><p className="mt-2 text-base leading-relaxed text-muted-foreground">{String(body)}</p></div>;
@@ -139,9 +145,45 @@ function Home() {
         <div className="mt-6 flex flex-wrap gap-3"><Button asChild><Link to="/business-account">Business buying</Link></Button><Button asChild variant="outline"><Link to="/request-a-quote">Request a quote</Link></Button></div>
       </Section>
 
-      <Section muted title="Buying with confidence" description="Clear commitments based on what Cossa Store can support.">
+      <Section muted title="Need more than the product?" description="Some purchases need installation, setup, project support or recurring service. Cossa Store can route suitable enquiries to the right Cossa support pathway.">
+        <div className="grid gap-4 md:grid-cols-3">
+          {STORE_SUPPORT_PATHWAYS.map((support) => (
+            <div key={support.id} className="rounded-xl border border-border bg-card p-6">
+              <Wrench className="h-5 w-5 text-primary" aria-hidden />
+              <h3 className="mt-3 font-display text-xl font-semibold">{support.name}</h3>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-primary">{support.need}</p>
+              <p className="mt-3 text-base leading-relaxed text-muted-foreground">{support.description}</p>
+              <Button asChild variant="link" className="mt-2 px-0"><Link to="/request-a-quote">Request help with your requirement</Link></Button>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <section className="border-y border-border bg-card">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+          <div className="max-w-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Supplier network</p>
+            <h2 className="mt-2 font-display text-2xl font-semibold">Supply Cossa Store</h2>
+            <p className="mt-3 text-base leading-relaxed text-muted-foreground">We are building a curated supplier network for physical products, local distribution, dropshipping, fulfilment and selected specialist ranges.</p>
+          </div>
+          <Button asChild size="lg"><Link to="/supplier-application">Apply as a supplier</Link></Button>
+        </div>
+      </section>
+
+      <Section muted title="Buying with confidence" description="Clear commitments based on what Cossa Store can actually support today." action={<Button asChild variant="outline"><Link to="/how-it-works">How Cossa Store works</Link></Button>}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {GUARANTEES.map((guarantee) => <div key={guarantee.title} className="rounded-xl border border-border bg-card p-5"><CheckCircle2 className="h-5 w-5 text-primary" /><h3 className="mt-3 text-sm font-semibold">{guarantee.title}</h3><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{guarantee.body}</p></div>)}
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            [Landmark, "South African business", `Cossa Store is operated by ${SITE.parent}, a registered South African company.`],
+            [ShieldCheck, "Payment truth", "Payment methods are presented as available only when the relevant merchant verification and production integration are complete."],
+            [Truck, "Delivery information", "Delivery expectations are communicated according to product type, destination and fulfilment route."],
+            [Undo2, "Type-specific returns", "Returns and refunds are handled according to product type, the published policy and applicable South African consumer law."],
+          ].map(([Icon, title, body]) => {
+            const CardIcon = Icon as typeof Landmark;
+            return <div key={String(title)} className="rounded-xl border border-border bg-card p-5"><CardIcon className="h-5 w-5 text-primary" /><h3 className="mt-3 text-sm font-semibold">{String(title)}</h3><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{String(body)}</p></div>;
+          })}
         </div>
       </Section>
 
@@ -169,7 +211,7 @@ function Hero() {
           <div className="relative flex min-h-[390px] max-w-2xl flex-col justify-center p-5 sm:min-h-[420px] sm:p-8 lg:min-h-[455px] lg:p-10">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Products · Projects · Business procurement</p>
             <GroupBadge className="mt-3 self-start" />
-            <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">Shop smarter.<span className="block text-primary">Build more.</span></h1>
+            <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">Shop smarter.<span className="block text-primary">Live better. Build more.</span></h1>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-white/85 sm:text-lg">Products and practical buying solutions for homes, projects and businesses — with Cossa support when you need more than a product.</p>
             <div className="mt-6 flex flex-wrap gap-3"><Button asChild size="lg"><Link to="/shop">Shop products <ArrowRight className="ml-2 h-4 w-4" /></Link></Button><Button asChild size="lg" variant="outline" className="border-primary/60 bg-black/55 text-white hover:bg-primary/15"><Link to="/shop-by-project">Shop by project</Link></Button></div>
           </div>
@@ -191,5 +233,5 @@ function Hero() {
 }
 
 function TrustStatsBar() {
-  return <section className="border-b border-border bg-surface-strong"><div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8"><dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">{TRUST_STATS.map((stat) => <div key={stat.id}><dt className="text-xs uppercase tracking-wide text-muted-foreground">{stat.label}</dt><dd className={stat.value ? "mt-1 font-display text-lg font-bold text-primary" : "mt-1 text-xs text-muted-foreground"}>{stat.value ?? stat.pending}</dd></div>)}</dl><div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">{COMPLIANCE_BADGES.map((badge) => <div key={badge.id} className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2"><ShieldCheck className="h-4 w-4 text-primary" /><span className="text-xs font-semibold">{badge.name}</span></div>)}</div></div></section>;
+  return <section className="border-b border-border bg-surface-strong"><div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8"><dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">{TRUST_STATS.map((stat) => <div key={stat.id}><dt className="text-xs uppercase tracking-wide text-muted-foreground">{stat.label}</dt><dd className={stat.value ? "mt-1 font-display text-lg font-bold text-primary" : "mt-1 text-xs text-muted-foreground"}>{stat.value ?? stat.pending}</dd></div>)}</dl><div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">{COMPLIANCE_BADGES.map((badge) => <div key={badge.id} className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2"><ShieldCheck className="h-4 w-4 text-primary" /><span className="text-xs font-semibold">{badge.name}</span></div>)}</div><p className="mt-3 text-xs text-muted-foreground">Registration, certification and performance claims are published only when supported by current business records.</p></div></section>;
 }
