@@ -23,6 +23,12 @@ export function isNewArrival(product: Product, now = Date.now()): boolean {
   return now - published <= windowMs && published <= now;
 }
 
+/**
+ * A legacy merchandising tag may still exist on records, but the public Store
+ * does not label a product as trending unless a verified demand-data pipeline
+ * is introduced. This prevents a staff tag from becoming an unsupported market
+ * demand claim.
+ */
 export function isTrending(product: Product): boolean {
   return product.tags.includes(MERCH_TAGS.trending);
 }
@@ -75,7 +81,6 @@ export function productBadges(product: Product): ProductBadge[] {
   badges.push(availabilityLabel(product));
   if (isProjectKit(product)) badges.push({ label: "Project kit", tone: "gold" });
   if (isNewArrival(product)) badges.push({ label: "New arrival", tone: "gold" });
-  if (isTrending(product)) badges.push({ label: "Trending", tone: "gold" });
   if (product.requires_quote) badges.push({ label: "Quote only", tone: "neutral" });
   return badges;
 }
@@ -116,12 +121,6 @@ export function buildSections(products: Product[], now = Date.now()): Merchandis
       products: cap(byNewest.filter((p) => isNewArrival(p, now))),
     },
     {
-      id: "trending",
-      title: "Trending now",
-      description: "Lines the Cossa team is currently highlighting.",
-      products: cap(products.filter(isTrending)),
-    },
-    {
       id: "featured",
       title: "Featured products",
       description: "Hand-picked from the Cossa Store catalogue.",
@@ -137,18 +136,22 @@ export function buildSections(products: Product[], now = Date.now()): Merchandis
       id: "physical-stock",
       title: "In stock now",
       description: "Held in Cossa stock with real available quantities.",
-      products: cap(products.filter((p) => p.stock_available)),
+      products: cap(
+        products.filter(
+          (p) => p.fulfilment_type === "cossa_stock" && p.stock_available,
+        ),
+      ),
     },
     {
       id: "affiliate",
       title: "Partner offers",
-      description: "Products fulfilled by vetted Cossa partners.",
+      description: "Products fulfilled by Cossa partners. Delivery, payment and returns follow the offer terms shown for each product.",
       products: cap(products.filter(isAffiliate)),
     },
     {
       id: "digital",
       title: "Digital products",
-      description: "Delivered instantly after purchase is confirmed.",
+      description: "Digital products supplied according to the access terms shown on each listing.",
       products: cap(products.filter(isDigital)),
     },
     {
