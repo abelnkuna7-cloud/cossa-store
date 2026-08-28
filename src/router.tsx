@@ -2,6 +2,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { initAnalytics, trackPageView } from "@/lib/analytics";
 import { routeTree } from "./routeTree.gen";
+import "./storefront-brand.css";
 
 export const getRouter = () => {
   const queryClient = new QueryClient();
