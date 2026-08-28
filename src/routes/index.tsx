@@ -219,12 +219,12 @@ function Hero() {
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
           <Link to="/shop" className="group relative min-h-44 overflow-hidden rounded-2xl border border-border bg-card p-5 sm:min-h-52 lg:min-h-0">
-            <img src="/assets/demo/home-improvement.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-35 transition duration-300 group-hover:scale-[1.03]" /><div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/15" />
+            <div className="absolute inset-0 bg-gradient-to-br from-black via-neutral-950 to-primary/10" aria-hidden />
             <img src={companyConfig.store.logo} alt={companyConfig.store.logoAlt} className="absolute right-4 top-4 h-14 w-14 rounded-lg border border-white/15 bg-black/75 object-contain p-1.5 shadow-lg sm:h-16 sm:w-16" />
             <div className="relative flex h-full flex-col justify-end"><Sparkles className="h-5 w-5 text-primary" /><p className="mt-2 text-xs font-bold uppercase tracking-wide text-primary">Useful products</p><h2 className="mt-1 text-xl font-bold text-white sm:text-2xl">Find what fits the job.</h2><span className="mt-2 inline-flex items-center text-sm font-semibold text-white">Browse the store <ArrowRight className="ml-1 h-4 w-4" /></span></div>
           </Link>
           <Link to="/request-a-quote" className="group relative min-h-44 overflow-hidden rounded-2xl border border-primary/30 bg-card p-5 sm:min-h-52 lg:min-h-0">
-            <img src="/assets/demo/project-kit.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-30 transition duration-300 group-hover:scale-[1.03]" /><div className="absolute inset-0 bg-gradient-to-t from-black via-black/75 to-black/20" />
+            <div className="absolute inset-0 bg-gradient-to-br from-black via-neutral-950 to-primary/10" aria-hidden />
             <img src={companyConfig.store.logo} alt={companyConfig.store.logoAlt} className="absolute right-4 top-4 h-14 w-14 rounded-lg border border-white/15 bg-black/75 object-contain p-1.5 shadow-lg sm:h-16 sm:w-16" />
             <div className="relative flex h-full flex-col justify-end"><Wrench className="h-5 w-5 text-primary" /><p className="mt-2 text-xs font-bold uppercase tracking-wide text-primary">Need more than a product?</p><h2 className="mt-1 text-xl font-bold text-white sm:text-2xl">Products + Cossa support.</h2><span className="mt-2 inline-flex items-center text-sm font-semibold text-white">Request help <ArrowRight className="ml-1 h-4 w-4" /></span></div>
           </Link>
