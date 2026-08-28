@@ -16,6 +16,27 @@ type Service = {
   cta_label: string;
 };
 
+const SERVICE_LOGOS = {
+  construction: "/assets/logos/cossa-nexus-construction.svg",
+  facility: "/assets/logos/cossa-facility-services.svg",
+  tech: "/assets/logos/cossa-tech.svg",
+  growth: "/assets/logos/growth.svg",
+  nexdocs: "/assets/logos/nexdocs.svg",
+  group: "/assets/logos/cossa-nexus-holdings.png",
+} as const;
+
+function getServiceLogo(service: Service) {
+  const id = service.id.toLowerCase();
+  const name = service.name.toLowerCase();
+
+  if (id.includes("construction") || name.includes("construction")) return SERVICE_LOGOS.construction;
+  if (id.includes("facility") || name.includes("facility")) return SERVICE_LOGOS.facility;
+  if (id.includes("tech") || name.includes("tech")) return SERVICE_LOGOS.tech;
+  if (id.includes("growth") || name.includes("growth")) return SERVICE_LOGOS.growth;
+  if (id.includes("nexdocs") || name.includes("nexdocs")) return SERVICE_LOGOS.nexdocs;
+  return SERVICE_LOGOS.group;
+}
+
 const FALLBACK: Service[] = [
   { id: "construction", name: "Cossa Nexus Construction", eyebrow: "Build · Renovate · Maintain", description: "Construction, renovations, repairs, maintenance and property improvement.", image_url: "/assets/demo/construction-tools.jpg", destination_url: "https://cossanexusholdings.co.za/construction", cta_label: "Explore construction" },
   { id: "facility", name: "Cossa Facility Services", eyebrow: "Clean · Maintain · Support", description: "Cleaning, hygiene, property care and professional facility-support solutions.", image_url: "/assets/demo/cleaning-supplies.jpg", destination_url: "https://cossanexusholdings.co.za/facility-services", cta_label: "Explore facility services" },
@@ -65,6 +86,9 @@ export function GroupSolutionsSection() {
               <div className="relative h-36 overflow-hidden bg-secondary">
                 {service.image_url ? <img src={service.image_url} alt="" loading="lazy" className="h-full w-full object-cover opacity-75 transition duration-300 group-hover:scale-[1.03]" /> : null}
                 <div className="absolute inset-0 bg-gradient-to-t from-background via-background/25 to-transparent" />
+                <div className="absolute left-4 top-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-white/15 bg-black/80 p-1.5 shadow-lg">
+                  <img src={getServiceLogo(service)} alt={`${service.name} logo`} loading="lazy" className="h-full w-full object-contain" />
+                </div>
               </div>
               <div className="p-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary">{service.eyebrow || "Cossa solution"}</p>
