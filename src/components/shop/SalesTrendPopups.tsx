@@ -1,18 +1,17 @@
 /**
- * Sliding "sales trends" popups.
+ * Sliding catalogue-highlight popups.
  *
- * Every card is built from real published catalogue data (trending, featured
- * and new-arrival signals plus the live price). No purchase activity is
- * invented — the cards only surface catalogue trends.
+ * Every card is built from factual published catalogue data. No sales volume,
+ * popularity, demand or trending activity is inferred or invented.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { TrendingUp, X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 
 import { ProductImage } from "@/components/shop/ProductImage";
 import { formatZar } from "@/lib/format";
-import { isNewArrival, isTrending } from "@/lib/merchandising";
+import { isNewArrival } from "@/lib/merchandising";
 import { storefrontProductsQuery } from "@/lib/queries";
 import type { Product } from "@/types/catalog";
 import { cn } from "@/lib/utils";
@@ -21,11 +20,10 @@ const FIRST_DELAY = 12000;
 const VISIBLE_MS = 9000;
 const GAP_MS = 18000;
 
-function trendLabel(product: Product): string {
-  if (isTrending(product)) return "Trending in the catalogue";
+function highlightLabel(product: Product): string {
   if (product.is_featured) return "Featured by Cossa Store";
   if (isNewArrival(product)) return "New arrival";
-  return "Popular right now";
+  return "From the Cossa Store catalogue";
 }
 
 export function SalesTrendPopups() {
@@ -36,8 +34,8 @@ export function SalesTrendPopups() {
 
   const picks = useMemo(() => {
     const all = products.data ?? [];
-    const ranked = all.filter((p) => isTrending(p) || p.is_featured || isNewArrival(p));
-    return (ranked.length ? ranked : all).slice(0, 6);
+    const highlighted = all.filter((p) => p.is_featured || isNewArrival(p));
+    return (highlighted.length ? highlighted : all).slice(0, 6);
   }, [products.data]);
 
   useEffect(() => {
@@ -78,9 +76,9 @@ export function SalesTrendPopups() {
           className="h-14 w-14 shrink-0 rounded-lg"
         />
         <div className="min-w-0">
-          <p className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-primary">
-            <TrendingUp className="h-3 w-3" aria-hidden />
-            {trendLabel(product)}
+          <p className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-primary">
+            <Sparkles className="h-3.5 w-3.5" aria-hidden />
+            {highlightLabel(product)}
           </p>
           <Link
             to="/product/$slug"
@@ -95,7 +93,7 @@ export function SalesTrendPopups() {
         </div>
         <button
           type="button"
-          aria-label="Dismiss sales trends"
+          aria-label="Dismiss catalogue highlight"
           className="ml-auto self-start rounded p-1 text-muted-foreground hover:text-foreground"
           onClick={() => setDismissed(true)}
         >
