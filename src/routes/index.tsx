@@ -18,6 +18,7 @@ import { SITE_URL } from "@/config/seo";
 import { Button } from "@/components/ui/button";
 import { ProductCarousel } from "@/components/shop/ProductCarousel";
 import { ProductImage } from "@/components/shop/ProductImage";
+import { GroupSolutionsSection } from "@/components/shop/GroupSolutionsSection";
 import { CATEGORIES, PROJECTS } from "@/data/categories";
 import { SITE, whatsappLink } from "@/config/site";
 import { publicCollectionsQuery, storefrontProductsQuery } from "@/lib/queries";
@@ -29,57 +30,6 @@ import { GroupBadge } from "@/components/company/GroupBadge";
 
 const TITLE = "Cossa Store | Products, Projects & Business Procurement";
 const DESCRIPTION = "Shop products, project solutions and business procurement through Cossa Store, a South African hybrid commerce platform operated by Cossa Nexus Holdings (Pty) Ltd.";
-
-const GROUP_SOLUTIONS = [
-  {
-    name: "Cossa Nexus Construction",
-    eyebrow: "Build · Renovate · Maintain",
-    description: "Construction, renovations, repairs, ceilings, painting, tiling, roofing, plumbing and project support.",
-    image: "/assets/demo/construction-tools.jpg",
-    href: `${SITE.platforms.corporate}/construction`,
-    action: "Explore construction",
-  },
-  {
-    name: "Cossa Facility Services",
-    eyebrow: "Clean · Maintain · Support",
-    description: "Cleaning, hygiene, facility support, property care and recurring service requirements.",
-    image: "/assets/demo/cleaning-supplies.jpg",
-    href: `${SITE.platforms.corporate}/facility-services`,
-    action: "Explore facility services",
-  },
-  {
-    name: "Cossa Tech",
-    eyebrow: "Marketing · AI · Business Growth",
-    description: "Websites, digital marketing, AI-enabled solutions, business technology and online growth support.",
-    image: "/assets/demo/technology-laptop.jpg",
-    href: `${SITE.platforms.corporate}/tech`,
-    action: "Explore Cossa Tech",
-  },
-  {
-    name: "Growth",
-    eyebrow: "CRM · Sales · Automation",
-    description: "Cossa's business growth platform for customer acquisition, sales operations, workflows and AI-enabled execution.",
-    image: "/assets/demo/smart-security.jpg",
-    href: SITE.platforms.growth,
-    action: "Open Growth",
-  },
-  {
-    name: "NexDocs",
-    eyebrow: "Business documents · Digital tools",
-    description: "Create practical business and project documents through Cossa's digital document platform.",
-    image: "/assets/demo/digital-download.jpg",
-    href: SITE.platforms.nexdocs,
-    action: "Open NexDocs",
-  },
-  {
-    name: "Cossa Nexus Holdings",
-    eyebrow: "One group · Connected solutions",
-    description: "Discover the Cossa business group and find the right product, service or business solution for your requirement.",
-    image: "/assets/backgrounds/cossa-eagle-hero.webp",
-    href: SITE.platforms.corporate,
-    action: "Visit the group",
-  },
-] as const;
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -146,7 +96,7 @@ function Home() {
         </Section>
       ) : null}
 
-      <GroupSolutions />
+      <GroupSolutionsSection />
 
       <Section title="Shop by category" description="Find the product range you need without searching through unrelated stock.">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -202,21 +152,6 @@ function Home() {
         </div>
       </section>
     </div>
-  );
-}
-
-function GroupSolutions() {
-  return (
-    <Section muted title="More from Cossa Nexus Holdings" description="Cossa Store connects products with the wider Cossa group when your requirement needs a service, project or digital solution.">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {GROUP_SOLUTIONS.map((solution) => (
-          <a key={solution.name} href={solution.href} className="group overflow-hidden rounded-xl border border-border bg-card transition hover:border-primary/60" target={solution.href.startsWith(SITE.storeWebsite) ? undefined : "_blank"} rel="noopener noreferrer">
-            <div className="relative h-36 overflow-hidden bg-secondary"><img src={solution.image} alt="" loading="lazy" className="h-full w-full object-cover opacity-75 transition duration-300 group-hover:scale-[1.03]" /><div className="absolute inset-0 bg-gradient-to-t from-background via-background/25 to-transparent" /></div>
-            <div className="p-5"><p className="text-xs font-semibold uppercase tracking-wide text-primary">{solution.eyebrow}</p><h3 className="mt-1 font-display text-xl font-semibold">{solution.name}</h3><p className="mt-2 text-base leading-relaxed text-muted-foreground">{solution.description}</p><span className="mt-4 inline-flex items-center text-sm font-semibold text-primary">{solution.action}<ArrowRight className="ml-1.5 h-4 w-4" /></span></div>
-          </a>
-        ))}
-      </div>
-    </Section>
   );
 }
 
