@@ -1,16 +1,29 @@
 /**
- * Analytics layer.
+ * Cossa Store analytics bridge.
  *
- * Ships a GA4-compatible dataLayer/gtag bridge plus the Cossa support events.
- * GA4 only initialises when a measurement ID is configured, so no third-party
- * script is loaded (and no page weight is added) until Cossa supplies one.
+ * Production behaviour:
+ * - If VITE_GTM_CONTAINER_ID is configured (GTM-XXXXXXX), GTM is the primary
+ *   analytics transport and all Store events are pushed into dataLayer.
+ * - If GTM is not configured but VITE_GA_MEASUREMENT_ID is configured
+ *   (G-XXXXXXX), the Store loads GA4 directly through gtag.js.
+ * - If neither identifier is configured, no Google script is loaded.
  *
- * To go live: set VITE_GA_MEASUREMENT_ID (G-XXXXXXX) and the ecommerce events
- * below start flowing automatically — no component changes required.
+ * GTM takes precedence when both values exist so the same event is not sent
+ * twice. A GTM container can then route the ecommerce events to GA4 and other
+ * authorised measurement destinations without changing Store components.
  */
-const MEASUREMENT_ID = import.meta.env["VITE_GA_MEASUREMENT_ID"] as string | undefined;
+const GTM_CONTAINER_ID = import.meta.env["VITE_GTM_CONTAINER_ID"] as string | undefined;
+const GA_MEASUREMENT_ID = import.meta.env["VITE_GA_MEASUREMENT_ID"] as string | undefined;
 
-export const ANALYTICS_CONNECTED = Boolean(MEASUREMENT_ID);
+const VALID_GTM_ID = GTM_CONTAINER_ID && /^GTM-[A-Z0-9]+$/i.test(GTM_CONTAINER_ID)
+  ? GTM_CONTAINER_ID
+  : undefined;
+const VALID_GA_ID = GA_MEASUREMENT_ID && /^G-[A-Z0-9]+$/i.test(GA_MEASUREMENT_ID)
+  ? GA_MEASUREMENT_ID
+  : undefined;
+
+export const ANALYTICS_CONNECTED = Boolean(VALID_GTM_ID || VALID_GA_ID);
+export const ANALYTICS_MODE = VALID_GTM_ID ? "gtm" : VALID_GA_ID ? "ga4" : "disabled";
 
 export type AnalyticsEvent =
   | "whatsapp_opened"
@@ -37,7 +50,6 @@ export type AnalyticsEvent =
   | "affiliate_link_click"
   | "quote_request_click"
   | "availability_request_click"
-  /* GA4 recommended ecommerce events */
   | "view_item"
   | "view_item_list"
   | "select_item"
@@ -52,7 +64,6 @@ export type AnalyticsEvent =
   | "generate_lead"
   | "view_project_kit"
   | "add_project_kit_to_cart"
-  /* Project engine */
   | "project_calculator_started"
   | "project_calculator_completed"
   | "project_saved"
@@ -83,14 +94,28 @@ declare global {
 const buffer: TrackedEvent[] = [];
 let initialised = false;
 
-/** Loads gtag.js once, only if a measurement ID exists. */
-export function initAnalytics(): void {
-  if (initialised || !MEASUREMENT_ID || typeof window === "undefined") return;
-  initialised = true;
+function pushDataLayer(value: Record<string, unknown>): void {
+  if (typeof window === "undefined") return;
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push(value);
+}
+
+function loadGtm(containerId: string): void {
+  window.dataLayer = window.dataLayer || [];
+  pushDataLayer({ "gtm.start": Date.now(), event: "gtm.js" });
 
   const script = document.createElement("script");
   script.async = true;
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`;
+  script.src = `https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(containerId)}`;
+  script.dataset.cossaAnalytics = "gtm";
+  document.head.appendChild(script);
+}
+
+function loadDirectGa4(measurementId: string): void {
+  const script = document.createElement("script");
+  script.async = true;
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`;
+  script.dataset.cossaAnalytics = "ga4";
   document.head.appendChild(script);
 
   window.dataLayer = window.dataLayer || [];
@@ -99,13 +124,43 @@ export function initAnalytics(): void {
   };
   window.gtag = gtag;
   gtag("js", new Date());
-  gtag("config", MEASUREMENT_ID, { send_page_view: false, currency: "ZAR" });
+  gtag("config", measurementId, {
+    send_page_view: false,
+    currency: "ZAR",
+  });
 }
 
-/** SPA page view — call on route change. */
+/** Initialise exactly one Google measurement transport. */
+export function initAnalytics(): void {
+  if (initialised || typeof window === "undefined") return;
+  initialised = true;
+
+  if (VALID_GTM_ID) {
+    loadGtm(VALID_GTM_ID);
+    return;
+  }
+
+  if (VALID_GA_ID) {
+    loadDirectGa4(VALID_GA_ID);
+  }
+}
+
+/** SPA page view — called by the TanStack router after a route resolves. */
 export function trackPageView(path: string, title?: string): void {
-  if (!MEASUREMENT_ID || typeof window === "undefined") return;
-  window.gtag?.("event", "page_view", { page_path: path, page_title: title });
+  if (typeof window === "undefined" || !ANALYTICS_CONNECTED) return;
+
+  const payload = {
+    page_path: path,
+    page_title: title || document.title,
+    page_location: window.location.href,
+  };
+
+  if (VALID_GTM_ID) {
+    pushDataLayer({ event: "page_view", ...payload });
+    return;
+  }
+
+  window.gtag?.("event", "page_view", payload);
 }
 
 export function trackEvent(name: AnalyticsEvent, payload?: Record<string, unknown>): void {
@@ -113,14 +168,19 @@ export function trackEvent(name: AnalyticsEvent, payload?: Record<string, unknow
   buffer.push(event);
   if (buffer.length > 100) buffer.shift();
 
-  if (typeof window !== "undefined" && window.gtag) {
-    window.gtag("event", name, payload ?? {});
-  } else if (import.meta.env.DEV) {
-    console.debug("[analytics:pending]", event.name, event.payload ?? {});
+  if (typeof window === "undefined" || !ANALYTICS_CONNECTED) {
+    if (import.meta.env.DEV) console.debug("[analytics:pending]", event.name, event.payload ?? {});
+    return;
   }
+
+  if (VALID_GTM_ID) {
+    pushDataLayer({ event: name, ...(payload ?? {}) });
+    return;
+  }
+
+  window.gtag?.("event", name, payload ?? {});
 }
 
-/** GA4 ecommerce item shape. */
 export interface EcommerceItem {
   item_id: string;
   item_name: string;
@@ -147,8 +207,13 @@ export function trackEcommerce(
   items: EcommerceItem[],
   extra?: Record<string, unknown>,
 ): void {
-  const value = items.reduce((sum, i) => sum + (i.price ?? 0) * (i.quantity ?? 1), 0);
-  trackEvent(name, { currency: "ZAR", value: Math.round(value * 100) / 100, items, ...extra });
+  const value = items.reduce((sum, item) => sum + (item.price ?? 0) * (item.quantity ?? 1), 0);
+  trackEvent(name, {
+    currency: "ZAR",
+    value: Math.round(value * 100) / 100,
+    items,
+    ...extra,
+  });
 }
 
 export function bufferedEvents(): readonly TrackedEvent[] {

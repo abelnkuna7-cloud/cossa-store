@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { CheckCircle2, RefreshCw, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,6 @@ type CjCommercialProduct = {
   title: string;
   status: "active" | "draft" | "archived";
   availableVariants?: number;
-  shippingOrigin?: string;
   shippingCarrier?: string;
   shippingAging?: string;
   shippingUsd?: number;
@@ -57,14 +56,14 @@ type CjCommercialResult = {
 };
 
 async function invokeFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
-  // The generated client uses an opaque publishable key. Pass the current user
-  // token explicitly so the Edge Function can enforce its server-side admin check.
   const {
     data: { session },
     error: sessionError,
   } = await supabase.auth.refreshSession();
-  if (sessionError) throw new Error("Please sign in again to run CJ catalogue sync.");
-  if (!session?.access_token) throw new Error("Please sign in again to run CJ catalogue sync.");
+
+  if (sessionError || !session?.access_token) {
+    throw new Error("Please sign in again to run CJ catalogue controls.");
+  }
 
   const { data, error } = await supabase.functions.invoke(name, {
     body,
@@ -72,13 +71,11 @@ async function invokeFunction<T>(name: string, body: Record<string, unknown>): P
   });
 
   if (error) {
-    const context = (error as { context?: unknown }).context;
-    const responseLike = context as {
+    const context = (error as { context?: unknown }).context as {
       clone?: () => { json?: () => Promise<unknown> };
       json?: () => Promise<unknown>;
     } | null;
-    const response =
-      typeof responseLike?.clone === "function" ? responseLike.clone() : responseLike;
+    const response = typeof context?.clone === "function" ? context.clone() : context;
     if (typeof response?.json === "function") {
       const payload = await response.json().catch(() => null);
       if (
@@ -89,321 +86,265 @@ async function invokeFunction<T>(name: string, body: Record<string, unknown>): P
         throw new Error((payload as { error: string }).error);
       }
     }
-    const message = (error as { message?: unknown }).message;
-    throw new Error(typeof message === "string" && message ? message : `${name} failed.`);
+    throw new Error((error as { message?: string }).message || `${name} failed.`);
   }
 
   if (data?.error) throw new Error(String(data.error));
   return data as T;
 }
 
-async function invokeCjSync(productRef?: string): Promise<CjSyncResult> {
-  return invokeFunction<CjSyncResult>("cj-product-sync", {
-    action: "sync",
-    ...(productRef ? { productRef } : {}),
-  });
+function zar(value?: number) {
+  return value == null
+    ? "—"
+    : new Intl.NumberFormat("en-ZA", {
+        style: "currency",
+        currency: "ZAR",
+        minimumFractionDigits: 2,
+      }).format(value);
 }
 
-async function invokeCjCommercial(productRef?: string): Promise<CjCommercialResult> {
-  return invokeFunction<CjCommercialResult>("cj-commercial-sync", {
-    action: "price_and_publish",
-    ...(productRef ? { productRef } : {}),
-  });
-}
-
-function zar(value?: number): string {
-  if (value == null) return "—";
-  return new Intl.NumberFormat("en-ZA", {
-    style: "currency",
-    currency: "ZAR",
-    minimumFractionDigits: 2,
-  }).format(value);
-}
-
-function usd(value?: number): string {
+function usd(value?: number) {
   return value == null ? "—" : `US$ ${value.toFixed(2)}`;
 }
 
 export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
-  const [syncing, setSyncing] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [requestedProduct, setRequestedProduct] = useState("");
   const [result, setResult] = useState<CjSyncResult | null>(null);
   const [commercial, setCommercial] = useState<CjCommercialResult | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
-  const [requestedProduct, setRequestedProduct] = useState("");
-
-  async function syncCjProducts() {
-    setLastError(null);
-    setSyncing(true);
-    try {
-      const next = await invokeCjSync();
-      // cj-product-sync performs its own live per-product availability check.
-      // Do not add a second full-catalogue refresh here: it can exceed the Edge
-      // runtime limit after a successful import and incorrectly look like a failure.
-      setResult(next);
-
-      setCommercial(null);
-      toast.success("CJ Draft products imported", {
-        description: `${next.createdAsDraft} real CJ product${next.createdAsDraft === 1 ? "" : "s"} added for catalogue and pricing review.`,
-      });
-      onSynced?.();
-    } catch (error) {
-      const candidate = (error as { message?: unknown } | null)?.message;
-      const message =
-        typeof candidate === "string" && candidate ? candidate : "CJ catalogue sync failed.";
-      setLastError(message);
-      toast.error(message);
-    } finally {
-      setSyncing(false);
-    }
-  }
-
-  async function priceEligibleDrafts() {
-    setLastError(null);
-    setSyncing(true);
-    try {
-      const next = await invokeCjCommercial();
-      setCommercial(next);
-      toast.success("CJ pricing review completed", {
-        description: `${next.activated} approved product${next.activated === 1 ? "" : "s"} published. Products that did not pass were kept out of the storefront.`,
-      });
-      onSynced?.();
-    } catch (error) {
-      const candidate = (error as { message?: unknown } | null)?.message;
-      const message =
-        typeof candidate === "string" && candidate ? candidate : "CJ pricing review failed.";
-      setLastError(message);
-      toast.error(message);
-    } finally {
-      setSyncing(false);
-    }
-  }
 
   async function addRequestedProduct() {
     const reference = requestedProduct.trim();
     if (!reference) {
-      setLastError("Paste a CJ product ID or product link first.");
+      setLastError("Paste a CJ product ID or CJ product link first.");
       return;
     }
+
+    setWorking(true);
     setLastError(null);
-    setSyncing(true);
     try {
-      const imported = await invokeCjSync(reference);
+      const imported = await invokeFunction<CjSyncResult>("cj-product-sync", {
+        action: "sync",
+        productRef: reference,
+      });
       setResult(imported);
+
       const productId = imported.products[0]?.productId;
-      if (!productId) throw new Error("CJ could not import that product for commercial review.");
-      const priced = await invokeCjCommercial(productId);
+      if (!productId) {
+        const rejection = imported.rejectionDetails?.[0]?.reason?.replace(/_/g, " ");
+        throw new Error(
+          rejection
+            ? `CJ candidate was not admitted: ${rejection}.`
+            : "CJ candidate did not pass the catalogue admission check.",
+        );
+      }
+
+      const priced = await invokeFunction<CjCommercialResult>("cj-commercial-sync", {
+        action: "price_and_publish",
+        productRef: productId,
+      });
       setCommercial(priced);
+
       const item = priced.products[0];
-      toast.success(
-        item?.status === "active"
-          ? "CJ product published"
-          : item?.status === "archived"
-            ? "CJ product archived"
-            : "CJ product kept as Draft",
-        {
+      if (item?.status === "active") {
+        toast.success("CJ product approved and published", {
           description:
-            item?.status === "active"
-              ? "The exact CJ product passed stock, South Africa shipping, and pricing checks."
-              : item?.status === "archived"
-                ? "The exact CJ product failed a confirmed commercial check and was removed from the working catalogue."
-                : "The exact CJ product needs review because CJ could not complete a temporary check.",
-        },
-      );
+            "The exact product passed live stock, South Africa freight and protected-pricing checks.",
+        });
+      } else if (item?.status === "archived") {
+        toast.error("CJ product failed commercial qualification", {
+          description:
+            "A confirmed commercial failure was archived instead of being left as unusable working stock.",
+        });
+      } else {
+        toast.warning("CJ product requires recheck", {
+          description:
+            "The product is not public. A temporary or incomplete provider check still needs verification.",
+        });
+      }
+
       setRequestedProduct("");
       onSynced?.();
     } catch (error) {
-      const candidate = (error as { message?: unknown } | null)?.message;
-      const message =
-        typeof candidate === "string" && candidate ? candidate : "CJ product import failed.";
+      const message = error instanceof Error ? error.message : "CJ product qualification failed.";
       setLastError(message);
       toast.error(message);
     } finally {
-      setSyncing(false);
+      setWorking(false);
+    }
+  }
+
+  async function reviewExistingDrafts() {
+    setWorking(true);
+    setLastError(null);
+    try {
+      const next = await invokeFunction<CjCommercialResult>("cj-commercial-sync", {
+        action: "price_and_publish",
+      });
+      setCommercial(next);
+      toast.success("Existing CJ drafts reviewed", {
+        description: `${next.activated} published · ${next.keptDraft} require recheck · ${next.archived} confirmed failures archived.`,
+      });
+      onSynced?.();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "CJ commercial review failed.";
+      setLastError(message);
+      toast.error(message);
+    } finally {
+      setWorking(false);
     }
   }
 
   return (
     <section className="rounded-lg border border-border bg-card p-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h2 className="font-semibold">CJ Dropshipping connection</h2>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Import a controlled, department-balanced batch of real CJ products with live variant
-            stock. Qualification prioritises categories with fewer approved CJ products. Only
-            products that pass stock, South Africa freight, and protected pricing become public.
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="max-w-3xl">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5 text-amber-500" aria-hidden />
+            <h2 className="font-semibold">CJ acquisition control</h2>
+          </div>
+
+          <p className="mt-2 text-sm text-muted-foreground">
+            Automatic bulk catalogue filling is paused. Cossa Store is moving to qualification-first
+            acquisition so supplier products are not accumulated merely to be rejected later.
           </p>
-          <div className="mt-3 flex max-w-3xl flex-col gap-2 sm:flex-row">
+
+          <div className="mt-3 grid gap-2 rounded-md border border-border bg-background/60 p-3 text-xs sm:grid-cols-2">
+            <div className="flex gap-2">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
+              <span>Exact product admission remains available for deliberate sourcing.</span>
+            </div>
+            <div className="flex gap-2">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
+              <span>Existing drafts can still be commercially reviewed and cleaned.</span>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <Input
               value={requestedProduct}
               onChange={(event) => setRequestedProduct(event.target.value)}
-              placeholder="Paste a CJ product ID or CJ product link"
+              placeholder="Paste an exact CJ product ID or CJ product link"
               aria-label="CJ product ID or link"
-              disabled={syncing}
+              disabled={working}
             />
             <Button
               type="button"
-              variant="secondary"
               onClick={() => void addRequestedProduct()}
-              disabled={syncing || !requestedProduct.trim()}
+              disabled={working || !requestedProduct.trim()}
             >
-              Add, price & publish
+              {working ? "Checking…" : "Qualify exact product"}
             </Button>
           </div>
+
           <p className="mt-2 text-xs text-muted-foreground">
-            Exact products are imported from CJ and published only after live stock, South Africa
-            freight, and protected pricing checks pass. Otherwise they remain Draft.
+            No public listing is promised at import time. Stock, South Africa freight and protected
+            pricing must pass before publication.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" onClick={() => void syncCjProducts()} disabled={syncing}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} aria-hidden />
-            {syncing ? "Working…" : "Import 25 CJ Draft Products"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void priceEligibleDrafts()}
-            disabled={syncing}
-          >
-            Price & publish eligible CJ drafts
-          </Button>
-        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => void reviewExistingDrafts()}
+          disabled={working}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${working ? "animate-spin" : ""}`} aria-hidden />
+          Review existing CJ drafts
+        </Button>
       </div>
 
       {lastError ? (
         <p
           role="alert"
-          className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
         >
           {lastError}
         </p>
       ) : null}
 
       {result ? (
-        <div className="mt-4 space-y-3 text-sm">
-          <div className="flex flex-wrap gap-x-6 gap-y-1">
-            <span>
-              <strong>Requested:</strong> {result.requested}
-            </span>
-            <span>
-              <strong>New drafts:</strong> {result.createdAsDraft}
-            </span>
-            <span>
-              <strong>Refreshed:</strong> {result.refreshed}
-            </span>
-            <span>
-              <strong>Skipped:</strong> {result.skipped}
-            </span>
-          </div>
-          {result.products.length ? (
-            <div className="overflow-x-auto rounded-md border border-border">
-              <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="bg-secondary/60 text-xs uppercase tracking-wide text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-2">CJ product</th>
-                    <th className="px-3 py-2">Variants</th>
-                    <th className="px-3 py-2">Available variants</th>
-                    <th className="px-3 py-2">CJ inventory</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {result.products.map((product) => (
-                    <tr key={product.productId}>
-                      <td className="px-3 py-2">
-                        <div className="font-medium">{product.title}</div>
-                        <div className="font-mono text-[11px] text-muted-foreground">
-                          {product.productId}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">{product.variants}</td>
-                      <td className="px-3 py-2">{product.availableVariants}</td>
-                      <td className="px-3 py-2">{product.totalInventory ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-          {result.rejectionDetails?.length ? (
-            <details className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
-              <summary className="cursor-pointer font-medium text-foreground">
-                Show import rejections
-              </summary>
-              <ul className="mt-2 space-y-1">
-                {result.rejectionDetails.map((rejection) => (
-                  <li key={rejection.productId}>
-                    <span className="font-mono">{rejection.productId}</span>:{" "}
-                    {rejection.reason.replace(/_/g, " ")}
-                    {rejection.diagnosticCode ? ` (${rejection.diagnosticCode})` : ""}
-                    {rejection.missingField ? ` — missing ${rejection.missingField}` : ""}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ) : null}
+        <div className="mt-5 overflow-x-auto rounded-md border border-border">
+          <table className="w-full min-w-[720px] text-left text-sm">
+            <thead className="bg-secondary/60 text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2">Candidate</th>
+                <th className="px-3 py-2">Available variants</th>
+                <th className="px-3 py-2">CJ inventory</th>
+                <th className="px-3 py-2">Admission</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {result.products.map((product) => (
+                <tr key={product.productId}>
+                  <td className="px-3 py-2">
+                    <div className="font-medium">{product.title}</div>
+                    <div className="font-mono text-[11px] text-muted-foreground">
+                      {product.productId}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2">
+                    {product.availableVariants}/{product.variants}
+                  </td>
+                  <td className="px-3 py-2">{product.totalInventory ?? "—"}</td>
+                  <td className="px-3 py-2">Controlled draft</td>
+                </tr>
+              ))}
+              {!result.products.length ? (
+                <tr>
+                  <td className="px-3 py-3 text-muted-foreground" colSpan={4}>
+                    Candidate not admitted. See the error or rejection reason above.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
       ) : null}
 
       {commercial ? (
         <div className="mt-5 space-y-3 text-sm">
           <div className="flex flex-wrap gap-x-6 gap-y-1">
-            <span>
-              <strong>Published:</strong> {commercial.activated}
-            </span>
-            <span>
-              <strong>Not approved:</strong> {commercial.keptDraft + commercial.archived}
-            </span>
-            <span>
-              <strong>Protected FX:</strong> US$1 = R{commercial.pricing.fxZarPerUsd.toFixed(2)}
-            </span>
-            <span>
-              <strong>Target margin:</strong>{" "}
-              {(commercial.pricing.targetGrossMargin * 100).toFixed(0)}%
-            </span>
+            <span><strong>Published:</strong> {commercial.activated}</span>
+            <span><strong>Recheck:</strong> {commercial.keptDraft}</span>
+            <span><strong>Archived failures:</strong> {commercial.archived}</span>
+            <span><strong>Protected FX:</strong> US$1 = R{commercial.pricing.fxZarPerUsd.toFixed(2)}</span>
+            <span><strong>Target margin:</strong> {(commercial.pricing.targetGrossMargin * 100).toFixed(0)}%</span>
           </div>
-          <div className="overflow-x-auto rounded-md border border-border">
-            <table className="w-full min-w-[980px] text-left text-sm">
-              <thead className="bg-secondary/60 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2">Product</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2">ZA freight</th>
-                  <th className="px-3 py-2">ETA</th>
-                  <th className="px-3 py-2">Protected cost</th>
-                  <th className="px-3 py-2">From price</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {commercial.products.filter((product) => product.status === "active").map((product) => (
-                  <tr key={product.productId}>
-                    <td className="px-3 py-2">
-                      <div className="font-medium">{product.title}</div>
-                      {product.reason ? (
-                        <div className="text-xs text-muted-foreground">
-                          {product.reason.replace(/_/g, " ")}
-                        </div>
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-2 capitalize">{product.status}</td>
-                    <td className="px-3 py-2">
-                      {product.shippingCarrier
-                        ? `${product.shippingCarrier} · ${usd(product.shippingUsd)}`
-                        : "—"}
-                    </td>
-                    <td className="px-3 py-2">{product.shippingAging || "—"}</td>
-                    <td className="px-3 py-2">{zar(product.minCostZar)}</td>
-                    <td className="px-3 py-2 font-medium">{zar(product.fromPriceZar)}</td>
+
+          {commercial.products.filter((product) => product.status === "active").length ? (
+            <div className="overflow-x-auto rounded-md border border-border">
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead className="bg-secondary/60 text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2">Approved product</th>
+                    <th className="px-3 py-2">ZA freight</th>
+                    <th className="px-3 py-2">ETA</th>
+                    <th className="px-3 py-2">Protected cost</th>
+                    <th className="px-3 py-2">From price</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            This list shows approved, public products only. Products without live CJ stock, a valid
-            South Africa freight quote, or commercially viable pricing are excluded from the
-            storefront. Pricing includes supplier cost, quoted freight, a protective FX rate, a risk
-            buffer, and Cossa margin protection.
-          </p>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {commercial.products
+                    .filter((product) => product.status === "active")
+                    .map((product) => (
+                      <tr key={product.productId}>
+                        <td className="px-3 py-2 font-medium">{product.title}</td>
+                        <td className="px-3 py-2">
+                          {product.shippingCarrier
+                            ? `${product.shippingCarrier} · ${usd(product.shippingUsd)}`
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-2">{product.shippingAging || "—"}</td>
+                        <td className="px-3 py-2">{zar(product.minCostZar)}</td>
+                        <td className="px-3 py-2 font-medium">{zar(product.fromPriceZar)}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </section>

@@ -1,0 +1,65 @@
+/* Storefront brand readability overrides.
+ * Keep the official Cossa black/gold identity while making the Store mark and
+ * slogan legible on small screens. The header component remains the semantic
+ * source of the logo; this layer only improves its visual presentation.
+ */
+header a[aria-label="Cossa Store home"] {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+header a[aria-label="Cossa Store home"] img {
+  height: 2.5rem !important;
+  width: auto !important;
+  max-width: 9.4rem !important;
+}
+
+header a[aria-label="Cossa Store home"]::after {
+  content: "SHOP SMARTER. LIVE BETTER. BUILD MORE.";
+  display: block;
+  max-width: 9.4rem;
+  color: #d4af37;
+  font-size: 0.5rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0.045em;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  header a[aria-label="Cossa Store home"] img {
+    height: 3rem !important;
+    max-width: 11rem !important;
+  }
+
+  header a[aria-label="Cossa Store home"]::after {
+    max-width: 11rem;
+    font-size: 0.58rem;
+    letter-spacing: 0.055em;
+  }
+}
+
+@media (min-width: 1024px) {
+  header a[aria-label="Cossa Store home"] img {
+    height: 3.25rem !important;
+    max-width: 12.5rem !important;
+  }
+
+  header a[aria-label="Cossa Store home"]::after {
+    max-width: 12.5rem;
+    font-size: 0.62rem;
+  }
+}
+
+/* Keep the four mobile account controls usable beside the wider brand block. */
+@media (max-width: 389px) {
+  header a[aria-label="Cossa Store home"] img,
+  header a[aria-label="Cossa Store home"]::after {
+    max-width: 8.2rem !important;
+  }
+
+  header a[aria-label="Cossa Store home"]::after {
+    font-size: 0.44rem;
+  }
+}

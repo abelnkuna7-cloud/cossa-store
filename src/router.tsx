@@ -1,6 +1,8 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
+import { initAnalytics, trackPageView } from "@/lib/analytics";
 import { routeTree } from "./routeTree.gen";
+import "./storefront-brand.css";
 
 export const getRouter = () => {
   const queryClient = new QueryClient();
@@ -11,6 +13,18 @@ export const getRouter = () => {
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
   });
+
+  if (typeof window !== "undefined") {
+    initAnalytics();
+
+    const sendPageView = () => {
+      const location = router.state.location;
+      trackPageView(`${location.pathname}${location.searchStr}${location.hash}`, document.title);
+    };
+
+    sendPageView();
+    router.subscribe("onResolved", sendPageView);
+  }
 
   return router;
 };
