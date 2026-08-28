@@ -83,12 +83,8 @@ export function GroupSolutionsSection() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {services.map((service) => (
             <a key={service.id} href={service.destination_url} target="_blank" rel="noopener noreferrer" className="group overflow-hidden rounded-xl border border-border bg-card transition hover:border-primary/60">
-              <div className="relative h-36 overflow-hidden bg-secondary">
-                {service.image_url ? <img src={service.image_url} alt="" loading="lazy" className="h-full w-full object-cover opacity-75 transition duration-300 group-hover:scale-[1.03]" /> : null}
-                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/25 to-transparent" />
-                <div className="absolute left-4 top-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-white/15 bg-black/80 p-1.5 shadow-lg">
-                  <img src={getServiceLogo(service)} alt={`${service.name} logo`} loading="lazy" className="h-full w-full object-contain" />
-                </div>
+              <div className="relative flex h-36 items-center justify-center overflow-hidden bg-gradient-to-br from-black via-neutral-950 to-primary/10">
+                <img src={getServiceLogo(service)} alt={`${service.name} logo`} loading="lazy" className="h-24 w-24 object-contain transition duration-300 group-hover:scale-[1.05]" />
               </div>
               <div className="p-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary">{service.eyebrow || "Cossa solution"}</p>
