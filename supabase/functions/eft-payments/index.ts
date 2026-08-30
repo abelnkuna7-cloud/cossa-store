@@ -1,10 +1,16 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { createClient, type User } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  canUploadEftProof,
+  EFT_PROOF_CONTENT_TYPES,
+  hasEftProofSignature,
+  MAX_EFT_PROOF_BYTES,
+  PROOF_SUBMITTED_STATUS,
+} from "../_shared/eft-proof-policy.ts";
 
 const COSSA_ORGANISATION_ID = "00000000-0000-4000-8000-000000000001";
 const PAYMENT_PROOFS_BUCKET = "eft-payment-proofs";
-const MAX_PROOF_BYTES = 10 * 1024 * 1024;
 const ALLOWED_ORIGINS = new Set([
   "https://store.cossanexusholdings.co.za",
   "https://growth.cossanexusholdings.co.za",
@@ -104,32 +110,6 @@ function sanitizeFileName(value: string): string {
   return (normalized || "proof-of-payment").slice(0, 120);
 }
 
-function isRecognizedProof(contentType: string, bytes: Uint8Array): boolean {
-  const isPdf =
-    contentType === "application/pdf" &&
-    bytes.length >= 5 &&
-    String.fromCharCode(...bytes.slice(0, 5)) === "%PDF-";
-  const isJpeg =
-    contentType === "image/jpeg" &&
-    bytes.length >= 3 &&
-    bytes[0] === 0xff &&
-    bytes[1] === 0xd8 &&
-    bytes[2] === 0xff;
-  const isPng =
-    contentType === "image/png" &&
-    bytes.length >= 8 &&
-    bytes[0] === 0x89 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x4e &&
-    bytes[3] === 0x47 &&
-    bytes[4] === 0x0d &&
-    bytes[5] === 0x0a &&
-    bytes[6] === 0x1a &&
-    bytes[7] === 0x0a;
-
-  return isPdf || isJpeg || isPng;
-}
-
 function paymentIsExpired(payment: PaymentRequest): boolean {
   return new Date(payment.expires_at).getTime() <= Date.now();
 }
@@ -146,6 +126,7 @@ function publicPayment(payment: PaymentRequest) {
     submittedAt: payment.submitted_at,
     reviewedAt: payment.reviewed_at,
     reviewerNote: payment.reviewer_note,
+    proofUploaded: Boolean(payment.proof_storage_path),
     createdAt: payment.created_at,
   };
 }
@@ -314,7 +295,7 @@ async function describeStoreOrder(
 
   const { data: order, error: orderError } = await admin
     .from("store_orders")
-    .select("order_number,status,total,store_order_items(product_name,sku,quantity,unit_price,line_total)")
+    .select("order_number,status,subtotal,shipping_total,shipping_method,total,store_order_items(product_name,sku,quantity,unit_price,line_total)")
     .eq("id", payment.store_order_id)
     .maybeSingle();
 
@@ -323,6 +304,10 @@ async function describeStoreOrder(
   return {
     orderNumber: order.order_number,
     orderStatus: order.status,
+    subtotal: Number(order.subtotal ?? 0),
+    shippingTotal: Number(order.shipping_total ?? 0),
+    shippingMethod: order.shipping_method ?? null,
+    requiresDelivery: Number(order.shipping_total ?? 0) > 0 || Boolean(order.shipping_method),
     total: Number(order.total),
     items: (order.store_order_items ?? []).map((item: Record<string, unknown>) => ({
       productName: item.product_name,
@@ -430,6 +415,31 @@ async function getMyPayment(
   });
 }
 
+async function getMyPaymentProofUrl(
+  request: Request,
+  admin: ReturnType<typeof createClient>,
+  user: User,
+  body: Record<string, unknown>,
+) {
+  const payment = await loadOwnedPayment(admin, cleanText(body.paymentId, 64), user.id);
+  if (!payment.proof_storage_path) {
+    throw new Error("No uploaded proof is available for this payment request.");
+  }
+
+  const { data, error } = await admin.storage
+    .from(PAYMENT_PROOFS_BUCKET)
+    .createSignedUrl(payment.proof_storage_path, 300);
+  if (error || !data?.signedUrl) {
+    throw new Error("Your proof could not be opened securely. Please try again.");
+  }
+
+  return json(request, {
+    url: data.signedUrl,
+    expiresInSeconds: 300,
+    fileName: payment.proof_file_name,
+  });
+}
+
 async function listMyPayments(
   request: Request,
   admin: ReturnType<typeof createClient>,
@@ -516,21 +526,21 @@ async function submitProof(
   const payerNote = cleanText(form.get("payerNote"), 1000);
 
   if (!(proof instanceof File)) throw new Error("Attach a PDF, JPG or PNG proof of payment.");
-  if (proof.size <= 0 || proof.size > MAX_PROOF_BYTES) {
+  if (proof.size <= 0 || proof.size > MAX_EFT_PROOF_BYTES) {
     throw new Error("Proof of payment must be between 1 byte and 10 MB.");
   }
-  if (!["application/pdf", "image/jpeg", "image/png"].includes(proof.type)) {
+  if (!EFT_PROOF_CONTENT_TYPES.includes(proof.type as (typeof EFT_PROOF_CONTENT_TYPES)[number])) {
     throw new Error("Proof of payment must be a PDF, JPG or PNG file.");
   }
 
   const existing = await loadOwnedPayment(admin, paymentId, user.id);
   const payment = await ensureActivePayment(admin, existing);
-  if (!(["awaiting_payment", "rejected"] as PaymentStatus[]).includes(payment.status)) {
+  if (!canUploadEftProof(payment.status)) {
     throw new Error("Proof can only be uploaded for a payment awaiting review.");
   }
 
   const bytes = new Uint8Array(await proof.arrayBuffer());
-  if (!isRecognizedProof(proof.type, bytes)) {
+  if (!hasEftProofSignature(proof.type, bytes)) {
     throw new Error("The uploaded file does not match its stated PDF, JPG or PNG format.");
   }
 
@@ -544,7 +554,7 @@ async function submitProof(
   const { data: updated, error: updateError } = await admin
     .from("eft_payment_requests")
     .update({
-      status: "proof_submitted",
+      status: PROOF_SUBMITTED_STATUS,
       proof_storage_path: objectPath,
       proof_file_name: sanitizeFileName(proof.name),
       proof_content_type: proof.type,
@@ -711,6 +721,8 @@ Deno.serve(async (request) => {
         return await startSubscriptionPayment(request, admin, user, body, "nexdocs_subscription");
       case "get_my_payment":
         return await getMyPayment(request, admin, user, body);
+      case "get_my_payment_proof_url":
+        return await getMyPaymentProofUrl(request, admin, user, body);
       case "list_my_payments":
         return await listMyPayments(request, admin, user);
       case "subscription_options":

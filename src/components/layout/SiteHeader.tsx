@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 import { companyConfig } from "@/config/company";
+import { STORE_SLOGAN } from "@/config/store-brand";
 import {
   SITE,
   whatsappLink,
@@ -393,6 +394,13 @@ export function SiteHeader() {
             decoding="async"
             className="h-8 w-auto max-w-[130px] object-contain sm:h-10 sm:max-w-[155px] lg:h-11 lg:max-w-none"
           />
+          <span className="store-slogan" aria-label="Shop smarter. Live better. Build more.">
+            {STORE_SLOGAN.map((phrase) => (
+              <span key={phrase.tone} className={`store-slogan__${phrase.tone}`}>
+                {phrase.text}
+              </span>
+            ))}
+          </span>
         </Link>
 
         {/* PARENT COMPANY BADGE */}

@@ -15,16 +15,26 @@ header a[aria-label="Cossa Store home"] img {
   max-width: 9.4rem !important;
 }
 
-header a[aria-label="Cossa Store home"]::after {
-  content: "SHOP SMARTER. LIVE BETTER. BUILD MORE.";
+header a[aria-label="Cossa Store home"] .store-slogan {
   display: block;
   max-width: 9.4rem;
-  color: #d4af37;
   font-size: 0.5rem;
   font-weight: 800;
   line-height: 1.15;
   letter-spacing: 0.045em;
   white-space: nowrap;
+}
+
+.store-slogan__gold {
+  color: #d4af37;
+}
+
+.store-slogan__ivory {
+  color: #f2e7c6;
+}
+
+.store-slogan__teal {
+  color: #9ad8d3;
 }
 
 @media (min-width: 640px) {
@@ -33,7 +43,7 @@ header a[aria-label="Cossa Store home"]::after {
     max-width: 11rem !important;
   }
 
-  header a[aria-label="Cossa Store home"]::after {
+  header a[aria-label="Cossa Store home"] .store-slogan {
     max-width: 11rem;
     font-size: 0.58rem;
     letter-spacing: 0.055em;
@@ -46,7 +56,7 @@ header a[aria-label="Cossa Store home"]::after {
     max-width: 12.5rem !important;
   }
 
-  header a[aria-label="Cossa Store home"]::after {
+  header a[aria-label="Cossa Store home"] .store-slogan {
     max-width: 12.5rem;
     font-size: 0.62rem;
   }
@@ -55,11 +65,11 @@ header a[aria-label="Cossa Store home"]::after {
 /* Keep the four mobile account controls usable beside the wider brand block. */
 @media (max-width: 389px) {
   header a[aria-label="Cossa Store home"] img,
-  header a[aria-label="Cossa Store home"]::after {
+  header a[aria-label="Cossa Store home"] .store-slogan {
     max-width: 8.2rem !important;
   }
 
-  header a[aria-label="Cossa Store home"]::after {
+  header a[aria-label="Cossa Store home"] .store-slogan {
     font-size: 0.44rem;
   }
 }

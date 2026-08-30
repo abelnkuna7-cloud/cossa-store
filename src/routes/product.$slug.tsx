@@ -9,7 +9,6 @@ import {
   ExternalLink,
   Heart,
   Info,
-  Package,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -20,7 +19,7 @@ import {
   LoadingBlock,
 } from "@/components/common/StateBlocks";
 import { ProductGrid } from "@/components/shop/ProductCard";
-import { ProductImage } from "@/components/shop/ProductImage";
+import { ProductGallery } from "@/components/shop/ProductGallery";
 import { FulfilmentDetails } from "@/components/shop/FulfilmentDetails";
 import {
   FulfilmentBadge,
@@ -1035,9 +1034,6 @@ function ProductDetail({
       product.visibility ===
         "public");
 
-  const image =
-    product.images[0];
-
   const taxLabel =
     vatLabel(
       product.vat_status,
@@ -1148,74 +1144,17 @@ function ProductDetail({
         {/* MEDIA                                                            */}
         {/* ---------------------------------------------------------------- */}
 
-        <div>
-          <div className="relative aspect-4/3 overflow-hidden rounded-lg border border-border bg-secondary">
-            {image?.url ? (
-              <ProductImage
-                url={
-                  image.url
-                }
-                alt={
-                  image.alt
-                }
-                className="h-full w-full"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-center">
-                <div>
-                  <Package
-                    className="mx-auto h-12 w-12 text-muted-foreground"
-                    aria-hidden
-                  />
-
-                  <p className="mt-3 text-xs uppercase tracking-wide text-muted-foreground">
-                    Product image
-                    pending
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {isDemo ? (
+        <ProductGallery
+          images={product.images}
+          productName={product.name}
+          badge={
+            isDemo ? (
               <span className="absolute left-0 top-4 bg-warning px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-background">
-                Demo product —
-                not for sale
+                Demo product — not for sale
               </span>
-            ) : null}
-          </div>
-
-          {product.images
-            .length > 1 ? (
-            <div className="mt-3 grid grid-cols-4 gap-2">
-              {product.images
-                .slice(
-                  0,
-                  4,
-                )
-                .map(
-                  (
-                    img,
-                    index,
-                  ) => (
-                    <div
-                      key={`${img.url ?? "image"}-${index}`}
-                      className="aspect-square overflow-hidden rounded border border-border"
-                    >
-                      <ProductImage
-                        url={
-                          img.url
-                        }
-                        alt={
-                          img.alt
-                        }
-                        className="h-full w-full"
-                      />
-                    </div>
-                  ),
-                )}
-            </div>
-          ) : null}
-        </div>
+            ) : null
+          }
+        />
 
         {/* ---------------------------------------------------------------- */}
         {/* PRODUCT INFORMATION                                              */}

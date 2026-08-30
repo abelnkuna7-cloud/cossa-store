@@ -16,6 +16,12 @@ import {
   type MemberRow,
   type ReviewProductRow,
 } from "@/services/moderation";
+import {
+  listEftReviewQueue,
+  reviewEftPayment,
+  type EftReviewPayment,
+} from "@/services/eft-payments";
+import { formatZar } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/admin/approvals")({
   head: () => ({
@@ -32,7 +38,7 @@ function ApprovalsPage() {
   return (
     <CatalogueShell
       title="Approvals dashboard"
-      description="Review listings submitted by catalogue managers and control who may submit products."
+      description="Review payment proofs and listings submitted by catalogue managers."
     >
       <AdminOnly />
     </CatalogueShell>
@@ -42,19 +48,154 @@ function ApprovalsPage() {
 function AdminOnly() {
   const access = useCatalogueAccess();
   if (access.loading) return <LoadingBlock label="Checking your access…" />;
-  if (!access.isAdmin) {
+  if (!access.isStaff) {
     return (
       <EmptyBlock
-        title="Administrators only"
-        description="Only cossa@cossanexusholdings.co.za and other administrators can approve listings."
+        title="Cossa staff only"
+        description="Only approved Cossa staff can review EFT payment proofs."
       />
     );
   }
   return (
     <div className="space-y-10">
-      <ReviewQueue />
-      <MemberAccess />
+      <PaymentReviewQueue />
+      {access.isAdmin ? (
+        <>
+          <ReviewQueue />
+          <MemberAccess />
+        </>
+      ) : null}
     </div>
+  );
+}
+
+function PaymentReviewQueue() {
+  const queryClient = useQueryClient();
+  const queue = useQuery({ queryKey: ["admin", "eft-review-queue"], queryFn: listEftReviewQueue });
+  const [notes, setNotes] = useState<Record<string, string>>({});
+
+  const review = useMutation({
+    mutationFn: (job: { paymentId: string; decision: "approve" | "reject"; reviewerNote: string }) =>
+      reviewEftPayment(job),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "eft-review-queue"] });
+      toast.success("Payment review recorded", { description: result.message });
+    },
+    onError: (error) =>
+      toast.error("Payment review could not be saved", {
+        description: error instanceof Error ? error.message : undefined,
+      }),
+  });
+
+  if (queue.isPending) return <LoadingBlock label="Loading payment proofs…" />;
+  if (queue.isError) return <ErrorBlock description="The payment-proof queue could not be loaded." />;
+
+  const payments = queue.data?.payments ?? [];
+
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">EFT payment proofs</h2>
+        <p className="text-sm text-muted-foreground">
+          Approve only after confirming the payment. Rejection keeps the order private and lets the customer upload a replacement proof.
+        </p>
+      </div>
+
+      {payments.length === 0 ? (
+        <EmptyBlock
+          title="No proofs awaiting review"
+          description="Customer proof uploads will appear here before fulfilment or digital access is activated."
+        />
+      ) : (
+        <ul className="space-y-3">
+          {payments.map((payment) => (
+            <PaymentReviewCard
+              key={payment.payment.id}
+              payment={payment}
+              busy={review.isPending}
+              note={notes[payment.payment.id] ?? ""}
+              onNote={(value) => setNotes((current) => ({ ...current, [payment.payment.id]: value }))}
+              onApprove={() =>
+                review.mutate({
+                  paymentId: payment.payment.id,
+                  decision: "approve",
+                  reviewerNote: notes[payment.payment.id] ?? "",
+                })
+              }
+              onReject={() =>
+                review.mutate({
+                  paymentId: payment.payment.id,
+                  decision: "reject",
+                  reviewerNote: notes[payment.payment.id] ?? "",
+                })
+              }
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function PaymentReviewCard({
+  payment,
+  busy,
+  note,
+  onNote,
+  onApprove,
+  onReject,
+}: {
+  payment: EftReviewPayment;
+  busy: boolean;
+  note: string;
+  onNote: (value: string) => void;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const order = payment.order;
+
+  return (
+    <li className="rounded-lg border border-border bg-card p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-medium">{payment.payment.reference}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {payment.payerEmail ?? "Customer email unavailable"} · {formatZar(payment.payment.amount)}
+          </p>
+          {order ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Order {order.orderNumber} · {order.items.length} {order.items.length === 1 ? "item" : "items"} · {order.requiresDelivery ? `delivery ${formatZar(order.shippingTotal)}` : "digital delivery"}
+            </p>
+          ) : null}
+          {payment.payerNote ? (
+            <p className="mt-3 rounded-md bg-secondary/50 px-3 py-2 text-sm">Customer note: {payment.payerNote}</p>
+          ) : null}
+        </div>
+        {payment.proofUrl ? (
+          <Button asChild size="sm" variant="outline">
+            <a href={payment.proofUrl} target="_blank" rel="noopener noreferrer">
+              Open proof
+            </a>
+          </Button>
+        ) : null}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Input
+          className="h-9 w-full sm:w-80"
+          placeholder="Reviewer note (required if rejecting)"
+          value={note}
+          maxLength={2000}
+          onChange={(event) => onNote(event.target.value)}
+        />
+        <Button size="sm" disabled={busy} onClick={onApprove}>
+          Approve payment
+        </Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={onReject}>
+          Reject proof
+        </Button>
+      </div>
+    </li>
   );
 }
 
