@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  checkoutQuoteFingerprint,
   deliveryAddressErrors,
   isCompleteDeliveryAddress,
   requiresPhysicalDelivery,
@@ -76,4 +77,27 @@ test("missing address information receives field-level errors", () => {
   assert.equal(errors.city, "City or town is required.");
   assert.equal(errors.region, "Select a South African province.");
   assert.equal(errors.zip, "Enter a valid four-digit postal code.");
+});
+
+test("changing an address or selected cart invalidates the browser delivery quote", () => {
+  const quoteFor = checkoutQuoteFingerprint({
+    cart: [{ product_id: "dm8363", variant_id: null, quantity: 1 }],
+    customerName: "Cossa Customer",
+    customerPhone: "082 000 0000",
+    deliveryAddress: completeAddress,
+  });
+  const changedAddress = checkoutQuoteFingerprint({
+    cart: [{ product_id: "dm8363", variant_id: null, quantity: 1 }],
+    customerName: "Cossa Customer",
+    customerPhone: "082 000 0000",
+    deliveryAddress: { ...completeAddress, zip: "2000" },
+  });
+  const changedCart = checkoutQuoteFingerprint({
+    cart: [{ product_id: "dm8363", variant_id: null, quantity: 2 }],
+    customerName: "Cossa Customer",
+    customerPhone: "082 000 0000",
+    deliveryAddress: completeAddress,
+  });
+  assert.notEqual(quoteFor, changedAddress);
+  assert.notEqual(quoteFor, changedCart);
 });

@@ -1,0 +1,275 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  CUSTOM_DELIVERY_QUOTE_REQUIRED,
+  DELIVERY_QUOTE_REQUIRED,
+  resolveConfiguredDeliveryGroup,
+  type ConfiguredDeliveryGroup,
+  type ConfiguredDeliveryRate,
+} from "../supabase/functions/_shared/configured-delivery.ts";
+
+const now = new Date("2026-08-30T10:00:00.000Z");
+const verifiedAt = "2026-08-29T10:00:00.000Z";
+
+const standardRate: ConfiguredDeliveryRate = {
+  id: "rate-standard",
+  supplierId: "dmc",
+  fulfilmentProfileId: "dmc-profile",
+  methodCode: "dmc_locker_to_door_xl",
+  customerLabel: "Locker-to-Door",
+  price: 179,
+  currency: "ZAR",
+  isActive: true,
+  customerSelectable: true,
+  isDefault: true,
+  classification: "standard",
+  eligibility: {
+    requires_dimensions: true,
+    requires_weight: true,
+    allowed_dimension_kinds: ["product", "packed_parcel"],
+    max_length_cm: 60,
+    max_width_cm: 41,
+    max_height_cm: 69,
+    max_weight_kg: 20,
+    max_rate_age_days: 90,
+  },
+  sourceUrl: "https://dmcwholesale.co.za/pages/wholesale-customer-terms-conditions",
+  sourceEvidence: "Verified DMC Locker-to-Door XL rate.",
+  verifiedAt,
+};
+
+function dmcGroup(overrides: Partial<ConfiguredDeliveryGroup> = {}): ConfiguredDeliveryGroup {
+  return {
+    supplierId: "dmc",
+    fulfilmentProfileId: "dmc-profile",
+    supplierIsActive: true,
+    fulfilmentProfileIsActive: true,
+    customerPaysDelivery: true,
+    rates: [standardRate],
+    items: [
+      {
+        productId: "dm8363",
+        quantity: 1,
+        measurements: {
+          lengthCm: 28,
+          widthCm: 21,
+          heightCm: 9,
+          weightKg: 1,
+          dimensionKind: "product",
+          dimensionsVerifiedAt: verifiedAt,
+          weightVerifiedAt: verifiedAt,
+        },
+      },
+    ],
+    ...overrides,
+  };
+}
+
+test("a verified eligible DMC DM8363 fixture receives one R179 Locker-to-Door quote", () => {
+  const delivery = resolveConfiguredDeliveryGroup(dmcGroup(), now);
+  assert.equal(delivery.status, "quoted");
+  if (delivery.status !== "quoted") return;
+  assert.equal(delivery.shippingMethod, "Locker-to-Door");
+  assert.equal(delivery.shippingTotal, 179);
+  // The checkout receives product prices only from the server. This fixture
+  // demonstrates the expected secure total for an authoritative R159 price.
+  assert.equal(159 + delivery.shippingTotal, 338);
+});
+
+test("missing or uncertain dimensions and weight never silently receive R179", () => {
+  const delivery = resolveConfiguredDeliveryGroup(
+    dmcGroup({
+      items: [
+        {
+          productId: "dm8363",
+          quantity: 1,
+          measurements: {
+            lengthCm: 28,
+            widthCm: 21,
+            heightCm: 9,
+            weightKg: null,
+            dimensionKind: "product",
+            dimensionsVerifiedAt: verifiedAt,
+            weightVerifiedAt: null,
+          },
+        },
+      ],
+    }),
+    now,
+  );
+  assert.equal(delivery.status, "quote_required");
+  if (delivery.status !== "quote_required") return;
+  assert.equal(delivery.reason, "missing_measurements");
+  assert.match(delivery.message, /Delivery quote required/i);
+});
+
+test("an order too large for the standard DMC rate blocks payment without a configured oversized rate", () => {
+  const delivery = resolveConfiguredDeliveryGroup(
+    dmcGroup({
+      items: [
+        {
+          productId: "large-item",
+          quantity: 1,
+          measurements: {
+            lengthCm: 80,
+            widthCm: 30,
+            heightCm: 20,
+            weightKg: 4,
+            dimensionKind: "packed_parcel",
+            dimensionsVerifiedAt: verifiedAt,
+            weightVerifiedAt: verifiedAt,
+          },
+        },
+      ],
+    }),
+    now,
+  );
+  assert.equal(delivery.status, "quote_required");
+  if (delivery.status !== "quote_required") return;
+  assert.equal(delivery.reason, "oversized_without_rate");
+  assert.equal(delivery.message, CUSTOM_DELIVERY_QUOTE_REQUIRED);
+});
+
+test("a separately verified oversized configuration is used only when it fits", () => {
+  const oversizedRate: ConfiguredDeliveryRate = {
+    ...standardRate,
+    id: "rate-oversized",
+    methodCode: "dmc_oversized_reviewed",
+    customerLabel: "Oversized delivery",
+    price: 349,
+    classification: "oversized",
+    eligibility: {
+      ...standardRate.eligibility,
+      max_length_cm: 100,
+      max_width_cm: 60,
+      max_height_cm: 60,
+      max_weight_kg: 30,
+    },
+  };
+  const delivery = resolveConfiguredDeliveryGroup(
+    dmcGroup({
+      rates: [standardRate, oversizedRate],
+      items: [
+        {
+          productId: "large-item",
+          quantity: 1,
+          measurements: {
+            lengthCm: 80,
+            widthCm: 30,
+            heightCm: 20,
+            weightKg: 4,
+            dimensionKind: "packed_parcel",
+            dimensionsVerifiedAt: verifiedAt,
+            weightVerifiedAt: verifiedAt,
+          },
+        },
+      ],
+    }),
+    now,
+  );
+  assert.equal(delivery.status, "quoted");
+  if (delivery.status !== "quoted") return;
+  assert.equal(delivery.shippingTotal, 349);
+  assert.equal(delivery.shippingMethod, "Oversized delivery");
+});
+
+test("multiple DMC products are conservatively combined and charged once", () => {
+  const delivery = resolveConfiguredDeliveryGroup(
+    dmcGroup({
+      items: [
+        dmcGroup().items[0],
+        {
+          productId: "second-dmc-product",
+          quantity: 1,
+          measurements: {
+            lengthCm: 10,
+            widthCm: 10,
+            heightCm: 10,
+            weightKg: 0.5,
+            dimensionKind: "packed_parcel",
+            dimensionsVerifiedAt: verifiedAt,
+            weightVerifiedAt: verifiedAt,
+          },
+        },
+      ],
+    }),
+    now,
+  );
+  assert.equal(delivery.status, "quoted");
+  if (delivery.status !== "quoted") return;
+  assert.equal(delivery.shippingTotal, 179);
+  assert.equal(delivery.parcel.itemQuantity, 2);
+  assert.equal(delivery.parcel.weightKg, 1.5);
+});
+
+test("combined DMC baskets with an unverified item require a quote", () => {
+  const delivery = resolveConfiguredDeliveryGroup(
+    dmcGroup({
+      items: [
+        dmcGroup().items[0],
+        {
+          productId: "unknown-dmc-product",
+          quantity: 1,
+          measurements: null,
+        },
+      ],
+    }),
+    now,
+  );
+  assert.equal(delivery.status, "quote_required");
+  if (delivery.status !== "quote_required") return;
+  assert.equal(delivery.reason, "missing_measurements");
+});
+
+test("inactive or stale rate configuration cannot create a delivery quote", () => {
+  const inactive = resolveConfiguredDeliveryGroup(
+    dmcGroup({ rates: [{ ...standardRate, isActive: false }] }),
+    now,
+  );
+  assert.equal(inactive.status, "quote_required");
+  if (inactive.status === "quote_required") {
+    assert.equal(inactive.reason, "invalid_or_stale_rate");
+  }
+
+  const stale = resolveConfiguredDeliveryGroup(
+    dmcGroup({ rates: [{ ...standardRate, verifiedAt: "2025-01-01T00:00:00.000Z" }] }),
+    now,
+  );
+  assert.equal(stale.status, "quote_required");
+  if (stale.status === "quote_required") {
+    assert.equal(stale.reason, "invalid_or_stale_rate");
+  }
+});
+
+test("a rate requiring destination verification stays blocked until the server has it", () => {
+  const rateRequiringAddress = {
+    ...standardRate,
+    eligibility: { ...standardRate.eligibility, requires_address_eligibility: true },
+  };
+  const unknown = resolveConfiguredDeliveryGroup(
+    dmcGroup({ rates: [rateRequiringAddress], addressEligibility: "unknown" }),
+    now,
+  );
+  assert.equal(unknown.status, "quote_required");
+  if (unknown.status === "quote_required") {
+    assert.equal(unknown.reason, "address_eligibility_unknown");
+    assert.match(unknown.message, /Delivery quote required/i);
+  }
+
+  const eligible = resolveConfiguredDeliveryGroup(
+    dmcGroup({ rates: [rateRequiringAddress], addressEligibility: "eligible" }),
+    now,
+  );
+  assert.equal(eligible.status, "quoted");
+});
+
+test("the resolver does not permit a customer-provided shipping price", () => {
+  const delivery = resolveConfiguredDeliveryGroup(dmcGroup(), now);
+  assert.equal(delivery.status, "quoted");
+  if (delivery.status !== "quoted") return;
+  // No client price exists in the resolver input. A browser can only receive
+  // this server-selected rate, so a fake R0/R999 field cannot affect R179.
+  assert.equal(delivery.shippingTotal, 179);
+  assert.equal(DELIVERY_QUOTE_REQUIRED, "Delivery quote required.");
+});

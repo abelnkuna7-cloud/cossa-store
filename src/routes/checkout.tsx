@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useSession } from "@/lib/auth";
 import { useCommerce } from "@/lib/commerce-store";
 import {
+  checkoutQuoteFingerprint,
   deliveryAddressErrors,
   isCompleteDeliveryAddress,
   requiresPhysicalDelivery,
@@ -116,7 +117,7 @@ function CheckoutPage() {
   const hasDeliveryAddress = isCompleteDeliveryAddress(deliveryAddress);
   const quoteFingerprint = useMemo(
     () =>
-      JSON.stringify({
+      checkoutQuoteFingerprint({
         cart: selectedCartLines,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
