@@ -9,6 +9,17 @@ const ALLOWED_ORIGINS = new Set([
 const PRINTIFY_BASE = "https://api.printify.com/v1";
 const PRINTIFY_SHOP_ID = "28233755";
 const DEFAULT_USD_ZAR = 16.0141;
+const SOUTH_AFRICAN_PROVINCES = new Set([
+  "Eastern Cape",
+  "Free State",
+  "Gauteng",
+  "KwaZulu-Natal",
+  "Limpopo",
+  "Mpumalanga",
+  "Northern Cape",
+  "North West",
+  "Western Cape",
+]);
 
 function cors(request: Request): HeadersInit {
   const origin = request.headers.get("origin");
@@ -47,10 +58,12 @@ function money(value: number) {
 type ShippingAddress = {
   address1: string;
   address2: string;
+  suburb: string;
   city: string;
   region: string;
   zip: string;
   country: "ZA";
+  deliveryInstructions: string;
 };
 
 type ResolvedCartLine = {
@@ -64,12 +77,32 @@ function readShippingAddress(value: unknown): ShippingAddress | null {
   const raw = value as Record<string, unknown>;
   const address1 = text(raw.address1, 180);
   const address2 = text(raw.address2, 180);
+  const suburb = text(raw.suburb, 100);
   const city = text(raw.city, 100);
   const region = text(raw.region, 100);
   const zip = text(raw.zip, 20);
   const country = text(raw.country, 2).toUpperCase();
-  if (!address1 || !city || !region || !zip || country !== "ZA") return null;
-  return { address1, address2, city, region, zip, country: "ZA" };
+  const deliveryInstructions = text(raw.deliveryInstructions, 500);
+  if (
+    address1.length < 4 ||
+    suburb.length < 2 ||
+    city.length < 2 ||
+    !SOUTH_AFRICAN_PROVINCES.has(region) ||
+    !/^\d{4}$/.test(zip) ||
+    country !== "ZA"
+  ) {
+    return null;
+  }
+  return {
+    address1,
+    address2,
+    suburb,
+    city,
+    region,
+    zip,
+    country: "ZA",
+    deliveryInstructions,
+  };
 }
 
 function splitName(fullName: string) {
@@ -89,32 +122,29 @@ async function printifyShipping(
   phone: string,
 ) {
   const { firstName, lastName } = splitName(customerName);
-  const response = await fetch(
-    `${PRINTIFY_BASE}/shops/${PRINTIFY_SHOP_ID}/orders/shipping.json`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        "User-Agent": "CossaStore/1.0",
-      },
-      body: JSON.stringify({
-        line_items: lineItems,
-        address_to: {
-          first_name: firstName,
-          last_name: lastName,
-          email,
-          phone,
-          country: address.country,
-          region: address.region,
-          address1: address.address1,
-          address2: address.address2,
-          city: address.city,
-          zip: address.zip,
-        },
-      }),
+  const response = await fetch(`${PRINTIFY_BASE}/shops/${PRINTIFY_SHOP_ID}/orders/shipping.json`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "User-Agent": "CossaStore/1.0",
     },
-  );
+    body: JSON.stringify({
+      line_items: lineItems,
+      address_to: {
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        phone,
+        country: address.country,
+        region: address.region,
+        address1: address.address1,
+        address2: address.address2,
+        city: address.city,
+        zip: address.zip,
+      },
+    }),
+  });
 
   const raw = await response.text();
   if (!response.ok) {
@@ -188,6 +218,13 @@ Deno.serve(async (request) => {
 
     stage = "cart_validation";
     const body = (await request.json()) as Record<string, unknown>;
+    const action =
+      body.action === "quote"
+        ? "quote"
+        : body.action === "create" || !body.action
+          ? "create"
+          : null;
+    if (!action) throw new Error("Unsupported checkout action.");
     const customerName = text(body.customerName, 140);
     const customerPhone = text(body.customerPhone, 40);
     const clientRequestId = text(body.clientRequestId, 64);
@@ -213,8 +250,10 @@ Deno.serve(async (request) => {
       variant_id: number;
       quantity: number;
     }> = [];
+    const unquotedPhysicalProducts: string[] = [];
     let requiresDelivery = false;
     let fxRate = DEFAULT_USD_ZAR;
+    let subtotal = 0;
 
     for (const line of cart) {
       stage = "product_validation";
@@ -230,7 +269,7 @@ Deno.serve(async (request) => {
       const { data: product, error: productError } = await admin
         .from("store_products")
         .select(
-          "id,name,status,product_type,fulfilment_model,supplier_name,supplier_product_ref,fx_rate_to_zar",
+          "id,name,status,product_type,fulfilment_model,supplier_name,supplier_product_ref,fx_rate_to_zar,price",
         )
         .eq("id", line.product_id)
         .maybeSingle();
@@ -245,13 +284,15 @@ Deno.serve(async (request) => {
         product.product_type !== "affiliate" &&
         product.fulfilment_model !== "affiliate";
       requiresDelivery ||= physical;
+      const productPrice = Number(product.price);
+      if (!Number.isFinite(productPrice) || productPrice <= 0) {
+        throw new Error(`${product.name}: a confirmed checkout price is not currently available.`);
+      }
+      subtotal = money(subtotal + productPrice * line.quantity);
 
       let resolvedVariantId = line.variant_id;
 
-      if (
-        product.supplier_name === "Printify" &&
-        product.fulfilment_model === "print_on_demand"
-      ) {
+      if (product.supplier_name === "Printify" && product.fulfilment_model === "print_on_demand") {
         if (!printifyToken) {
           throw new Error("Printify delivery quoting is temporarily unavailable.");
         }
@@ -309,32 +350,28 @@ Deno.serve(async (request) => {
         }
 
         fxRate =
-          Number(
-            variant.fx_rate_to_zar ?? product.fx_rate_to_zar ?? DEFAULT_USD_ZAR,
-          ) || DEFAULT_USD_ZAR;
+          Number(variant.fx_rate_to_zar ?? product.fx_rate_to_zar ?? DEFAULT_USD_ZAR) ||
+          DEFAULT_USD_ZAR;
         printifyLines.push({
           product_id: product.supplier_product_ref,
           variant_id: providerVariantId,
           quantity: line.quantity,
         });
+      } else if (physical) {
+        unquotedPhysicalProducts.push(product.name);
       }
 
       resolvedCart.push({
         product_id: product.id,
-        variant_id:
-          resolvedVariantId && uuid(resolvedVariantId) ? resolvedVariantId : null,
+        variant_id: resolvedVariantId && uuid(resolvedVariantId) ? resolvedVariantId : null,
         quantity: line.quantity,
       });
     }
 
     stage = "delivery_validation";
-    const shippingAddress = requiresDelivery
-      ? readShippingAddress(body.shippingAddress)
-      : null;
+    const shippingAddress = requiresDelivery ? readShippingAddress(body.shippingAddress) : null;
     if (requiresDelivery && !shippingAddress) {
-      throw new Error(
-        "Enter a complete South African delivery address for physical products.",
-      );
+      throw new Error("Enter a complete South African delivery address for physical products.");
     }
 
     let shippingTotal = 0;
@@ -351,6 +388,25 @@ Deno.serve(async (request) => {
       );
       shippingMethod = quote.method;
       shippingTotal = money((quote.centsUsd / 100) * fxRate);
+    }
+
+    if (unquotedPhysicalProducts.length) {
+      throw new Error(
+        "Delivery pricing is not configured for one or more physical products. A verified customer-paid delivery quote is required before an EFT payment request can be issued.",
+      );
+    }
+
+    const total = money(subtotal + shippingTotal);
+    if (action === "quote") {
+      return json(request, {
+        quote: {
+          subtotal,
+          shippingTotal,
+          shippingMethod: requiresDelivery ? shippingMethod : null,
+          requiresDelivery,
+          total,
+        },
+      });
     }
 
     stage = "eft_order_creation";
@@ -427,6 +483,8 @@ Deno.serve(async (request) => {
             orderStatus: order.status,
             subtotal: Number(order.subtotal ?? 0),
             shippingTotal: Number(order.shipping_total ?? 0),
+            shippingMethod: requiresDelivery ? shippingMethod : null,
+            requiresDelivery,
             total: Number(order.total),
             items: (order.store_order_items ?? []).map((item: any) => ({
               productName: item.product_name,
@@ -440,8 +498,7 @@ Deno.serve(async (request) => {
         : null,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Checkout could not be completed.";
+    const message = error instanceof Error ? error.message : "Checkout could not be completed.";
     console.error(`[store-eft-checkout] stage=${stage} error=${message}`);
     return json(request, { error: message, stage }, 400);
   }

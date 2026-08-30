@@ -6,7 +6,8 @@ export type EftPayment = {
   reference: string;
   amount: number;
   currency: "ZAR";
-  status: "awaiting_payment" | "proof_submitted" | "approved" | "rejected" | "expired" | "cancelled";
+  status:
+    "awaiting_payment" | "proof_submitted" | "approved" | "rejected" | "expired" | "cancelled";
   expiresAt: string;
   submittedAt: string | null;
   reviewedAt: string | null;
@@ -31,6 +32,8 @@ export type EftOrder = {
   orderStatus: string;
   subtotal: number;
   shippingTotal: number;
+  shippingMethod: string | null;
+  requiresDelivery: boolean;
   total: number;
   items: Array<{
     productName: string;
@@ -48,15 +51,27 @@ export type EftPaymentDetail = {
   order?: EftOrder;
 };
 
+export type StoreCheckoutQuote = {
+  quote: {
+    subtotal: number;
+    shippingTotal: number;
+    shippingMethod: string | null;
+    requiresDelivery: boolean;
+    total: number;
+  };
+};
+
 type CheckoutLine = { productId: string; variantId?: string | null; quantity: number };
 
 export type StoreShippingAddress = {
   address1: string;
   address2?: string;
+  suburb: string;
   city: string;
   region: string;
   zip: string;
   country: "ZA";
+  deliveryInstructions?: string;
 };
 
 async function errorMessage(error: unknown, data: unknown, fallback: string): Promise<string> {
@@ -88,7 +103,8 @@ async function errorMessage(error: unknown, data: unknown, fallback: string): Pr
 
 async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke("eft-payments", { body });
-  if (error) throw new Error(await errorMessage(error, data, "The EFT payment service is unavailable."));
+  if (error)
+    throw new Error(await errorMessage(error, data, "The EFT payment service is unavailable."));
   if (!data) throw new Error("The EFT payment service returned no result.");
   return data as T;
 }
@@ -99,7 +115,9 @@ function preserveVariantIdentity(cart: CheckoutLine[]): CheckoutLine[] {
   try {
     const raw = window.localStorage.getItem("cossa.commerce.v2");
     if (!raw) return cart;
-    const saved = JSON.parse(raw) as { cart?: Array<{ product_id?: unknown; variant_id?: unknown; quantity?: unknown }> };
+    const saved = JSON.parse(raw) as {
+      cart?: Array<{ product_id?: unknown; variant_id?: unknown; quantity?: unknown }>;
+    };
     if (!Array.isArray(saved.cart)) return cart;
 
     return cart.map((line) => {
@@ -114,9 +132,7 @@ function preserveVariantIdentity(cart: CheckoutLine[]): CheckoutLine[] {
       return {
         ...line,
         variantId:
-          typeof storedVariant === "string" && storedVariant.trim()
-            ? storedVariant.trim()
-            : null,
+          typeof storedVariant === "string" && storedVariant.trim() ? storedVariant.trim() : null,
       };
     });
   } catch {
@@ -131,11 +147,27 @@ export async function startStoreEftPayment(input: {
   clientRequestId: string;
   shippingAddress?: StoreShippingAddress;
 }): Promise<EftPaymentDetail> {
-  const payload = { ...input, cart: preserveVariantIdentity(input.cart) };
+  const payload = { action: "create", ...input, cart: preserveVariantIdentity(input.cart) };
   const { data, error } = await supabase.functions.invoke("store-eft-checkout", { body: payload });
-  if (error) throw new Error(await errorMessage(error, data, "The secure Store checkout is unavailable."));
+  if (error)
+    throw new Error(await errorMessage(error, data, "The secure Store checkout is unavailable."));
   if (!data) throw new Error("The secure Store checkout returned no result.");
   return data as EftPaymentDetail;
+}
+
+export async function quoteStoreEftCheckout(input: {
+  customerName: string;
+  customerPhone: string;
+  cart: CheckoutLine[];
+  clientRequestId: string;
+  shippingAddress?: StoreShippingAddress;
+}): Promise<StoreCheckoutQuote> {
+  const payload = { action: "quote", ...input, cart: preserveVariantIdentity(input.cart) };
+  const { data, error } = await supabase.functions.invoke("store-eft-checkout", { body: payload });
+  if (error)
+    throw new Error(await errorMessage(error, data, "The secure Store checkout is unavailable."));
+  if (!data) throw new Error("The secure Store checkout returned no delivery quote.");
+  return data as StoreCheckoutQuote;
 }
 
 export async function listMyEftPayments(): Promise<{ payments: EftPaymentDetail[] }> {
@@ -153,7 +185,10 @@ export async function submitEftProof(input: {
   body.set("payerNote", input.payerNote);
 
   const { data, error } = await supabase.functions.invoke("eft-payments", { body });
-  if (error) throw new Error(await errorMessage(error, data, "Your proof of payment could not be uploaded."));
+  if (error)
+    throw new Error(
+      await errorMessage(error, data, "Your proof of payment could not be uploaded."),
+    );
   if (!data) throw new Error("The payment service returned no result.");
   return data as { payment: EftPayment; message: string };
 }
