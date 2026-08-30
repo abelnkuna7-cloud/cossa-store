@@ -12,6 +12,8 @@ export const CUSTOM_DELIVERY_QUOTE_REQUIRED =
 
 export type DeliveryClassification = "standard" | "oversized";
 export type MeasurementKind = "product" | "packed_parcel";
+export type DeliveryOperationalState =
+  "STANDARD_RATE_ELIGIBLE" | "OVERSIZED_OR_SURCHARGE_REQUIRED" | "MANUAL_DELIVERY_QUOTE_REQUIRED";
 
 export type DeliveryRateEligibility = {
   requires_dimensions?: boolean;
@@ -21,6 +23,9 @@ export type DeliveryRateEligibility = {
   max_width_cm?: number;
   max_height_cm?: number;
   max_weight_kg?: number;
+  // Use this where a carrier states "under" a limit. For example, PUDO's
+  // 20 kg rule means 20 kg itself is not eligible.
+  max_weight_kg_exclusive?: number;
   max_rate_age_days?: number;
   // DMC's published rate warns that remote-area surcharges can apply. A rate
   // that requires this check must not be used until a trusted server-side
@@ -69,7 +74,7 @@ export type ConfiguredDeliveryGroup = {
   supplierIsActive: boolean;
   fulfilmentProfileIsActive: boolean;
   customerPaysDelivery: boolean;
-  addressEligibility?: "eligible" | "unknown" | "unsupported";
+  addressEligibility?: "eligible" | "unknown" | "surcharge_required" | "unsupported";
   items: ConfiguredDeliveryItem[];
   rates: ConfiguredDeliveryRate[];
 };
@@ -89,6 +94,7 @@ export type DeliveryResolution =
       parcel: ResolvedParcel;
       shippingTotal: number;
       shippingMethod: string;
+      operationalState: "STANDARD_RATE_ELIGIBLE" | "OVERSIZED_OR_SURCHARGE_REQUIRED";
     }
   | {
       status: "quote_required";
@@ -96,11 +102,13 @@ export type DeliveryResolution =
         | "inactive_supplier_or_profile"
         | "customer_payer_not_configured"
         | "address_eligibility_unknown"
+        | "remote_or_surcharge_required"
         | "invalid_or_stale_rate"
         | "missing_measurements"
         | "unsupported_measurements"
         | "oversized_without_rate";
       message: string;
+      operationalState: DeliveryOperationalState;
     };
 
 const money = (value: number) => Math.round(value * 100) / 100;
@@ -155,15 +163,19 @@ function rateBounds(rate: ConfiguredDeliveryRate) {
     !positive(requirements.max_length_cm) ||
     !positive(requirements.max_width_cm) ||
     !positive(requirements.max_height_cm) ||
-    !positive(requirements.max_weight_kg)
+    (!positive(requirements.max_weight_kg) && !positive(requirements.max_weight_kg_exclusive))
   ) {
     return null;
   }
-  return normalizedDimensions(
-    requirements.max_length_cm,
-    requirements.max_width_cm,
-    requirements.max_height_cm,
-  );
+  return {
+    dimensions: normalizedDimensions(
+      requirements.max_length_cm,
+      requirements.max_width_cm,
+      requirements.max_height_cm,
+    ),
+    maximumWeightKg: requirements.max_weight_kg,
+    exclusiveMaximumWeightKg: requirements.max_weight_kg_exclusive,
+  };
 }
 
 function resolveParcel(
@@ -232,19 +244,23 @@ function parcelFitsRate(parcel: ResolvedParcel, rate: ConfiguredDeliveryRate) {
   const bounds = rateBounds(rate);
   if (!bounds) return false;
   const parcelBounds = normalizedDimensions(parcel.lengthCm, parcel.widthCm, parcel.heightCm);
+  const weightFits = positive(bounds.exclusiveMaximumWeightKg)
+    ? parcel.weightKg < bounds.exclusiveMaximumWeightKg
+    : parcel.weightKg <= (bounds.maximumWeightKg ?? 0);
   return (
-    parcelBounds[0] <= bounds[0] &&
-    parcelBounds[1] <= bounds[1] &&
-    parcelBounds[2] <= bounds[2] &&
-    parcel.weightKg <= (rate.eligibility.max_weight_kg ?? 0)
+    parcelBounds[0] <= bounds.dimensions[0] &&
+    parcelBounds[1] <= bounds.dimensions[1] &&
+    parcelBounds[2] <= bounds.dimensions[2] &&
+    weightFits
   );
 }
 
 function quoteRequired(
   reason: Extract<DeliveryResolution, { status: "quote_required" }>["reason"],
   message: string,
+  operationalState: DeliveryOperationalState = "MANUAL_DELIVERY_QUOTE_REQUIRED",
 ): DeliveryResolution {
-  return { status: "quote_required", reason, message };
+  return { status: "quote_required", reason, message, operationalState };
 }
 
 /**
@@ -280,6 +296,16 @@ export function resolveConfiguredDeliveryGroup(
     standardRate.eligibility.requires_address_eligibility &&
     group.addressEligibility !== "eligible"
   ) {
+    if (
+      group.addressEligibility === "surcharge_required" ||
+      group.addressEligibility === "unsupported"
+    ) {
+      return quoteRequired(
+        "remote_or_surcharge_required",
+        CUSTOM_DELIVERY_QUOTE_REQUIRED,
+        "OVERSIZED_OR_SURCHARGE_REQUIRED",
+      );
+    }
     return quoteRequired(
       "address_eligibility_unknown",
       `${DELIVERY_QUOTE_REQUIRED} This destination needs a verified delivery eligibility check.`,
@@ -301,6 +327,7 @@ export function resolveConfiguredDeliveryGroup(
       parcel: parcelResult.parcel,
       shippingTotal: money(standardRate.price),
       shippingMethod: standardRate.customerLabel,
+      operationalState: "STANDARD_RATE_ELIGIBLE",
     };
   }
 
@@ -312,8 +339,13 @@ export function resolveConfiguredDeliveryGroup(
       parcel: parcelResult.parcel,
       shippingTotal: money(oversizedRate.price),
       shippingMethod: oversizedRate.customerLabel,
+      operationalState: "OVERSIZED_OR_SURCHARGE_REQUIRED",
     };
   }
 
-  return quoteRequired("oversized_without_rate", CUSTOM_DELIVERY_QUOTE_REQUIRED);
+  return quoteRequired(
+    "oversized_without_rate",
+    CUSTOM_DELIVERY_QUOTE_REQUIRED,
+    "OVERSIZED_OR_SURCHARGE_REQUIRED",
+  );
 }

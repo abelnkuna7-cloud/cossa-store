@@ -31,7 +31,7 @@ const standardRate: ConfiguredDeliveryRate = {
     max_length_cm: 60,
     max_width_cm: 41,
     max_height_cm: 69,
-    max_weight_kg: 20,
+    max_weight_kg_exclusive: 20,
     max_rate_age_days: 90,
   },
   sourceUrl: "https://dmcwholesale.co.za/pages/wholesale-customer-terms-conditions",
@@ -72,6 +72,7 @@ test("a verified eligible DMC DM8363 fixture receives one R179 Locker-to-Door qu
   if (delivery.status !== "quoted") return;
   assert.equal(delivery.shippingMethod, "Locker-to-Door");
   assert.equal(delivery.shippingTotal, 179);
+  assert.equal(delivery.operationalState, "STANDARD_RATE_ELIGIBLE");
   // The checkout receives product prices only from the server. This fixture
   // demonstrates the expected secure total for an authoritative R159 price.
   assert.equal(159 + delivery.shippingTotal, 338);
@@ -101,6 +102,7 @@ test("missing or uncertain dimensions and weight never silently receive R179", (
   assert.equal(delivery.status, "quote_required");
   if (delivery.status !== "quote_required") return;
   assert.equal(delivery.reason, "missing_measurements");
+  assert.equal(delivery.operationalState, "MANUAL_DELIVERY_QUOTE_REQUIRED");
   assert.match(delivery.message, /Delivery quote required/i);
 });
 
@@ -129,6 +131,7 @@ test("an order too large for the standard DMC rate blocks payment without a conf
   if (delivery.status !== "quote_required") return;
   assert.equal(delivery.reason, "oversized_without_rate");
   assert.equal(delivery.message, CUSTOM_DELIVERY_QUOTE_REQUIRED);
+  assert.equal(delivery.operationalState, "OVERSIZED_OR_SURCHARGE_REQUIRED");
 });
 
 test("a separately verified oversized configuration is used only when it fits", () => {
@@ -144,7 +147,7 @@ test("a separately verified oversized configuration is used only when it fits", 
       max_length_cm: 100,
       max_width_cm: 60,
       max_height_cm: 60,
-      max_weight_kg: 30,
+      max_weight_kg_exclusive: 30,
     },
   };
   const delivery = resolveConfiguredDeliveryGroup(
@@ -172,6 +175,7 @@ test("a separately verified oversized configuration is used only when it fits", 
   if (delivery.status !== "quoted") return;
   assert.equal(delivery.shippingTotal, 349);
   assert.equal(delivery.shippingMethod, "Oversized delivery");
+  assert.equal(delivery.operationalState, "OVERSIZED_OR_SURCHARGE_REQUIRED");
 });
 
 test("multiple DMC products are conservatively combined and charged once", () => {
@@ -201,6 +205,7 @@ test("multiple DMC products are conservatively combined and charged once", () =>
   assert.equal(delivery.shippingTotal, 179);
   assert.equal(delivery.parcel.itemQuantity, 2);
   assert.equal(delivery.parcel.weightKg, 1.5);
+  assert.equal(delivery.operationalState, "STANDARD_RATE_ELIGIBLE");
 });
 
 test("combined DMC baskets with an unverified item require a quote", () => {
@@ -255,6 +260,7 @@ test("a rate requiring destination verification stays blocked until the server h
   if (unknown.status === "quote_required") {
     assert.equal(unknown.reason, "address_eligibility_unknown");
     assert.match(unknown.message, /Delivery quote required/i);
+    assert.equal(unknown.operationalState, "MANUAL_DELIVERY_QUOTE_REQUIRED");
   }
 
   const eligible = resolveConfiguredDeliveryGroup(
@@ -262,6 +268,71 @@ test("a rate requiring destination verification stays blocked until the server h
     now,
   );
   assert.equal(eligible.status, "quoted");
+});
+
+test("PUDO's under-20-kg limit rejects a parcel at exactly 20 kg", () => {
+  const underTwenty = resolveConfiguredDeliveryGroup(
+    dmcGroup({
+      items: [
+        {
+          productId: "verified-light-parcel",
+          quantity: 1,
+          measurements: {
+            lengthCm: 28,
+            widthCm: 21,
+            heightCm: 9,
+            weightKg: 19.999,
+            dimensionKind: "packed_parcel",
+            dimensionsVerifiedAt: verifiedAt,
+            weightVerifiedAt: verifiedAt,
+          },
+        },
+      ],
+    }),
+    now,
+  );
+  assert.equal(underTwenty.status, "quoted");
+
+  const exactlyTwenty = resolveConfiguredDeliveryGroup(
+    dmcGroup({
+      items: [
+        {
+          productId: "limit-parcel",
+          quantity: 1,
+          measurements: {
+            lengthCm: 28,
+            widthCm: 21,
+            heightCm: 9,
+            weightKg: 20,
+            dimensionKind: "packed_parcel",
+            dimensionsVerifiedAt: verifiedAt,
+            weightVerifiedAt: verifiedAt,
+          },
+        },
+      ],
+    }),
+    now,
+  );
+  assert.equal(exactlyTwenty.status, "quote_required");
+  if (exactlyTwenty.status === "quote_required") {
+    assert.equal(exactlyTwenty.operationalState, "OVERSIZED_OR_SURCHARGE_REQUIRED");
+  }
+});
+
+test("a confirmed remote surcharge maps to the surcharge state, not a guessed rate", () => {
+  const rateRequiringAddress = {
+    ...standardRate,
+    eligibility: { ...standardRate.eligibility, requires_address_eligibility: true },
+  };
+  const delivery = resolveConfiguredDeliveryGroup(
+    dmcGroup({ rates: [rateRequiringAddress], addressEligibility: "surcharge_required" }),
+    now,
+  );
+  assert.equal(delivery.status, "quote_required");
+  if (delivery.status !== "quote_required") return;
+  assert.equal(delivery.reason, "remote_or_surcharge_required");
+  assert.equal(delivery.operationalState, "OVERSIZED_OR_SURCHARGE_REQUIRED");
+  assert.equal(delivery.message, CUSTOM_DELIVERY_QUOTE_REQUIRED);
 });
 
 test("the resolver does not permit a customer-provided shipping price", () => {

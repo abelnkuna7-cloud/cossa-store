@@ -71,10 +71,12 @@ revoke all on table public.store_product_delivery_attributes from public, anon, 
 grant select, insert, update, delete on table public.store_delivery_rate_configurations to service_role;
 grant select, insert, update, delete on table public.store_product_delivery_attributes to service_role;
 
--- Only the published DMC Locker-to-Door XL charge is configured. DMC's terms
--- warn that surcharges may apply, so an address must be verified server-side
--- before this active rate may be quoted. Locker-to-Locker, kiosk delivery and
--- Bundle-Up are deliberately not seeded/customer-selectable.
+-- Only the verified base DMC Locker-to-Door XL charge is configured. DMC/PUDO
+-- evidence requires a parcel to fit a PUDO locker and weigh *under* 20 kg.
+-- DMC also warns that larger parcels and remote destinations can incur a
+-- surcharge, so a trusted address check must pass before this rate is quoted.
+-- Locker-to-Locker, kiosk delivery and Bundle-Up are deliberately not
+-- seeded/customer-selectable.
 insert into public.store_delivery_rate_configurations (
   organisation_id,
   supplier_id,
@@ -112,14 +114,17 @@ select
     'max_length_cm', 60,
     'max_width_cm', 41,
     'max_height_cm', 69,
-    'max_weight_kg', 20,
+    'max_weight_kg_exclusive', 20,
     'max_rate_age_days', 90,
-    'requires_address_eligibility', true
+    'requires_address_eligibility', true,
+    'parcel_eligibility', 'XL PUDO-box eligible parcel that fits a PUDO locker',
+    'base_rate_scope', 'Locker-to-Door base rate only',
+    'surcharge_condition', 'Larger parcels or remote destinations may incur a surcharge'
   ),
   'https://dmcwholesale.co.za/pages/wholesale-customer-terms-conditions',
-  'DMC lists Locker to Door at R179 for an XL box and notes that surcharges may apply; PUDO XL limits are 60 x 41 x 69 cm and 20 kg.',
+  'Current DMC delivery policy: Locker-to-Door base rate is R179 for an XL PUDO box; larger boxes and remote destinations may incur a surcharge. Current PUDO policy: parcel must fit a PUDO locker and weigh under 20 kg. Supporting policy: https://mail.pudo.co.za/faq.php',
   now(),
-  'Customer-paid DMC rate. Quote only after verified dimensions, weight and destination eligibility. No oversized rate is configured; custom quote is required when the standard route cannot be verified.'
+  'Customer-paid DMC base rate. Quote only after verified dimensions, packed weight and destination eligibility. No oversized rate is configured; a larger parcel, surcharge-required destination, or missing weight/destination evidence requires a manual delivery quote.'
 from public.store_fulfilment_profiles f
 join public.store_suppliers s on s.id = f.supplier_id
 where f.profile_code = 'dmc-sa-customer-paid'
@@ -163,7 +168,7 @@ select
   'https://dmcwholesale.co.za/products/portable-small-gadget-bag',
   'Supplier page lists Size: 28 x 21 x 9 cm.',
   now(),
-  'Supplier page does not provide a verified packed weight. Do not apply a fixed delivery charge until weight and destination eligibility are verified.'
+  'Supplier page does not provide a verified packed weight. Do not apply the R179 base delivery charge until packed weight (under 20 kg) and destination eligibility are verified.'
 from public.store_products p
 where p.supplier_product_ref = 'DM8363'
 on conflict (store_product_id) do update
