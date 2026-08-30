@@ -28,11 +28,9 @@ const standardRate: ConfiguredDeliveryRate = {
     requires_dimensions: true,
     requires_weight: true,
     allowed_dimension_kinds: ["product", "packed_parcel"],
-    max_length_cm: 60,
-    max_width_cm: 41,
-    max_height_cm: 69,
     max_weight_kg_exclusive: 20,
     max_rate_age_days: 90,
+    requires_address_eligibility: true,
   },
   sourceUrl: "https://dmcwholesale.co.za/pages/wholesale-customer-terms-conditions",
   sourceEvidence: "Verified DMC Locker-to-Door XL rate.",
@@ -46,6 +44,7 @@ function dmcGroup(overrides: Partial<ConfiguredDeliveryGroup> = {}): ConfiguredD
     supplierIsActive: true,
     fulfilmentProfileIsActive: true,
     customerPaysDelivery: true,
+    addressEligibility: "eligible",
     rates: [standardRate],
     items: [
       {
@@ -66,7 +65,7 @@ function dmcGroup(overrides: Partial<ConfiguredDeliveryGroup> = {}): ConfiguredD
   };
 }
 
-test("a verified eligible DMC DM8363 fixture receives one R179 Locker-to-Door quote", () => {
+test("an admin-confirmed eligible DMC fixture receives one R179 Locker-to-Door quote", () => {
   const delivery = resolveConfiguredDeliveryGroup(dmcGroup(), now);
   assert.equal(delivery.status, "quoted");
   if (delivery.status !== "quoted") return;
@@ -106,9 +105,31 @@ test("missing or uncertain dimensions and weight never silently receive R179", (
   assert.match(delivery.message, /Delivery quote required/i);
 });
 
+test("no unverified numeric locker dimensions are needed after staff confirms parcel fit", () => {
+  const delivery = resolveConfiguredDeliveryGroup(dmcGroup(), now);
+  assert.equal("max_length_cm" in standardRate.eligibility, false);
+  assert.equal("max_width_cm" in standardRate.eligibility, false);
+  assert.equal("max_height_cm" in standardRate.eligibility, false);
+  assert.equal(delivery.status, "quoted");
+  if (delivery.status !== "quoted") return;
+  assert.equal(delivery.shippingTotal, 179);
+});
+
 test("an order too large for the standard DMC rate blocks payment without a configured oversized rate", () => {
+  const boundedFixtureRate = {
+    ...standardRate,
+    eligibility: {
+      ...standardRate.eligibility,
+      // Test-only dimensions model a carrier rule that has actually supplied
+      // limits. Production DMC configuration deliberately has none.
+      max_length_cm: 60,
+      max_width_cm: 41,
+      max_height_cm: 69,
+    },
+  };
   const delivery = resolveConfiguredDeliveryGroup(
     dmcGroup({
+      rates: [boundedFixtureRate],
       items: [
         {
           productId: "large-item",
@@ -135,6 +156,15 @@ test("an order too large for the standard DMC rate blocks payment without a conf
 });
 
 test("a separately verified oversized configuration is used only when it fits", () => {
+  const boundedStandardRate: ConfiguredDeliveryRate = {
+    ...standardRate,
+    eligibility: {
+      ...standardRate.eligibility,
+      max_length_cm: 60,
+      max_width_cm: 41,
+      max_height_cm: 69,
+    },
+  };
   const oversizedRate: ConfiguredDeliveryRate = {
     ...standardRate,
     id: "rate-oversized",
@@ -152,7 +182,7 @@ test("a separately verified oversized configuration is used only when it fits", 
   };
   const delivery = resolveConfiguredDeliveryGroup(
     dmcGroup({
-      rates: [standardRate, oversizedRate],
+      rates: [boundedStandardRate, oversizedRate],
       items: [
         {
           productId: "large-item",

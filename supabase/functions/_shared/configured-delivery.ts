@@ -159,20 +159,29 @@ function normalizedDimensions(lengthCm: number, widthCm: number, heightCm: numbe
 
 function rateBounds(rate: ConfiguredDeliveryRate) {
   const requirements = rate.eligibility;
-  if (
-    !positive(requirements.max_length_cm) ||
-    !positive(requirements.max_width_cm) ||
-    !positive(requirements.max_height_cm) ||
-    (!positive(requirements.max_weight_kg) && !positive(requirements.max_weight_kg_exclusive))
-  ) {
+  if (!positive(requirements.max_weight_kg) && !positive(requirements.max_weight_kg_exclusive)) {
     return null;
   }
+
+  const dimensionLimits = [
+    requirements.max_length_cm,
+    requirements.max_width_cm,
+    requirements.max_height_cm,
+  ];
+  const hasAnyDimensionLimit = dimensionLimits.some(positive);
+  // A carrier can require that a parcel fits a locker without publishing an
+  // exact internal dimension. In that case the staff confirmation is the
+  // evidence of fit; never manufacture a numeric limit in code.
+  if (hasAnyDimensionLimit && !dimensionLimits.every(positive)) return null;
+
   return {
-    dimensions: normalizedDimensions(
-      requirements.max_length_cm,
-      requirements.max_width_cm,
-      requirements.max_height_cm,
-    ),
+    dimensions: hasAnyDimensionLimit
+      ? normalizedDimensions(
+          requirements.max_length_cm!,
+          requirements.max_width_cm!,
+          requirements.max_height_cm!,
+        )
+      : null,
     maximumWeightKg: requirements.max_weight_kg,
     exclusiveMaximumWeightKg: requirements.max_weight_kg_exclusive,
   };
@@ -248,9 +257,10 @@ function parcelFitsRate(parcel: ResolvedParcel, rate: ConfiguredDeliveryRate) {
     ? parcel.weightKg < bounds.exclusiveMaximumWeightKg
     : parcel.weightKg <= (bounds.maximumWeightKg ?? 0);
   return (
-    parcelBounds[0] <= bounds.dimensions[0] &&
-    parcelBounds[1] <= bounds.dimensions[1] &&
-    parcelBounds[2] <= bounds.dimensions[2] &&
+    (!bounds.dimensions ||
+      (parcelBounds[0] <= bounds.dimensions[0] &&
+        parcelBounds[1] <= bounds.dimensions[1] &&
+        parcelBounds[2] <= bounds.dimensions[2])) &&
     weightFits
   );
 }

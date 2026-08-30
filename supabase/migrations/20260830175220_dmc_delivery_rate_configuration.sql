@@ -63,13 +63,67 @@ create table if not exists public.store_product_delivery_attributes (
   )
 );
 
+-- A staff-confirmed quote is deliberately scoped to the exact server-resolved
+-- cart and delivery address. It holds operational evidence only; it is never
+-- readable or writable from the customer-facing Data API.
+create table if not exists public.store_delivery_quote_confirmations (
+  id uuid primary key default gen_random_uuid(),
+  organisation_id uuid not null,
+  supplier_id uuid not null references public.store_suppliers(id) on delete restrict,
+  fulfilment_profile_id uuid not null references public.store_fulfilment_profiles(id) on delete restrict,
+  rate_configuration_id uuid references public.store_delivery_rate_configurations(id) on delete restrict,
+  cart_fingerprint text not null check (cart_fingerprint ~ '^[a-f0-9]{64}$'),
+  address_fingerprint text not null check (address_fingerprint ~ '^[a-f0-9]{64}$'),
+  eligibility_classification text not null check (
+    eligibility_classification in (
+      'STANDARD_RATE_ELIGIBLE',
+      'OVERSIZED_OR_SURCHARGE_REQUIRED',
+      'MANUAL_DELIVERY_QUOTE_REQUIRED'
+    )
+  ),
+  delivery_method text,
+  delivery_amount numeric(12,2) check (delivery_amount is null or delivery_amount >= 0),
+  currency text check (currency is null or currency = 'ZAR'),
+  evidence_note text not null check (length(trim(evidence_note)) between 3 and 2000),
+  verified_by uuid not null references auth.users(id) on delete restrict,
+  verified_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  check (
+    (
+      eligibility_classification = 'STANDARD_RATE_ELIGIBLE'
+      and rate_configuration_id is not null
+      and delivery_method is not null
+      and delivery_amount is not null
+      and currency = 'ZAR'
+    )
+    or (
+      eligibility_classification <> 'STANDARD_RATE_ELIGIBLE'
+      and delivery_amount is null
+    )
+  )
+);
+
+create index if not exists store_delivery_quote_confirmations_lookup_idx
+  on public.store_delivery_quote_confirmations (
+    fulfilment_profile_id,
+    cart_fingerprint,
+    address_fingerprint,
+    is_active,
+    expires_at desc
+  );
+
 alter table public.store_delivery_rate_configurations enable row level security;
 alter table public.store_product_delivery_attributes enable row level security;
+alter table public.store_delivery_quote_confirmations enable row level security;
 
 revoke all on table public.store_delivery_rate_configurations from public, anon, authenticated;
 revoke all on table public.store_product_delivery_attributes from public, anon, authenticated;
+revoke all on table public.store_delivery_quote_confirmations from public, anon, authenticated;
 grant select, insert, update, delete on table public.store_delivery_rate_configurations to service_role;
 grant select, insert, update, delete on table public.store_product_delivery_attributes to service_role;
+grant select, insert, update, delete on table public.store_delivery_quote_confirmations to service_role;
 
 -- Only the verified base DMC Locker-to-Door XL charge is configured. DMC/PUDO
 -- evidence requires a parcel to fit a PUDO locker and weigh *under* 20 kg.
@@ -111,9 +165,6 @@ select
     'requires_dimensions', true,
     'requires_weight', true,
     'allowed_dimension_kinds', jsonb_build_array('product', 'packed_parcel'),
-    'max_length_cm', 60,
-    'max_width_cm', 41,
-    'max_height_cm', 69,
     'max_weight_kg_exclusive', 20,
     'max_rate_age_days', 90,
     'requires_address_eligibility', true,
@@ -124,7 +175,7 @@ select
   'https://dmcwholesale.co.za/pages/wholesale-customer-terms-conditions',
   'Current DMC delivery policy: Locker-to-Door base rate is R179 for an XL PUDO box; larger boxes and remote destinations may incur a surcharge. Current PUDO policy: parcel must fit a PUDO locker and weigh under 20 kg. Supporting policy: https://mail.pudo.co.za/faq.php',
   now(),
-  'Customer-paid DMC base rate. Quote only after verified dimensions, packed weight and destination eligibility. No oversized rate is configured; a larger parcel, surcharge-required destination, or missing weight/destination evidence requires a manual delivery quote.'
+  'Customer-paid DMC base rate. Quote only after verified dimensions, packed weight and staff-held evidence that the exact parcel fits an applicable PUDO locker and the destination is eligible. No numeric locker dimensions are configured because none are verified. No oversized rate is configured; a larger parcel, surcharge-required destination, or missing weight/destination evidence requires a manual delivery quote.'
 from public.store_fulfilment_profiles f
 join public.store_suppliers s on s.id = f.supplier_id
 where f.profile_code = 'dmc-sa-customer-paid'
