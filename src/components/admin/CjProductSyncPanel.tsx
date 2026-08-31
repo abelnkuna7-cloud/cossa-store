@@ -42,6 +42,7 @@ type CjPreview = {
     freightUsd: number | null;
     landedCostZar: number | null;
     bufferedCostZar: number | null;
+    minimumSellingPriceZar: number | null;
     proposedSellingPriceZar: number | null;
     grossProfitZar: number | null;
     grossMargin: number | null;
@@ -268,6 +269,10 @@ export function CjProductSyncPanel({ onSynced }: { onSynced?: () => void }) {
             <Metric label="Supplier cost" value={usd(preview.pricing.supplierCostUsd)} />
             <Metric label="ZA freight" value={usd(preview.pricing.freightUsd)} />
             <Metric label="Landed cost" value={zar(preview.pricing.landedCostZar)} />
+            <Metric
+              label="Minimum protected price"
+              value={zar(preview.pricing.minimumSellingPriceZar)}
+            />
             <Metric label="Proposed price" value={zar(preview.pricing.proposedSellingPriceZar)} />
             <Metric label="Gross profit" value={zar(preview.pricing.grossProfitZar)} />
             <Metric

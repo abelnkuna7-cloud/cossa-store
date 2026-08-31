@@ -3,7 +3,9 @@ import test from "node:test";
 
 import {
   CJ_PROTECTED_PRICING,
+  calculateCjCommercialPreview,
   cjDraftDecision,
+  meetsProtectedMargin,
   qualifyCjCandidate,
   type CjQualificationInput,
 } from "../supabase/functions/_shared/cj-qualification.ts";
@@ -52,7 +54,46 @@ test("eligible CJ candidate produces a protected 35% review preview", () => {
   assert.equal(result.pricing.targetGrossMargin, CJ_PROTECTED_PRICING.targetGrossMargin);
   assert.equal(result.pricing.landedCostZar, 148.5);
   assert.equal(result.pricing.proposedSellingPriceZar, 289.9);
-  assert.ok((result.pricing.grossMargin ?? 0) >= 0.35);
+  assert.equal(
+    meetsProtectedMargin(
+      result.pricing.proposedSellingPriceZar ?? 0,
+      result.pricing.bufferedCostZar ?? 0,
+    ),
+    true,
+  );
+});
+
+test("a just-below-target psychological price is repriced rather than approved", () => {
+  const pricing = calculateCjCommercialPreview(1.83, 8.34);
+  assert.equal(pricing.bufferedCostZar, 207.95);
+  assert.equal(pricing.minimumSellingPriceZar, 319.93);
+  assert.equal(meetsProtectedMargin(319.9, pricing.bufferedCostZar), false);
+  assert.equal(pricing.proposedSellingPriceZar, 329.9);
+  assert.equal(
+    meetsProtectedMargin(pricing.proposedSellingPriceZar, pricing.bufferedCostZar),
+    true,
+  );
+});
+
+test("an exact target margin passes without relying on a rounded display", () => {
+  assert.equal(meetsProtectedMargin(100, 65), true);
+  assert.equal(meetsProtectedMargin(99.99, 65), false);
+});
+
+test("a displayed 35.0% margin still fails when its server-side value is below target", () => {
+  const displayedMargin = ((319.9 - 207.95) / 319.9) * 100;
+  assert.equal(displayedMargin.toFixed(1), "35.0");
+  assert.equal(meetsProtectedMargin(319.9, 207.95), false);
+});
+
+test("the selected psychological price is always at or above the exact protected minimum", () => {
+  const pricing = calculateCjCommercialPreview(1.83, 8.34);
+  assert.ok(pricing.proposedSellingPriceZar >= pricing.minimumSellingPriceZar);
+  assert.equal((pricing.proposedSellingPriceZar % 10).toFixed(2), "9.90");
+  assert.equal(
+    meetsProtectedMargin(pricing.proposedSellingPriceZar, pricing.bufferedCostZar),
+    true,
+  );
 });
 
 test("shipping uncertainty is held for review rather than commercially rejected", () => {

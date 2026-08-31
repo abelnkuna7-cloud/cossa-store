@@ -60,6 +60,7 @@ export type CjQualificationPreview = CjQualificationInput & {
     freightUsd: number | null;
     landedCostZar: number | null;
     bufferedCostZar: number | null;
+    minimumSellingPriceZar: number | null;
     proposedSellingPriceZar: number | null;
     grossProfitZar: number | null;
     grossMargin: number | null;
@@ -81,9 +82,34 @@ function rounded(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function psychologicalPrice(value: number): number {
-  const ten = Math.ceil(value / 10) * 10;
-  return Math.max(49.9, rounded(ten - 0.1));
+function asCents(value: number): number {
+  return Math.round(value * 100);
+}
+
+function targetMarginBasisPoints(): number {
+  return Math.round(CJ_PROTECTED_PRICING.targetGrossMargin * 10_000);
+}
+
+export function meetsProtectedMargin(sellingPriceZar: number, bufferedCostZar: number): boolean {
+  const sellingCents = asCents(sellingPriceZar);
+  const bufferedCostCents = asCents(bufferedCostZar);
+  if (sellingCents <= 0 || bufferedCostCents < 0) return false;
+
+  return (sellingCents - bufferedCostCents) * 10_000 >= sellingCents * targetMarginBasisPoints();
+}
+
+function minimumSellingPrice(bufferedCostZar: number): number {
+  const bufferedCostCents = asCents(bufferedCostZar);
+  const remainingMarginBasisPoints = 10_000 - targetMarginBasisPoints();
+  const minimumCents = Math.ceil((bufferedCostCents * 10_000) / remainingMarginBasisPoints);
+  return minimumCents / 100;
+}
+
+function approvedPsychologicalPriceAtOrAbove(minimumSellingPriceZar: number): number {
+  const minimumCents = Math.max(asCents(minimumSellingPriceZar), 4_990);
+  let psychologicalCents = Math.ceil(minimumCents / 1_000) * 1_000 - 10;
+  if (psychologicalCents < minimumCents) psychologicalCents += 1_000;
+  return psychologicalCents / 100;
 }
 
 export function calculateCjCommercialPreview(supplierCostUsd: number, freightUsd: number) {
@@ -92,14 +118,14 @@ export function calculateCjCommercialPreview(supplierCostUsd: number, freightUsd
     landedCostZar * (1 + CJ_PROTECTED_PRICING.riskBufferRate) +
       CJ_PROTECTED_PRICING.fixedOrderBufferZar,
   );
-  const proposedSellingPriceZar = psychologicalPrice(
-    bufferedCostZar / (1 - CJ_PROTECTED_PRICING.targetGrossMargin),
-  );
+  const minimumSellingPriceZar = minimumSellingPrice(bufferedCostZar);
+  const proposedSellingPriceZar = approvedPsychologicalPriceAtOrAbove(minimumSellingPriceZar);
   const grossProfitZar = rounded(proposedSellingPriceZar - bufferedCostZar);
   const grossMargin = grossProfitZar / proposedSellingPriceZar;
   return {
     landedCostZar,
     bufferedCostZar,
+    minimumSellingPriceZar,
     proposedSellingPriceZar,
     grossProfitZar,
     grossMargin,
@@ -146,7 +172,9 @@ export function qualifyCjCandidate(input: CjQualificationInput): CjQualification
   } else if (commercial.proposedSellingPriceZar > CJ_PROTECTED_PRICING.maxRetailZar) {
     outcome = "REVIEW_PRICING";
     reasons.push("The protected proposed selling price exceeds the configured CJ review ceiling.");
-  } else if (commercial.grossMargin < CJ_PROTECTED_PRICING.targetGrossMargin) {
+  } else if (
+    !meetsProtectedMargin(commercial.proposedSellingPriceZar, commercial.bufferedCostZar)
+  ) {
     outcome = "REJECTED_LOW_MARGIN";
     reasons.push("The calculated gross margin is below Cossa's 35% target margin.");
   } else {
@@ -172,6 +200,7 @@ export function qualifyCjCandidate(input: CjQualificationInput): CjQualification
       freightUsd,
       landedCostZar: commercial?.landedCostZar ?? null,
       bufferedCostZar: commercial?.bufferedCostZar ?? null,
+      minimumSellingPriceZar: commercial?.minimumSellingPriceZar ?? null,
       proposedSellingPriceZar: commercial?.proposedSellingPriceZar ?? null,
       grossProfitZar: commercial?.grossProfitZar ?? null,
       grossMargin: commercial?.grossMargin ?? null,
