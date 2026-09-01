@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   Building2,
@@ -207,7 +207,7 @@ function Hero() {
     <section className="border-b border-primary/20 bg-background">
       <div className="mx-auto grid max-w-7xl gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:grid-cols-[1.55fr_.85fr] lg:px-8">
         <div className="relative isolate min-h-[390px] overflow-hidden rounded-2xl border border-primary/25 sm:min-h-[420px] lg:min-h-[455px]">
-          <img src={companyConfig.backgrounds.heroEagle} alt="" width={1146} height={1368} fetchPriority="high" decoding="async" className="absolute inset-0 h-full w-full object-cover object-center" />
+          <HeroBackground />
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-black/30" aria-hidden />
           <div className="relative flex min-h-[390px] max-w-2xl flex-col justify-center p-5 sm:min-h-[420px] sm:p-8 lg:min-h-[455px] lg:p-10">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Products · Projects · Business procurement</p>
@@ -239,6 +239,39 @@ function Hero() {
         </div>
       </div>
     </section>
+  );
+}
+
+function HeroBackground() {
+  const [motionAllowed, setMotionAllowed] = useState(false);
+
+  useEffect(() => {
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updateMotionPreference = () => setMotionAllowed(!reducedMotion.matches);
+
+    updateMotionPreference();
+    reducedMotion.addEventListener("change", updateMotionPreference);
+    return () => reducedMotion.removeEventListener("change", updateMotionPreference);
+  }, []);
+
+  return (
+    <>
+      <img src={companyConfig.backgrounds.heroEagle} alt="" width={1146} height={1368} fetchPriority="high" decoding="async" className="absolute inset-0 h-full w-full object-cover object-center" />
+      {motionAllowed ? (
+        <video
+          aria-hidden
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+          poster={companyConfig.backgrounds.heroEagle}
+          className="absolute inset-0 h-full w-full object-cover object-center"
+        >
+          <source src={companyConfig.backgrounds.heroEagleVideo} type="video/mp4" />
+        </video>
+      ) : null}
+    </>
   );
 }
 
