@@ -17,6 +17,8 @@ const KNOWN_ORIGINS = new Set([
   "http://localhost:3000",
   "http://localhost:5173",
 ]);
+const VERCEL_PREVIEW_ORIGIN =
+  /^https:\/\/cossa-store(?:-[a-z0-9-]+)?-abelnkuna7-5234s-projects\.vercel\.app$/i;
 
 type ServiceClient = ReturnType<typeof createClient>;
 type CjQuote = {
@@ -65,12 +67,7 @@ function apiFetch(key: string): typeof fetch {
 }
 
 function isPreviewOrigin(origin: string): boolean {
-  try {
-    const url = new URL(origin);
-    return url.protocol === "https:" && url.hostname.endsWith(".vercel.app");
-  } catch {
-    return false;
-  }
+  return VERCEL_PREVIEW_ORIGIN.test(origin);
 }
 
 function allowedOrigin(origin: string | null): boolean {
