@@ -29,6 +29,7 @@ import { ServiceCrossSell } from "@/components/support/ServiceCrossSell";
 
 import { subcategoryName } from "@/data/categories";
 import { useCommerce } from "@/lib/commerce-store";
+import { PARTNER_OFFER_DISCLOSURE } from "@/lib/customer-facing-store";
 import { formatZar } from "@/lib/format";
 import {
   productQuery,
@@ -165,7 +166,7 @@ function availabilityLabel(
         return "Made to order";
 
       case "available_from_supplier":
-        return "Available from supplier";
+        return "Available to order";
 
       case "available_to_order":
         return "Available to order";
@@ -177,7 +178,7 @@ function availabilityLabel(
         return "Service available";
 
       case "partner_offer":
-        return "Available from partner";
+        return "Partner offer";
 
       case "quote_required":
         return "Quotation required";
@@ -189,10 +190,10 @@ function availabilityLabel(
 
   switch (product.fulfilment_type) {
     case "local_supplier":
-      return "Supplier fulfilled";
+      return "Local fulfilment";
 
     case "local_dropshipping":
-      return "Ships from local supplier";
+      return "Local Dropshipping";
 
     case "international_dropshipping":
       return "International fulfilment";
@@ -201,7 +202,7 @@ function availabilityLabel(
       return "Made to order";
 
     case "affiliate":
-      return "Available from partner";
+      return "Partner offer";
 
     case "digital":
       return "Digital product";
@@ -1298,10 +1299,7 @@ function ProductDetail({
                   </p>
 
                   <p className="mt-1">
-                    {product
-                      .affiliate
-                      .disclosure_text ??
-                      `This product is offered by ${product.affiliate.partner_name}. If you continue to the partner website, their pricing, availability, checkout, delivery, returns and privacy terms apply.`}
+                    {PARTNER_OFFER_DISCLOSURE}
                   </p>
                 </div>
               </div>
@@ -1491,12 +1489,7 @@ function ProductDetail({
                   target="_blank"
                   rel="nofollow sponsored noopener noreferrer"
                 >
-                  View at{" "}
-                  {
-                    product
-                      .affiliate
-                      .partner_name
-                  }
+                  Visit partner
 
                   <ExternalLink
                     className="ml-2 h-4 w-4"

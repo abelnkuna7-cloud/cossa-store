@@ -4,6 +4,8 @@ import {
   storeDepartmentSlugFor,
 } from "@/config/store-departments";
 import { CATEGORIES } from "@/data/categories";
+import { customerAffiliateOffer } from "@/lib/customer-facing-store";
+import { matchesStoreSearch } from "@/lib/store-search";
 import type { FulfilmentType, Product, ProductVariantPublic } from "@/types/catalog";
 
 const db = supabase as unknown as { from: (table: string) => any };
@@ -13,7 +15,7 @@ export interface ProductQuery {
   subcategory?: string;
   search?: string;
   collection?: string;
-  sort?: "relevance" | "price_asc" | "price_desc" | "name_asc";
+  sort?: "relevance" | "newest" | "price_asc" | "price_desc" | "name_asc";
 }
 
 type PublicStoreProductRow = {
@@ -38,7 +40,6 @@ type PublicStoreProductRow = {
   category: string | null;
   brand: string | null;
   affiliate_url: string | null;
-  partner_name: string | null;
   currency: "ZAR";
   price: number | string;
   compare_at_price: number | string | null;
@@ -67,7 +68,7 @@ type StoreVariantRow = {
 };
 
 const PUBLIC_PRODUCT_SELECT =
-  "id,name,slug,sku,product_type,status,short_description,description,category,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at,fulfilment_model,partner_name";
+  "id,name,slug,sku,product_type,status,short_description,description,category,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at,fulfilment_model";
 
 const PUBLIC_VARIANT_SELECT =
   "id,product_id,provider,provider_variant_id,sku,title,price_zar,is_default,is_available,sort_order";
@@ -205,12 +206,8 @@ function mapRow(row: PublicStoreProductRow, variantRows: StoreVariantRow[] = [])
     is_primary: index === 0,
   }));
 
-  const affiliate = fulfilment === "affiliate" && row.affiliate_url
-    ? {
-        partner_name: row.partner_name || row.brand || "Partner retailer",
-        tracking_url: row.affiliate_url,
-        disclosure_text: "This is a partner offer. Payment, delivery and returns are handled by the retailer. Cossa Store may earn a commission.",
-      }
+  const affiliate = fulfilment === "affiliate"
+    ? customerAffiliateOffer(row.affiliate_url)
     : null;
 
   return {
@@ -240,7 +237,10 @@ function mapRow(row: PublicStoreProductRow, variantRows: StoreVariantRow[] = [])
     category: category.slug,
     subcategory: "",
     display_category: category.name,
-    brand: row.brand,
+    // Affiliate source identities are operational data, not product brands.
+    // Keep an independently recorded brand on Cossa-sold product records,
+    // but never use an affiliate partner as customer-facing brand copy.
+    brand: fulfilment === "affiliate" ? null : row.brand,
     collection: null,
     images,
     variants,
@@ -320,14 +320,10 @@ export async function listProducts(query: ProductQuery = {}): Promise<Product[]>
   if (query.category) products = products.filter((product) => product.category === query.category);
   if (query.subcategory) products = products.filter((product) => product.subcategory === query.subcategory);
   if (query.search?.trim()) {
-    const needle = query.search.trim().toLowerCase();
-    products = products.filter((product) =>
-      [product.name, product.sku, product.short_description, product.full_description, product.brand, product.category]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(needle)),
-    );
+    products = products.filter((product) => matchesStoreSearch(product, query.search!));
   }
   switch (query.sort) {
+    case "newest": products.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)); break;
     case "price_asc": products.sort((a, b) => a.selling_price - b.selling_price); break;
     case "price_desc": products.sort((a, b) => b.selling_price - a.selling_price); break;
     case "name_asc": products.sort((a, b) => a.name.localeCompare(b.name)); break;

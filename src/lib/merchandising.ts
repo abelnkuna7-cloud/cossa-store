@@ -5,8 +5,8 @@
  * real published catalogue values (fulfilment model, real counted stock,
  * genuine promotional prices and staff-set merchandising tags).
  */
-import { MERCH_TAGS, MERCHANDISING } from "@/config/merchandising";
-import { FULFILMENT_LABELS, type Product } from "@/types/catalog";
+import { MERCH_TAGS, MERCHANDISING } from "../config/merchandising.ts";
+import { type FulfilmentType, type Product } from "../types/catalog.ts";
 
 export type BadgeTone = "gold" | "neutral" | "positive" | "warning";
 
@@ -33,8 +33,28 @@ export function isTrending(product: Product): boolean {
   return product.tags.includes(MERCH_TAGS.trending);
 }
 
+/** A popular label is shown only after staff set the evidence-backed tag. */
+export function isPopular(product: Product): boolean {
+  return product.tags.includes(MERCH_TAGS.popular);
+}
+
 export function isAffiliate(product: Product): boolean {
   return product.product_type === "affiliate" || product.fulfilment_type === "affiliate";
+}
+
+/** Only products physically owned by Cossa can use the Cossa Stock label. */
+export function isCossaStock(product: Product): boolean {
+  return product.fulfilment_type === "cossa_stock" && product.product_type === "physical";
+}
+
+/** Supplier location is internal; this label is driven only by the fulfilment model. */
+export function isLocalDropshipping(product: Product): boolean {
+  return product.fulfilment_type === "local_dropshipping";
+}
+
+/** International dropshipping is Cossa-sold, never an affiliate redirect. */
+export function isGlobalDropshipping(product: Product): boolean {
+  return product.fulfilment_type === "international_dropshipping" && !isAffiliate(product);
 }
 
 export function isDigital(product: Product): boolean {
@@ -64,15 +84,13 @@ export function canAddToCart(product: Product): boolean {
 
 /** Customer-facing availability wording. Never exposes internal stock counts. */
 export function availabilityLabel(product: Product): ProductBadge {
-  if (isAffiliate(product)) return { label: FULFILMENT_LABELS.affiliate, tone: "neutral" };
-  if (isDigital(product)) return { label: FULFILMENT_LABELS.digital, tone: "positive" };
-  if (isService(product)) return { label: FULFILMENT_LABELS.service, tone: "neutral" };
-  if (product.fulfilment_type === "cossa_stock") {
-    return product.stock_available
-      ? { label: "In stock", tone: "positive" }
-      : { label: "Available on request", tone: "warning" };
-  }
-  return { label: FULFILMENT_LABELS[product.fulfilment_type], tone: "neutral" };
+  if (isAffiliate(product)) return { label: "Partner offer", tone: "neutral" };
+  if (isCossaStock(product)) return { label: "Cossa stock", tone: "positive" };
+  if (isLocalDropshipping(product)) return { label: "Local", tone: "positive" };
+  if (isGlobalDropshipping(product)) return { label: "Global fulfilment", tone: "neutral" };
+  if (isDigital(product)) return { label: "Digital", tone: "positive" };
+  if (isService(product)) return { label: "Service", tone: "neutral" };
+  return { label: "Available to order", tone: "neutral" };
 }
 
 export function productBadges(product: Product): ProductBadge[] {
@@ -81,6 +99,11 @@ export function productBadges(product: Product): ProductBadge[] {
   badges.push(availabilityLabel(product));
   if (isProjectKit(product)) badges.push({ label: "Project kit", tone: "gold" });
   if (isNewArrival(product)) badges.push({ label: "New arrival", tone: "gold" });
+  if (genuineComparePrice(product)) badges.push({ label: "Sale", tone: "gold" });
+  if (isCossaStock(product) && product.stock_status === "low_stock") {
+    badges.push({ label: "Limited stock", tone: "warning" });
+  }
+  if (isPopular(product)) badges.push({ label: "Popular", tone: "positive" });
   if (product.requires_quote) badges.push({ label: "Quote only", tone: "neutral" });
   return badges;
 }
@@ -98,6 +121,10 @@ export interface MerchandisingSection {
   title: string;
   description: string;
   products: Product[];
+  filter?: {
+    fulfilment?: FulfilmentType;
+    flag?: "new" | "affiliate" | "made_to_order" | "popular";
+  };
 }
 
 const cap = (items: Product[]) => items.slice(0, MERCHANDISING.sectionLimit);
@@ -117,8 +144,37 @@ export function buildSections(products: Product[], now = Date.now()): Merchandis
     {
       id: "new-arrivals",
       title: "New arrivals",
-      description: `Published in the last ${MERCHANDISING.newArrivalWindowDays} days.`,
+      description: "Recently published products from the live Cossa Store catalogue.",
       products: cap(byNewest.filter((p) => isNewArrival(p, now))),
+      filter: { flag: "new" },
+    },
+    {
+      id: "cossa-stock",
+      title: "Cossa Stock",
+      description: "Physical products genuinely held by Cossa Store.",
+      products: cap(products.filter(isCossaStock)),
+      filter: { fulfilment: "cossa_stock" },
+    },
+    {
+      id: "local-dropshipping",
+      title: "Local Dropshipping",
+      description: "Cossa-sold products fulfilled locally after an order is confirmed.",
+      products: cap(products.filter(isLocalDropshipping)),
+      filter: { fulfilment: "local_dropshipping" },
+    },
+    {
+      id: "partner-deals",
+      title: "Partner Deals",
+      description: "Selected offers from independent retailers. Payment, delivery and returns are completed with the retailer.",
+      products: cap(products.filter(isAffiliate)),
+      filter: { flag: "affiliate" },
+    },
+    {
+      id: "global-dropshipping",
+      title: "Global Dropshipping",
+      description: "Cossa-sold products fulfilled through international supply routes.",
+      products: cap(products.filter(isGlobalDropshipping)),
+      filter: { fulfilment: "international_dropshipping" },
     },
     {
       id: "featured",
@@ -131,22 +187,14 @@ export function buildSections(products: Product[], now = Date.now()): Merchandis
       title: "Made to order",
       description: "Printed and produced for you after ordering.",
       products: cap(products.filter((p) => p.fulfilment_type === "print_on_demand")),
+      filter: { flag: "made_to_order" },
     },
     {
-      id: "physical-stock",
-      title: "In stock now",
-      description: "Held in Cossa stock with real available quantities.",
-      products: cap(
-        products.filter(
-          (p) => p.fulfilment_type === "cossa_stock" && p.stock_available,
-        ),
-      ),
-    },
-    {
-      id: "affiliate",
-      title: "Partner offers",
-      description: "Products fulfilled by Cossa partners. Delivery, payment and returns follow the offer terms shown for each product.",
-      products: cap(products.filter(isAffiliate)),
+      id: "popular",
+      title: "Popular",
+      description: "Products marked from verified Cossa Store demand signals.",
+      products: cap(products.filter(isPopular)),
+      filter: { flag: "popular" },
     },
     {
       id: "digital",
