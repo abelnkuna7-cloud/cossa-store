@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/components/shop/ProductImage";
 import { useCommerce } from "@/lib/commerce-store";
+import { PARTNER_OFFER_DISCLOSURE } from "@/lib/customer-facing-store";
 import { formatZar } from "@/lib/format";
 import { trackEvent } from "@/lib/analytics";
 import {
@@ -147,8 +148,7 @@ export function ProductCard({
 
         {affiliate && product.affiliate ? (
           <p className="mt-2 text-[11px] text-muted-foreground">
-            {product.affiliate.disclosure_text ??
-              `Sold and fulfilled by ${product.affiliate.partner_name}. Cossa may earn a commission.`}
+            {PARTNER_OFFER_DISCLOSURE}
           </p>
         ) : null}
 
@@ -162,7 +162,6 @@ export function ProductCard({
                 onClick={() =>
                   trackEvent("affiliate_link_click", {
                     product_id: product.id,
-                    partner: product.affiliate?.partner_name ?? null,
                   })
                 }
               >

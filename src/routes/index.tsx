@@ -81,7 +81,7 @@ function Home() {
           title={section.title}
           description={section.description}
           products={section.products}
-          action={<Button asChild variant="outline" size="sm"><Link to="/shop">Shop all</Link></Button>}
+          action={<Button asChild variant="outline" size="sm"><Link to="/shop" search={section.filter}>View all</Link></Button>}
         />
       ))}
 
@@ -104,7 +104,7 @@ function Home() {
 
       <GroupSolutionsSection />
 
-      <Section title="Shop by category" description="Find the product range you need without searching through unrelated stock.">
+      <Section title="Shop by department" description="Browse from department to category and subcategory without searching through unrelated stock.">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {CATEGORIES.map((category) => (
             <Link key={category.slug} to="/category/$slug" params={{ slug: category.slug }} className="flex min-h-44 flex-col rounded-xl border border-border bg-card p-5 transition hover:border-primary/60">

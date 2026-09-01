@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
 import { SITE, whatsappLink } from "@/config/site";
+import { PARTNER_OFFER_DISCLOSURE } from "@/lib/customer-facing-store";
 import type { Product } from "@/types/catalog";
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
@@ -60,10 +61,10 @@ export function FulfilmentDetails({ product }: { product: Product }) {
       ) : null}
 
       {product.fulfilment_type === "local_supplier" ? (
-        <Panel title="Local supplier fulfilment">
+        <Panel title="Local fulfilment">
           <p>
-            Supplied by {product.supplier_name ?? "a verified local supplier"}. We confirm
-            availability with the supplier before the order is processed.
+            Fulfilled through a verified local Cossa partner. We confirm availability before the
+            order is processed.
           </p>
           <p>Delivery: {product.estimated_delivery}</p>
         </Panel>
@@ -73,8 +74,8 @@ export function FulfilmentDetails({ product }: { product: Product }) {
       product.fulfilment_type === "international_dropshipping" ? (
         <Panel title="Shipped by our fulfilment partner">
           <p>
-            This item ships directly from{" "}
-            {product.supplier_name ?? "our fulfilment partner"} to your delivery address.
+            This item ships directly from a verified Cossa fulfilment partner to your delivery
+            address.
           </p>
           <p>Estimated delivery: {product.estimated_delivery}</p>
           <p>
@@ -89,21 +90,15 @@ export function FulfilmentDetails({ product }: { product: Product }) {
 
       {product.affiliate ? (
         <Panel title="Partner offer">
-          <p>
-            {product.affiliate.disclosure_text ??
-              `Sold and fulfilled by ${product.affiliate.partner_name}.`}
-          </p>
-          <p>
-            Payment, delivery and returns are handled by the retailer — this order does not go
-            through Cossa checkout.
-          </p>
+          <p>{PARTNER_OFFER_DISCLOSURE}</p>
+          <p>Payment, delivery and returns are handled by the retailer — this order does not go through Cossa checkout.</p>
           <Button asChild size="sm">
             <a
               href={product.affiliate.tracking_url}
               target="_blank"
               rel="nofollow sponsored noreferrer"
             >
-              View offer at {product.affiliate.partner_name}
+              Visit partner
             </a>
           </Button>
         </Panel>
