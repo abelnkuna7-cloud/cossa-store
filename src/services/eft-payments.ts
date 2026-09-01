@@ -12,6 +12,7 @@ export type EftPayment = {
   submittedAt: string | null;
   reviewedAt: string | null;
   reviewerNote: string | null;
+  proofUploaded: boolean;
   createdAt: string;
 };
 
@@ -49,6 +50,16 @@ export type EftPaymentDetail = {
   payment: EftPayment;
   instructions: EftInstructions;
   order?: EftOrder;
+};
+
+export type EftReviewPayment = {
+  payment: EftPayment;
+  payerEmail: string | null;
+  payerNote: string | null;
+  proofFileName: string | null;
+  proofContentType: string | null;
+  proofUrl: string | null;
+  order: EftOrder;
 };
 
 export type StoreCheckoutQuote = {
@@ -172,6 +183,30 @@ export async function quoteStoreEftCheckout(input: {
 
 export async function listMyEftPayments(): Promise<{ payments: EftPaymentDetail[] }> {
   return invoke<{ payments: EftPaymentDetail[] }>({ action: "list_my_payments" });
+}
+
+export async function getMyEftProofUrl(paymentId: string): Promise<{
+  url: string;
+  expiresInSeconds: number;
+  fileName: string | null;
+}> {
+  return invoke({ action: "get_my_payment_proof_url", paymentId });
+}
+
+export async function listEftReviewQueue(): Promise<{ payments: EftReviewPayment[] }> {
+  return invoke<{ payments: EftReviewPayment[] }>({ action: "review_queue" });
+}
+
+export async function reviewEftPayment(input: {
+  paymentId: string;
+  decision: "approve" | "reject";
+  reviewerNote: string;
+}): Promise<{ payment: EftPayment; message: string }> {
+  return invoke({
+    action: input.decision === "approve" ? "approve_payment" : "reject_payment",
+    paymentId: input.paymentId,
+    reviewerNote: input.reviewerNote,
+  });
 }
 
 export async function submitEftProof(input: {

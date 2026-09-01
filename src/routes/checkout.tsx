@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useSession } from "@/lib/auth";
 import { useCommerce } from "@/lib/commerce-store";
 import {
+  checkoutQuoteFingerprint,
   deliveryAddressErrors,
   isCompleteDeliveryAddress,
   requiresPhysicalDelivery,
@@ -51,7 +52,7 @@ function newRequestId(): string {
 
 function CheckoutPage() {
   const { session, loading: authLoading } = useSession();
-  const { cart, hydrated, clearCart } = useCommerce();
+  const { selectedCartLines, hydrated, removePaidCartLines } = useCommerce();
   const [acceptedPolicies, setAcceptedPolicies] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -85,8 +86,8 @@ function CheckoutPage() {
   ]);
 
   const productIds = useMemo(
-    () => Array.from(new Set(cart.map((line) => line.product_id))),
-    [cart],
+    () => Array.from(new Set(selectedCartLines.map((line) => line.product_id))),
+    [selectedCartLines],
   );
   const cartProductsQuery = useQuery({
     ...productsByIdsQuery(productIds),
@@ -116,32 +117,32 @@ function CheckoutPage() {
   const hasDeliveryAddress = isCompleteDeliveryAddress(deliveryAddress);
   const quoteFingerprint = useMemo(
     () =>
-      JSON.stringify({
-        cart,
+      checkoutQuoteFingerprint({
+        cart: selectedCartLines,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
         deliveryAddress: requiresDelivery ? deliveryAddress : null,
       }),
-    [cart, customerName, customerPhone, deliveryAddress, requiresDelivery],
+    [customerName, customerPhone, deliveryAddress, requiresDelivery, selectedCartLines],
   );
   const activeQuote = quote && quotedFor === quoteFingerprint ? quote : null;
 
   const canQuote =
     Boolean(session?.user) &&
     hydrated &&
-    cart.length > 0 &&
+    selectedCartLines.length > 0 &&
     cartProductsResolved &&
     customerName.trim().length >= 2 &&
     (!requiresDelivery || hasDeliveryAddress) &&
     !quoting;
 
   const canRequestQuote =
-    Boolean(session?.user) && hydrated && cart.length > 0 && cartProductsResolved && !quoting;
+    Boolean(session?.user) && hydrated && selectedCartLines.length > 0 && cartProductsResolved && !quoting;
 
   const canStartPayment =
     Boolean(session?.user) &&
     hydrated &&
-    cart.length > 0 &&
+    selectedCartLines.length > 0 &&
     cartProductsResolved &&
     acceptedPolicies &&
     customerName.trim().length >= 2 &&
@@ -175,7 +176,7 @@ function CheckoutPage() {
         customerName,
         customerPhone,
         clientRequestId: requestId,
-        cart: cart.map((line) => ({
+        cart: selectedCartLines.map((line) => ({
           productId: line.product_id,
           variantId: line.variant_id,
           quantity: line.quantity,
@@ -209,7 +210,7 @@ function CheckoutPage() {
         customerName,
         customerPhone,
         clientRequestId: requestId,
-        cart: cart.map((line) => ({
+        cart: selectedCartLines.map((line) => ({
           productId: line.product_id,
           variantId: line.variant_id,
           quantity: line.quantity,
@@ -217,7 +218,7 @@ function CheckoutPage() {
         shippingAddress: requiresDelivery ? deliveryAddress : undefined,
       });
       setPayment(result);
-      clearCart();
+      removePaidCartLines(selectedCartLines);
       toast.success("Your EFT order is ready", {
         description:
           "Use the exact amount and unique reference below, then upload your proof of payment.",
@@ -530,9 +531,8 @@ function CheckoutPage() {
             <section className="rounded-lg border border-border bg-card p-6">
               <h2 className="font-display text-lg font-semibold">Create your EFT order</h2>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                Your cart currently has {hydrated ? cart.length : "…"} product
-                {hydrated && cart.length === 1 ? "" : "s"}. The exact product and delivery total is
-                confirmed securely before you pay.
+                This EFT order contains {hydrated ? selectedCartLines.length : "…"} selected product
+                {hydrated && selectedCartLines.length === 1 ? "" : "s"}. Products left in your cart are not sent to checkout. The exact product and delivery total is confirmed securely before you pay.
               </p>
 
               {session?.user.email ? (
@@ -811,10 +811,9 @@ function CheckoutPage() {
                   <Link to="/cart">Back to cart</Link>
                 </Button>
               </div>
-              {!hydrated || cart.length === 0 ? (
+              {!hydrated || selectedCartLines.length === 0 ? (
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Add active Cossa Store products to your cart before creating an EFT payment
-                  request.
+                  Select active Cossa Store products in your cart before creating an EFT payment request.
                 </p>
               ) : null}
               {activeQuote && !acceptedPolicies ? (

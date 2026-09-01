@@ -27,6 +27,19 @@ export type PublicCartProduct = {
   affiliate: unknown;
 };
 
+export type CheckoutQuoteLine = {
+  product_id: string;
+  variant_id?: string | null;
+  quantity: number;
+};
+
+export type CheckoutQuoteFingerprintInput = {
+  cart: CheckoutQuoteLine[];
+  customerName: string;
+  customerPhone: string;
+  deliveryAddress: CheckoutDeliveryAddress | null;
+};
+
 const clean = (value: string) => value.trim();
 
 export function requiresPhysicalDelivery(product: PublicCartProduct): boolean {
@@ -57,4 +70,23 @@ export function deliveryAddressErrors(
 
 export function isCompleteDeliveryAddress(address: CheckoutDeliveryAddress): boolean {
   return Object.keys(deliveryAddressErrors(address)).length === 0;
+}
+
+/**
+ * A browser quote is usable only for this exact selected-cart, customer and
+ * address state. The server repeats the full price/delivery calculation when
+ * an EFT request is created; this only prevents a stale UI quote from enabling
+ * the button after the cart or address changes.
+ */
+export function checkoutQuoteFingerprint(input: CheckoutQuoteFingerprintInput): string {
+  return JSON.stringify({
+    cart: input.cart.map((line) => ({
+      product_id: line.product_id,
+      variant_id: line.variant_id ?? null,
+      quantity: line.quantity,
+    })),
+    customerName: input.customerName.trim(),
+    customerPhone: input.customerPhone.trim(),
+    deliveryAddress: input.deliveryAddress,
+  });
 }

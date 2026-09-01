@@ -9,6 +9,14 @@ import {
 } from "react";
 
 import type { CartLine, QuoteLine } from "@/types/catalog";
+import {
+  cartLineKey,
+  cartQuantity,
+  mergeCartLines,
+  removeCartLineKeys,
+  selectedCartLineKeys as normaliseSelectedCartLineKeys,
+  selectedCartLines as filterSelectedCartLines,
+} from "@/lib/cart-lines";
 
 /**
  * Cossa Store browser commerce state.
@@ -48,6 +56,8 @@ export type CommerceQuoteLine = QuoteLine & {
 
 interface CommerceState {
   cart: CommerceCartLine[];
+  savedForLater: CommerceCartLine[];
+  selectedCartLines: CommerceCartLine[];
   wishlist: string[];
   quoteBasket: CommerceQuoteLine[];
 
@@ -71,6 +81,28 @@ interface CommerceState {
   ) => void;
 
   clearCart: () => void;
+
+  toggleCartLineSelection: (
+    productId: string,
+    variantId?: string | null,
+  ) => void;
+
+  saveCartLineForLater: (
+    productId: string,
+    variantId?: string | null,
+  ) => void;
+
+  moveSavedLineToCart: (
+    productId: string,
+    variantId?: string | null,
+  ) => void;
+
+  removeSavedLine: (
+    productId: string,
+    variantId?: string | null,
+  ) => void;
+
+  removePaidCartLines: (lines: CommerceCartLine[]) => void;
 
   toggleWishlist: (productId: string) => void;
 
@@ -113,12 +145,16 @@ const LEGACY_KEY = "cossa.commerce.v1";
 
 interface Persisted {
   cart: CommerceCartLine[];
+  savedForLater: CommerceCartLine[];
+  selectedCartLineKeys: string[];
   wishlist: string[];
   quoteBasket: CommerceQuoteLine[];
 }
 
 const EMPTY: Persisted = {
   cart: [],
+  savedForLater: [],
+  selectedCartLineKeys: [],
   wishlist: [],
   quoteBasket: [],
 };
@@ -161,13 +197,6 @@ function normaliseProductId(value: unknown): string | null {
 /* LINE IDENTITY                                                              */
 /* -------------------------------------------------------------------------- */
 
-function lineKey(
-  productId: string,
-  variantId: string | null,
-): string {
-  return `${productId}::${variantId ?? "base"}`;
-}
-
 /* -------------------------------------------------------------------------- */
 /* DUPLICATE MERGING                                                          */
 /* -------------------------------------------------------------------------- */
@@ -175,23 +204,7 @@ function lineKey(
 function mergeDuplicateCartLines(
   lines: CommerceCartLine[],
 ): CommerceCartLine[] {
-  const map = new Map<string, CommerceCartLine>();
-
-  for (const line of lines) {
-    const key = lineKey(line.product_id, line.variant_id);
-    const existing = map.get(key);
-
-    if (existing) {
-      map.set(key, {
-        ...existing,
-        quantity: existing.quantity + line.quantity,
-      });
-    } else {
-      map.set(key, line);
-    }
-  }
-
-  return Array.from(map.values());
+  return mergeCartLines(lines);
 }
 
 function mergeDuplicateQuoteLines(
@@ -200,7 +213,7 @@ function mergeDuplicateQuoteLines(
   const map = new Map<string, CommerceQuoteLine>();
 
   for (const line of lines) {
-    const key = lineKey(line.product_id, line.variant_id);
+    const key = cartLineKey(line);
     const existing = map.get(key);
 
     if (existing) {
@@ -303,6 +316,8 @@ function parsePersisted(raw: string): Persisted {
     if (!parsed || typeof parsed !== "object") {
       return {
         cart: [],
+        savedForLater: [],
+        selectedCartLineKeys: [],
         wishlist: [],
         quoteBasket: [],
       };
@@ -312,12 +327,19 @@ function parsePersisted(raw: string): Persisted {
 
     return {
       cart: normaliseCartLines(record.cart),
+      savedForLater: normaliseCartLines(record.savedForLater),
+      selectedCartLineKeys: normaliseSelectedCartLineKeys(
+        normaliseCartLines(record.cart),
+        record.selectedCartLineKeys,
+      ),
       wishlist: normaliseWishlist(record.wishlist),
       quoteBasket: normaliseQuoteLines(record.quoteBasket),
     };
   } catch {
     return {
       cart: [],
+      savedForLater: [],
+      selectedCartLineKeys: [],
       wishlist: [],
       quoteBasket: [],
     };
@@ -328,6 +350,8 @@ function read(): Persisted {
   if (typeof window === "undefined") {
     return {
       cart: [],
+      savedForLater: [],
+      selectedCartLineKeys: [],
       wishlist: [],
       quoteBasket: [],
     };
@@ -348,12 +372,16 @@ function read(): Persisted {
 
     return {
       cart: [],
+      savedForLater: [],
+      selectedCartLineKeys: [],
       wishlist: [],
       quoteBasket: [],
     };
   } catch {
     return {
       cart: [],
+      savedForLater: [],
+      selectedCartLineKeys: [],
       wishlist: [],
       quoteBasket: [],
     };
@@ -421,16 +449,16 @@ export function CommerceProvider({
       const safeQuantity = normaliseQuantity(quantity);
 
       setState((previous) => {
-        const key = lineKey(safeProductId, safeVariantId);
+        const key = cartLineKey({ product_id: safeProductId, variant_id: safeVariantId });
 
         const existing = previous.cart.find(
           (line) =>
-            lineKey(line.product_id, line.variant_id) === key,
+            cartLineKey(line) === key,
         );
 
         const nextCart = existing
           ? previous.cart.map((line) =>
-              lineKey(line.product_id, line.variant_id) === key
+              cartLineKey(line) === key
                 ? {
                     ...line,
                     quantity: line.quantity + safeQuantity,
@@ -449,6 +477,9 @@ export function CommerceProvider({
         return {
           ...previous,
           cart: nextCart,
+          selectedCartLineKeys: Array.from(
+            new Set([...previous.selectedCartLineKeys, key]),
+          ),
         };
       });
     },
@@ -487,18 +518,14 @@ export function CommerceProvider({
           return previous;
         }
 
-        const targetKey = lineKey(
-          target.product_id,
-          target.variant_id,
-        );
+        const targetKey = cartLineKey(target);
 
         if (!Number.isFinite(quantity) || quantity <= 0) {
           return {
             ...previous,
-            cart: previous.cart.filter(
-              (line) =>
-                lineKey(line.product_id, line.variant_id) !==
-                targetKey,
+            cart: removeCartLineKeys(previous.cart, [targetKey]),
+            selectedCartLineKeys: previous.selectedCartLineKeys.filter(
+              (key) => key !== targetKey,
             ),
           };
         }
@@ -508,7 +535,7 @@ export function CommerceProvider({
         return {
           ...previous,
           cart: previous.cart.map((line) =>
-            lineKey(line.product_id, line.variant_id) === targetKey
+            cartLineKey(line) === targetKey
               ? {
                   ...line,
                   quantity: safeQuantity,
@@ -537,14 +564,15 @@ export function CommerceProvider({
 
       setState((previous) => {
         if (hasExplicitVariant) {
+          const targetKey = cartLineKey({
+            product_id: safeProductId,
+            variant_id: safeVariantId,
+          });
           return {
             ...previous,
-            cart: previous.cart.filter(
-              (line) =>
-                !(
-                  line.product_id === safeProductId &&
-                  line.variant_id === safeVariantId
-                ),
+            cart: removeCartLineKeys(previous.cart, [targetKey]),
+            selectedCartLineKeys: previous.selectedCartLineKeys.filter(
+              (key) => key !== targetKey,
             ),
           };
         }
@@ -567,10 +595,9 @@ export function CommerceProvider({
 
         return {
           ...previous,
-          cart: previous.cart.filter(
-            (line) =>
-              lineKey(line.product_id, line.variant_id) !==
-              lineKey(target.product_id, target.variant_id),
+          cart: removeCartLineKeys(previous.cart, [cartLineKey(target)]),
+          selectedCartLineKeys: previous.selectedCartLineKeys.filter(
+            (key) => key !== cartLineKey(target),
           ),
         };
       });
@@ -582,7 +609,133 @@ export function CommerceProvider({
     setState((previous) => ({
       ...previous,
       cart: [],
+      selectedCartLineKeys: [],
     }));
+  }, []);
+
+  const toggleCartLineSelection = useCallback(
+    (productId: string, variantId?: string | null) => {
+      const safeProductId = normaliseProductId(productId);
+      if (!safeProductId) return;
+
+      const hasExplicitVariant = variantId !== undefined;
+      const safeVariantId = normaliseVariantId(variantId);
+
+      setState((previous) => {
+        const matching = previous.cart.filter((line) =>
+          line.product_id === safeProductId &&
+          (!hasExplicitVariant || line.variant_id === safeVariantId),
+        );
+        if (matching.length !== 1) return previous;
+
+        const key = cartLineKey(matching[0]);
+        const isSelected = previous.selectedCartLineKeys.includes(key);
+        return {
+          ...previous,
+          selectedCartLineKeys: isSelected
+            ? previous.selectedCartLineKeys.filter((value) => value !== key)
+            : [...previous.selectedCartLineKeys, key],
+        };
+      });
+    },
+    [],
+  );
+
+  const saveCartLineForLater = useCallback(
+    (productId: string, variantId?: string | null) => {
+      const safeProductId = normaliseProductId(productId);
+      if (!safeProductId) return;
+
+      const hasExplicitVariant = variantId !== undefined;
+      const safeVariantId = normaliseVariantId(variantId);
+      setState((previous) => {
+        const matches = previous.cart.filter((line) =>
+          line.product_id === safeProductId &&
+          (!hasExplicitVariant || line.variant_id === safeVariantId),
+        );
+        if (matches.length !== 1) return previous;
+
+        const target = matches[0];
+        const key = cartLineKey(target);
+        return {
+          ...previous,
+          cart: removeCartLineKeys(previous.cart, [key]),
+          savedForLater: mergeDuplicateCartLines([...previous.savedForLater, target]),
+          selectedCartLineKeys: previous.selectedCartLineKeys.filter((value) => value !== key),
+        };
+      });
+    },
+    [],
+  );
+
+  const moveSavedLineToCart = useCallback(
+    (productId: string, variantId?: string | null) => {
+      const safeProductId = normaliseProductId(productId);
+      if (!safeProductId) return;
+
+      const hasExplicitVariant = variantId !== undefined;
+      const safeVariantId = normaliseVariantId(variantId);
+      setState((previous) => {
+        const matches = previous.savedForLater.filter((line) =>
+          line.product_id === safeProductId &&
+          (!hasExplicitVariant || line.variant_id === safeVariantId),
+        );
+        if (matches.length !== 1) return previous;
+
+        const target = matches[0];
+        const key = cartLineKey(target);
+        return {
+          ...previous,
+          cart: mergeDuplicateCartLines([...previous.cart, target]),
+          savedForLater: removeCartLineKeys(previous.savedForLater, [key]),
+          selectedCartLineKeys: Array.from(
+            new Set([...previous.selectedCartLineKeys, key]),
+          ),
+        };
+      });
+    },
+    [],
+  );
+
+  const removeSavedLine = useCallback(
+    (productId: string, variantId?: string | null) => {
+      const safeProductId = normaliseProductId(productId);
+      if (!safeProductId) return;
+
+      const hasExplicitVariant = variantId !== undefined;
+      const safeVariantId = normaliseVariantId(variantId);
+      setState((previous) => {
+        const matches = previous.savedForLater.filter((line) =>
+          line.product_id === safeProductId &&
+          (!hasExplicitVariant || line.variant_id === safeVariantId),
+        );
+        if (matches.length !== 1) return previous;
+        return {
+          ...previous,
+          savedForLater: removeCartLineKeys(previous.savedForLater, [cartLineKey(matches[0])]),
+        };
+      });
+    },
+    [],
+  );
+
+  const removePaidCartLines = useCallback((paidLines: CommerceCartLine[]) => {
+    const paidByKey = new Map(paidLines.map((line) => [cartLineKey(line), line.quantity]));
+    setState((previous) => {
+      // Retain a line if its quantity changed while the payment request was
+      // being prepared. It is safer to leave it for the customer to review
+      // than to silently remove a newly changed quantity.
+      const removedKeys = previous.cart
+        .filter((line) => paidByKey.get(cartLineKey(line)) === line.quantity)
+        .map(cartLineKey);
+      return {
+        ...previous,
+        cart: removeCartLineKeys(previous.cart, removedKeys),
+        selectedCartLineKeys: previous.selectedCartLineKeys.filter(
+          (key) => !removedKeys.includes(key),
+        ),
+      };
+    });
   }, []);
 
   /* ------------------------------------------------------------------------ */
@@ -650,16 +803,16 @@ export function CommerceProvider({
       const safeQuantity = normaliseQuantity(quantity);
 
       setState((previous) => {
-        const key = lineKey(safeProductId, safeVariantId);
+        const key = cartLineKey({ product_id: safeProductId, variant_id: safeVariantId });
 
         const existing = previous.quoteBasket.find(
           (line) =>
-            lineKey(line.product_id, line.variant_id) === key,
+            cartLineKey(line) === key,
         );
 
         const nextQuoteBasket = existing
           ? previous.quoteBasket.map((line) =>
-              lineKey(line.product_id, line.variant_id) === key
+              cartLineKey(line) === key
                 ? {
                     ...line,
                     quantity: line.quantity + safeQuantity,
@@ -716,17 +869,14 @@ export function CommerceProvider({
           return previous;
         }
 
-        const targetKey = lineKey(
-          target.product_id,
-          target.variant_id,
-        );
+        const targetKey = cartLineKey(target);
 
         if (!Number.isFinite(quantity) || quantity <= 0) {
           return {
             ...previous,
             quoteBasket: previous.quoteBasket.filter(
               (line) =>
-                lineKey(line.product_id, line.variant_id) !==
+                cartLineKey(line) !==
                 targetKey,
             ),
           };
@@ -737,7 +887,7 @@ export function CommerceProvider({
         return {
           ...previous,
           quoteBasket: previous.quoteBasket.map((line) =>
-            lineKey(line.product_id, line.variant_id) === targetKey
+            cartLineKey(line) === targetKey
               ? {
                   ...line,
                   quantity: safeQuantity,
@@ -797,8 +947,8 @@ export function CommerceProvider({
           ...previous,
           quoteBasket: previous.quoteBasket.filter(
             (line) =>
-              lineKey(line.product_id, line.variant_id) !==
-              lineKey(target.product_id, target.variant_id),
+              cartLineKey(line) !==
+              cartLineKey(target),
           ),
         };
       });
@@ -817,14 +967,7 @@ export function CommerceProvider({
   /* COUNTS                                                                   */
   /* ------------------------------------------------------------------------ */
 
-  const cartCount = useMemo(
-    () =>
-      state.cart.reduce(
-        (total, line) => total + line.quantity,
-        0,
-      ),
-    [state.cart],
-  );
+  const cartCount = useMemo(() => cartQuantity(state.cart), [state.cart]);
 
   const quoteCount = useMemo(
     () =>
@@ -835,6 +978,11 @@ export function CommerceProvider({
     [state.quoteBasket],
   );
 
+  const selectedCartLines = useMemo(
+    () => filterSelectedCartLines(state.cart, state.selectedCartLineKeys),
+    [state.cart, state.selectedCartLineKeys],
+  );
+
   /* ------------------------------------------------------------------------ */
   /* CONTEXT VALUE                                                            */
   /* ------------------------------------------------------------------------ */
@@ -842,6 +990,8 @@ export function CommerceProvider({
   const value = useMemo<CommerceState>(
     () => ({
       cart: state.cart,
+      savedForLater: state.savedForLater,
+      selectedCartLines,
       wishlist: state.wishlist,
       quoteBasket: state.quoteBasket,
 
@@ -851,6 +1001,11 @@ export function CommerceProvider({
       setCartQuantity,
       removeFromCart,
       clearCart,
+      toggleCartLineSelection,
+      saveCartLineForLater,
+      moveSavedLineToCart,
+      removeSavedLine,
+      removePaidCartLines,
 
       toggleWishlist,
       isWishlisted,
@@ -867,6 +1022,7 @@ export function CommerceProvider({
     }),
     [
       state.cart,
+      state.savedForLater,
       state.wishlist,
       state.quoteBasket,
       hydrated,
@@ -874,6 +1030,11 @@ export function CommerceProvider({
       setCartQuantity,
       removeFromCart,
       clearCart,
+      toggleCartLineSelection,
+      saveCartLineForLater,
+      moveSavedLineToCart,
+      removeSavedLine,
+      removePaidCartLines,
       toggleWishlist,
       isWishlisted,
       removeFromWishlist,
@@ -882,6 +1043,7 @@ export function CommerceProvider({
       removeFromQuote,
       clearQuote,
       cartCount,
+      selectedCartLines,
       quoteCount,
     ],
   );

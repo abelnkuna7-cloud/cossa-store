@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, Bookmark, Trash2 } from "lucide-react";
 
 import { PageHeader } from "@/components/common/PageHeader";
 import {
@@ -16,6 +16,7 @@ import {
   useCommerce,
   type CommerceCartLine,
 } from "@/lib/commerce-store";
+import { cartLineKey } from "@/lib/cart-lines";
 
 import { formatZar } from "@/lib/format";
 import { productsByIdsQuery } from "@/lib/queries";
@@ -239,10 +240,16 @@ function lineIssue(
 function CartPage() {
   const {
     cart,
+    savedForLater,
+    selectedCartLines,
     hydrated,
     setCartQuantity,
     removeFromCart,
     clearCart,
+    toggleCartLineSelection,
+    saveCartLineForLater,
+    moveSavedLineToCart,
+    removeSavedLine,
   } = useCommerce();
 
   /**
@@ -253,12 +260,12 @@ function CartPage() {
     () =>
       Array.from(
         new Set(
-          cart.map(
+          [...cart, ...savedForLater].map(
             (line) => line.product_id,
           ),
         ),
       ),
-    [cart],
+    [cart, savedForLater],
   );
 
   const query = useQuery({
@@ -268,8 +275,7 @@ function CartPage() {
       productIds.length > 0,
   });
 
-  const products =
-    query.data ?? [];
+  const products = useMemo(() => query.data ?? [], [query.data]);
 
   const resolvedLines =
     useMemo<ResolvedCartLine[]>(
@@ -341,14 +347,46 @@ function CartPage() {
       [cart, products],
     );
 
-  const unresolvedLines =
-    hydrated &&
-    !query.isPending &&
-    cart.length -
-      resolvedLines.length;
+  const resolvedSavedLines =
+    useMemo<ResolvedCartLine[]>(
+      () =>
+        savedForLater
+          .map((line) => {
+            const product = products.find((candidate) => candidate.id === line.product_id);
+            if (!product) return null;
 
-  const subtotal =
-    resolvedLines.reduce(
+            const variant = resolveVariant(product, line.variant_id);
+            const unitPrice = resolveUnitPrice(product, variant);
+            const compareAtPrice = resolveCompareAtPrice(product, variant, unitPrice);
+            const issue = lineIssue(product, variant, line, unitPrice);
+
+            return {
+              line,
+              product,
+              variant,
+              unitPrice,
+              compareAtPrice,
+              lineTotal: unitPrice * line.quantity,
+              purchasable: issue === null,
+              issue,
+            };
+          })
+          .filter((value): value is ResolvedCartLine => value !== null),
+      [products, savedForLater],
+    );
+
+  const unresolvedLines =
+    hydrated && !query.isPending ? cart.length - resolvedLines.length : 0;
+
+  const selectedLineKeys = useMemo(
+    () => new Set(selectedCartLines.map(cartLineKey)),
+    [selectedCartLines],
+  );
+
+  const selectedResolvedLines = resolvedLines.filter((item) => selectedLineKeys.has(cartLineKey(item.line)));
+
+  const selectedSubtotal =
+    selectedResolvedLines.reduce(
       (total, item) =>
         total +
         item.lineTotal,
@@ -356,16 +394,23 @@ function CartPage() {
     );
 
   const blockedLines =
-    resolvedLines.filter(
+    selectedResolvedLines.filter(
       (item) =>
         !item.purchasable,
     );
 
+  const selectedUnresolvedLines = Math.max(0, selectedCartLines.length - selectedResolvedLines.length);
+
+  const selectedQuantity = selectedResolvedLines.reduce(
+    (total, item) => total + item.line.quantity,
+    0,
+  );
+
   const canCheckout =
     hydrated &&
-    resolvedLines.length > 0 &&
+    selectedResolvedLines.length > 0 &&
     blockedLines.length === 0 &&
-    unresolvedLines === 0;
+    selectedUnresolvedLines === 0;
 
   /**
    * VAT summary must not assume every line uses the same tax treatment.
@@ -374,8 +419,8 @@ function CartPage() {
    * the cart deliberately avoids calculating a blanket 15% VAT portion.
    */
   const allVatInclusive =
-    resolvedLines.length > 0 &&
-    resolvedLines.every(
+    selectedResolvedLines.length > 0 &&
+    selectedResolvedLines.every(
       ({ product }) =>
         product.vat_status ===
         "vat_inclusive",
@@ -397,7 +442,7 @@ function CartPage() {
 
         {/* EMPTY CART */}
         {hydrated &&
-        cart.length === 0 ? (
+        cart.length === 0 && savedForLater.length === 0 ? (
           <EmptyBlock
             title="Your cart is empty"
             description="Browse products, build a project kit or request a quotation for larger requirements."
@@ -481,12 +526,29 @@ function CartPage() {
                   const lineId =
                     `${product.id}-${line.variant_id ?? "base"}`;
 
+                  const selected = selectedLineKeys.has(cartLineKey(line));
+
                   return (
                     <article
                       key={lineId}
                       className="rounded-lg border border-border bg-card p-4"
                     >
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                        <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm font-medium">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() =>
+                              toggleCartLineSelection(product.id, line.variant_id)
+                            }
+                            className="h-4 w-4 accent-current"
+                            aria-label={`Include ${product.name}${
+                              variant ? ` — ${variant.name}` : ""
+                            } in this order`}
+                          />
+                          <span className="sm:sr-only">Include in this order</span>
+                        </label>
+
                         <div className="min-w-0 flex-1">
                           <Link
                             to="/product/$slug"
@@ -651,6 +713,18 @@ function CartPage() {
                           <Button
                             type="button"
                             variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              saveCartLineForLater(product.id, line.variant_id)
+                            }
+                          >
+                            <Bookmark className="mr-1.5 h-4 w-4" />
+                            Save for later
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
                             size="icon"
                             aria-label={`Remove ${product.name}${
                               variant
@@ -704,12 +778,12 @@ function CartPage() {
               <dl className="space-y-2 text-sm">
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">
-                    Merchandise subtotal
+                    Selected subtotal
                   </dt>
 
                   <dd className="font-medium">
                     {formatZar(
-                      subtotal,
+                      selectedSubtotal,
                     )}
                   </dd>
                 </div>
@@ -738,16 +812,20 @@ function CartPage() {
 
                 <div className="flex justify-between gap-4 border-t border-border pt-3 text-base font-semibold">
                   <dt>
-                    Current subtotal
+                    Selected subtotal
                   </dt>
 
                   <dd>
                     {formatZar(
-                      subtotal,
+                      selectedSubtotal,
                     )}
                   </dd>
                 </div>
               </dl>
+
+              <p className="rounded-md bg-secondary/50 px-3 py-2 text-sm text-muted-foreground">
+                {selectedQuantity} {selectedQuantity === 1 ? "item" : "items"} selected for checkout. Products not selected stay in your cart.
+              </p>
 
               {blockedLines.length >
               0 ? (
@@ -764,14 +842,12 @@ function CartPage() {
                 </NoticeBlock>
               ) : null}
 
-              {unresolvedLines > 0 ? (
+              {selectedUnresolvedLines > 0 ? (
                 <NoticeBlock
                   tone="pending"
                   title="Catalogue changed"
                 >
-                  Some saved items can no longer be verified against the current
-                  catalogue. Checkout remains disabled until the cart is
-                  resolved.
+                  A selected item can no longer be verified against the current catalogue. Remove it from this order or resolve it before checkout.
                 </NoticeBlock>
               ) : null}
 
@@ -787,7 +863,7 @@ function CartPage() {
               >
                 {canCheckout ? (
                   <a href="/checkout">
-                    Continue to checkout
+                    Checkout selected items
                   </a>
                 ) : (
                   <span>
@@ -818,6 +894,75 @@ function CartPage() {
               </NoticeBlock>
             </aside>
           </div>
+        ) : null}
+
+        {hydrated && savedForLater.length > 0 ? (
+          <section className="mt-8 max-w-4xl rounded-xl border border-border bg-card p-5 sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+                  Saved for later
+                </p>
+                <h2 className="mt-1 font-display text-xl font-semibold">Keep these products for another time</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Saved products stay in this browser until you move them back to your cart or remove them.
+                </p>
+              </div>
+              {cart.length === 0 ? (
+                <Button asChild variant="outline">
+                  <Link to="/shop">Continue shopping</Link>
+                </Button>
+              ) : null}
+            </div>
+
+            {query.isPending ? <LoadingBlock /> : null}
+
+            {savedForLater.length > resolvedSavedLines.length && !query.isPending ? (
+              <NoticeBlock tone="pending" title="Some saved products need attention">
+                One or more saved products are no longer available in the public catalogue. They have not been moved into checkout.
+              </NoticeBlock>
+            ) : null}
+
+            <ul className="mt-5 divide-y divide-border rounded-lg border border-border">
+              {resolvedSavedLines.map(({ line, product, variant, lineTotal, issue }) => (
+                <li
+                  key={cartLineKey(line)}
+                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <Link
+                      to="/product/$slug"
+                      params={{ slug: product.slug }}
+                      className="font-medium hover:underline"
+                    >
+                      {product.name}
+                    </Link>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {variant ? `${variant.name} · ` : ""}Quantity {line.quantity} · {formatZar(lineTotal)}
+                    </p>
+                    {issue ? <p className="mt-2 text-xs text-warning">{issue}</p> : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => moveSavedLineToCart(product.id, line.variant_id)}
+                    >
+                      Move to cart
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeSavedLine(product.id, line.variant_id)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
       </div>
     </div>

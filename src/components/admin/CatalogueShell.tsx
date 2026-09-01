@@ -52,13 +52,17 @@ export function CatalogueShell({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {actions}
+          {access.isStaff ? (
+            <Button asChild size="sm" variant="outline">
+              <Link to="/admin/approvals">
+                {access.isAdmin ? "Approvals" : "Payment reviews"}
+              </Link>
+            </Button>
+          ) : null}
           {access.isAdmin ? (
             <>
               <Button asChild size="sm" variant="outline">
                 <Link to="/admin/email-operations">Email operations</Link>
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <Link to="/admin/approvals">Approvals</Link>
               </Button>
             </>
           ) : null}

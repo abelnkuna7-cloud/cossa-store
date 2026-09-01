@@ -1,4 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  normaliseStoreDepartmentKey,
+  storeDepartmentSlugFor,
+} from "@/config/store-departments";
 import { CATEGORIES } from "@/data/categories";
 import type { FulfilmentType, Product, ProductVariantPublic } from "@/types/catalog";
 
@@ -142,12 +146,17 @@ function estimatedDeliveryFor(row: PublicStoreProductRow) {
 function storefrontCategory(row: PublicStoreProductRow) {
   const raw = row.category?.trim();
   if (!raw) return { slug: "digital-products", name: "Digital Products" };
-  const normalized = raw.toLocaleLowerCase();
+  const normalized = normaliseStoreDepartmentKey(raw);
+  const departmentSlug = storeDepartmentSlugFor(raw);
   const category = CATEGORIES.find(
-    (candidate) => candidate.slug === normalized || candidate.name.toLocaleLowerCase() === normalized,
+    (candidate) =>
+      candidate.slug === departmentSlug ||
+      candidate.slug === normalized ||
+      candidate.name.toLocaleLowerCase() === normalized,
   );
   return category ? { slug: category.slug, name: category.name } : { slug: raw, name: raw };
 }
+
 
 function inferSize(title: string): string | null {
   const match = title.match(/(?:^|\s|\/|-)(5XL|4XL|3XL|2XL|XXXL|XXL|XL|L|M|S|XS|XXS)(?:$|\s|\/|-)/i);

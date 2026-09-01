@@ -26,6 +26,7 @@ import { ProductImage } from "@/components/shop/ProductImage";
 import { GroupSolutionsSection } from "@/components/shop/GroupSolutionsSection";
 import { CATEGORIES, PROJECTS } from "@/data/categories";
 import { SITE, STORE_SUPPORT_PATHWAYS, whatsappLink } from "@/config/site";
+import { STORE_SLOGAN } from "@/config/store-brand";
 import { publicCollectionsQuery, storefrontProductsQuery } from "@/lib/queries";
 import { buildSections } from "@/lib/merchandising";
 import { ContactStrip } from "@/components/support/ContactStrip";
@@ -211,7 +212,14 @@ function Hero() {
           <div className="relative flex min-h-[390px] max-w-2xl flex-col justify-center p-5 sm:min-h-[420px] sm:p-8 lg:min-h-[455px] lg:p-10">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Products · Projects · Business procurement</p>
             <GroupBadge className="mt-3 self-start" />
-            <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">Shop smarter.<span className="block text-primary">Live better. Build more.</span></h1>
+            <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.02] tracking-tight sm:text-5xl lg:text-6xl">
+              {STORE_SLOGAN.map((phrase, index) => (
+                <span key={phrase.tone} className={index === 0 ? `store-slogan__${phrase.tone}` : `block store-slogan__${phrase.tone}`}>
+                  {phrase.text}
+                  {index === 0 ? " " : null}
+                </span>
+              ))}
+            </h1>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-white/85 sm:text-lg">Products and practical buying solutions for homes, projects and businesses — with Cossa support when you need more than a product.</p>
             <div className="mt-6 flex flex-wrap gap-3"><Button asChild size="lg"><Link to="/shop">Shop products <ArrowRight className="ml-2 h-4 w-4" /></Link></Button><Button asChild size="lg" variant="outline" className="border-primary/60 bg-black/55 text-white hover:bg-primary/15"><Link to="/shop-by-project">Shop by project</Link></Button></div>
           </div>
