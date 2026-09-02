@@ -84,6 +84,21 @@ function xmlResponse(body: string, cacheSeconds = 900): Response {
   });
 }
 
+function xmlFailureResponse(kind: "sitemap" | "merchant-feed"): Response {
+  return new Response(
+    `<?xml version="1.0" encoding="UTF-8"?>\n<error><message>${kind} temporarily unavailable</message></error>\n`,
+    {
+      status: 503,
+      headers: {
+        "content-type": "application/xml; charset=utf-8",
+        "cache-control": "no-store",
+        "retry-after": "300",
+        "x-content-type-options": "nosniff",
+      },
+    },
+  );
+}
+
 async function loadSeoProducts(): Promise<SeoProductRow[]> {
   // Keep crawler endpoints cheap: never load the 20k+ variant catalogue here.
   // store_public_products is already the published/public catalogue boundary.
@@ -176,13 +191,20 @@ async function handleSeoFeedRequest(request: Request): Promise<Response | null> 
     return null;
   }
 
-  const products = await loadSeoProducts();
+  const kind = url.pathname === "/sitemap.xml" ? "sitemap" : "merchant-feed";
 
-  if (url.pathname === "/sitemap.xml") {
-    return xmlResponse(buildSitemap(products));
+  try {
+    const products = await loadSeoProducts();
+
+    if (kind === "sitemap") {
+      return xmlResponse(buildSitemap(products));
+    }
+
+    return xmlResponse(buildMerchantFeed(products), 1800);
+  } catch (error) {
+    console.error(`[Cossa Store] ${kind} generation failed`, error);
+    return xmlFailureResponse(kind);
   }
-
-  return xmlResponse(buildMerchantFeed(products), 1800);
 }
 
 // h3 swallows in-handler throws into a normal 500 Response with body
