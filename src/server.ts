@@ -1,15 +1,47 @@
 import "./lib/error-capture";
 
 import { SITE_URL } from "./config/seo";
+import { supabase } from "./integrations/supabase/client";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
-import { listStorefrontProducts } from "./services/store-products.service";
-
-import type { Product } from "./types/catalog";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
+
+type SeoProductRow = {
+  id: string;
+  name: string;
+  slug: string;
+  sku: string | null;
+  product_type: "physical" | "digital" | "affiliate" | "pod" | "dropshipping";
+  fulfilment_model:
+    | "cossa_stock"
+    | "local_supplier"
+    | "local_dropshipping"
+    | "international_dropshipping"
+    | "print_on_demand"
+    | "affiliate"
+    | "digital";
+  short_description: string | null;
+  description: string | null;
+  brand: string | null;
+  currency: "ZAR";
+  price: number | string;
+  track_inventory: boolean;
+  stock_quantity: number;
+  unlimited_stock: boolean;
+  image_urls: string[];
+  seo_title: string | null;
+  seo_description: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const SEO_PRODUCT_SELECT =
+  "id,name,slug,sku,product_type,fulfilment_model,short_description,description,brand,currency,price,track_inventory,stock_quantity,unlimited_stock,image_urls,seo_title,seo_description,created_at,updated_at";
+
+const db = supabase as unknown as { from: (table: string) => any };
 
 let serverEntryPromise: Promise<ServerEntry> | undefined;
 
@@ -35,45 +67,57 @@ function absoluteStoreUrl(path: string): string {
   return new URL(path, SITE_URL).toString();
 }
 
+function safeIsoDate(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
+}
+
 function xmlResponse(body: string, cacheSeconds = 900): Response {
   return new Response(body, {
     status: 200,
     headers: {
       "content-type": "application/xml; charset=utf-8",
       "cache-control": `public, max-age=300, s-maxage=${cacheSeconds}, stale-while-revalidate=3600`,
+      "x-content-type-options": "nosniff",
     },
   });
 }
 
-function isPublicIndexableProduct(product: Product): boolean {
-  return (
-    !product.is_demo &&
-    product.status === "active" &&
-    (!product.publication_state || product.publication_state === "published") &&
-    (!product.visibility || product.visibility === "public")
-  );
+async function loadSeoProducts(): Promise<SeoProductRow[]> {
+  // Keep crawler endpoints cheap: never load the 20k+ variant catalogue here.
+  // store_public_products is already the published/public catalogue boundary.
+  const { data, error } = await db
+    .from("store_public_products")
+    .select(SEO_PRODUCT_SELECT)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("[Cossa Store] Failed to load SEO product rows", error);
+    throw error;
+  }
+
+  return (data ?? []) as SeoProductRow[];
 }
 
-function buildSitemap(products: Product[]): string {
-  const staticEntries = [
+function buildSitemap(products: SeoProductRow[]): string {
+  const staticEntries: Array<{ loc: string; lastmod: string | null }> = [
     { loc: absoluteStoreUrl("/"), lastmod: null },
     { loc: absoluteStoreUrl("/shop"), lastmod: null },
     { loc: absoluteStoreUrl("/about"), lastmod: null },
     { loc: absoluteStoreUrl("/contact"), lastmod: null },
   ];
 
-  const productEntries = products
-    .filter(isPublicIndexableProduct)
-    .map((product) => ({
-      loc: absoluteStoreUrl(`/product/${encodeURIComponent(product.slug)}`),
-      lastmod: product.updated_at || product.published_at || product.created_at || null,
-    }));
+  const productEntries = products.map((product) => ({
+    loc: absoluteStoreUrl(`/product/${encodeURIComponent(product.slug)}`),
+    lastmod: safeIsoDate(product.updated_at || product.created_at),
+  }));
 
   const urls = [...staticEntries, ...productEntries]
     .map(
       ({ loc, lastmod }) =>
         `  <url>\n    <loc>${xmlEscape(loc)}</loc>${
-          lastmod ? `\n    <lastmod>${xmlEscape(new Date(lastmod).toISOString())}</lastmod>` : ""
+          lastmod ? `\n    <lastmod>${xmlEscape(lastmod)}</lastmod>` : ""
         }\n  </url>`,
     )
     .join("\n");
@@ -81,52 +125,48 @@ function buildSitemap(products: Product[]): string {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
 
-function merchantAvailability(product: Product): "in_stock" | "out_of_stock" | null {
-  const availability = product.availability_status ?? product.stock_status;
+function merchantAvailability(product: SeoProductRow): "in_stock" | "out_of_stock" | null {
+  // Only Cossa-controlled stock can currently be represented with Merchant-level certainty.
+  // Supplier-managed / POD availability remains excluded until the landing page, structured
+  // data and feed can share one verified Google-supported availability state.
+  if (product.fulfilment_model !== "cossa_stock") return null;
 
-  if (availability === "in_stock" || availability === "low_stock") {
-    return "in_stock";
-  }
-
-  if (availability === "out_of_stock") {
-    return "out_of_stock";
-  }
-
-  // Cossa deliberately does not guess Merchant availability for supplier-managed,
-  // made-to-order, backorder, quote, preorder or otherwise uncertain states.
-  return null;
+  if (product.unlimited_stock) return "in_stock";
+  if (!product.track_inventory) return null;
+  return product.stock_quantity > 0 ? "in_stock" : "out_of_stock";
 }
 
-function isMerchantFeedEligible(product: Product): boolean {
-  if (!isPublicIndexableProduct(product)) return false;
-  if (product.fulfilment_type === "affiliate") return false;
+function isMerchantFeedEligible(product: SeoProductRow): boolean {
   if (product.product_type === "affiliate" || product.product_type === "digital") return false;
-  if (product.requires_quote || product.price_display_mode === "quote") return false;
-  if (!Number.isFinite(product.selling_price) || product.selling_price <= 0) return false;
-  if (product.variants.length > 0) return false;
-  if (!product.images[0]?.url) return false;
+  if (product.fulfilment_model !== "cossa_stock") return false;
+  const price = Number(product.price);
+  if (!Number.isFinite(price) || price <= 0) return false;
+  if (!product.image_urls?.[0]) return false;
   return merchantAvailability(product) !== null;
 }
 
-function buildMerchantFeed(products: Product[]): string {
+function buildMerchantFeed(products: SeoProductRow[]): string {
   const items = products
     .filter(isMerchantFeedEligible)
     .map((product) => {
       const link = absoluteStoreUrl(`/product/${encodeURIComponent(product.slug)}`);
-      const imageLink = new URL(product.images[0].url, SITE_URL).toString();
+      const imageLink = new URL(product.image_urls[0], SITE_URL).toString();
       const description =
-        product.seo_description || product.short_description || product.full_description || product.name;
+        product.seo_description || product.short_description || product.description || product.name;
       const availability = merchantAvailability(product);
+      const price = Number(product.price);
 
       const optionalBrand = product.brand
         ? `\n      <g:brand>${xmlEscape(product.brand)}</g:brand>`
         : "";
 
-      return `    <item>\n      <g:id>${xmlEscape(product.sku || product.id)}</g:id>\n      <title>${xmlEscape(product.seo_title || product.name)}</title>\n      <description>${xmlEscape(description)}</description>\n      <link>${xmlEscape(link)}</link>\n      <g:image_link>${xmlEscape(imageLink)}</g:image_link>\n      <g:availability>${availability}</g:availability>\n      <g:price>${product.selling_price.toFixed(2)} ZAR</g:price>\n      <g:condition>new</g:condition>${optionalBrand}\n    </item>`;
+      // Condition, GTIN, MPN and identifier_exists are intentionally omitted until
+      // Cossa has source-backed values. Internal SKUs are valid feed IDs, not UPIs.
+      return `    <item>\n      <g:id>${xmlEscape(product.sku || product.id)}</g:id>\n      <title>${xmlEscape(product.seo_title || product.name)}</title>\n      <description>${xmlEscape(description)}</description>\n      <link>${xmlEscape(link)}</link>\n      <g:image_link>${xmlEscape(imageLink)}</g:image_link>\n      <g:availability>${availability}</g:availability>\n      <g:price>${price.toFixed(2)} ZAR</g:price>${optionalBrand}\n    </item>`;
     })
     .join("\n");
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">\n  <channel>\n    <title>Cossa Store South Africa</title>\n    <link>${xmlEscape(absoluteStoreUrl("/"))}</link>\n    <description>Cossa Store published direct-sale products eligible for Google Merchant review.</description>\n${items}\n  </channel>\n</rss>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">\n  <channel>\n    <title>Cossa Store South Africa</title>\n    <link>${xmlEscape(absoluteStoreUrl("/"))}</link>\n    <description>Cossa Store published direct-sale products with Merchant-safe availability evidence.</description>\n${items}\n  </channel>\n</rss>\n`;
 }
 
 async function handleSeoFeedRequest(request: Request): Promise<Response | null> {
@@ -136,13 +176,13 @@ async function handleSeoFeedRequest(request: Request): Promise<Response | null> 
     return null;
   }
 
-  const products = await listStorefrontProducts();
+  const products = await loadSeoProducts();
 
   if (url.pathname === "/sitemap.xml") {
     return xmlResponse(buildSitemap(products));
   }
 
-  return xmlResponse(buildMerchantFeed(products), 600);
+  return xmlResponse(buildMerchantFeed(products), 1800);
 }
 
 // h3 swallows in-handler throws into a normal 500 Response with body
