@@ -191,6 +191,13 @@ async function handleSeoFeedRequest(request: Request): Promise<Response | null> 
     return null;
   }
 
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response(null, {
+      status: 405,
+      headers: { allow: "GET, HEAD", "cache-control": "no-store" },
+    });
+  }
+
   const kind = url.pathname === "/sitemap.xml" ? "sitemap" : "merchant-feed";
 
   try {
