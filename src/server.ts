@@ -175,6 +175,7 @@ function merchantAvailability(product: SeoProductRow): "in_stock" | "out_of_stoc
 function isMerchantFeedEligible(product: SeoProductRow): boolean {
   if (product.product_type === "affiliate" || product.product_type === "digital") return false;
   if (product.fulfilment_model !== "cossa_stock") return false;
+  if (product.currency !== "ZAR") return false;
   if (!productUrl(product.slug)) return false;
   const price = Number(product.price);
   if (!Number.isFinite(price) || price <= 0) return false;
