@@ -67,6 +67,17 @@ function absoluteStoreUrl(path: string): string {
   return new URL(path, SITE_URL).toString();
 }
 
+function safeAbsoluteUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value, SITE_URL);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 function safeIsoDate(value: string | null | undefined): string | null {
   if (!value) return null;
   const timestamp = Date.parse(value);
@@ -157,7 +168,7 @@ function isMerchantFeedEligible(product: SeoProductRow): boolean {
   if (product.fulfilment_model !== "cossa_stock") return false;
   const price = Number(product.price);
   if (!Number.isFinite(price) || price <= 0) return false;
-  if (!product.image_urls?.[0]) return false;
+  if (!safeAbsoluteUrl(product.image_urls?.[0])) return false;
   return merchantAvailability(product) !== null;
 }
 
@@ -166,11 +177,13 @@ function buildMerchantFeed(products: SeoProductRow[]): string {
     .filter(isMerchantFeedEligible)
     .map((product) => {
       const link = absoluteStoreUrl(`/product/${encodeURIComponent(product.slug)}`);
-      const imageLink = new URL(product.image_urls[0], SITE_URL).toString();
+      const imageLink = safeAbsoluteUrl(product.image_urls[0]);
       const description =
         product.seo_description || product.short_description || product.description || product.name;
       const availability = merchantAvailability(product);
       const price = Number(product.price);
+
+      if (!imageLink || !availability) return null;
 
       const optionalBrand = product.brand
         ? `\n      <g:brand>${xmlEscape(product.brand)}</g:brand>`
@@ -180,6 +193,7 @@ function buildMerchantFeed(products: SeoProductRow[]): string {
       // Cossa has source-backed values. Internal SKUs are valid feed IDs, not UPIs.
       return `    <item>\n      <g:id>${xmlEscape(product.sku || product.id)}</g:id>\n      <title>${xmlEscape(product.seo_title || product.name)}</title>\n      <description>${xmlEscape(description)}</description>\n      <link>${xmlEscape(link)}</link>\n      <g:image_link>${xmlEscape(imageLink)}</g:image_link>\n      <g:availability>${availability}</g:availability>\n      <g:price>${price.toFixed(2)} ZAR</g:price>${optionalBrand}\n    </item>`;
     })
+    .filter((item): item is string => Boolean(item))
     .join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">\n  <channel>\n    <title>Cossa Store South Africa</title>\n    <link>${xmlEscape(absoluteStoreUrl("/"))}</link>\n    <description>Cossa Store published direct-sale products with Merchant-safe availability evidence.</description>\n${items}\n  </channel>\n</rss>\n`;
