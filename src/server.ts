@@ -78,6 +78,11 @@ function safeAbsoluteUrl(value: string | null | undefined): string | null {
   }
 }
 
+function productUrl(slug: string | null | undefined): string | null {
+  const normalized = slug?.trim();
+  return normalized ? absoluteStoreUrl(`/product/${encodeURIComponent(normalized)}`) : null;
+}
+
 function safeIsoDate(value: string | null | undefined): string | null {
   if (!value) return null;
   const timestamp = Date.parse(value);
@@ -135,10 +140,14 @@ function buildSitemap(products: SeoProductRow[]): string {
     { loc: absoluteStoreUrl("/contact"), lastmod: null },
   ];
 
-  const productEntries = products.map((product) => ({
-    loc: absoluteStoreUrl(`/product/${encodeURIComponent(product.slug)}`),
-    lastmod: safeIsoDate(product.updated_at || product.created_at),
-  }));
+  const productEntries = products
+    .map((product) => {
+      const loc = productUrl(product.slug);
+      return loc
+        ? { loc, lastmod: safeIsoDate(product.updated_at || product.created_at) }
+        : null;
+    })
+    .filter((entry): entry is { loc: string; lastmod: string | null } => Boolean(entry));
 
   const urls = [...staticEntries, ...productEntries]
     .map(
@@ -166,6 +175,7 @@ function merchantAvailability(product: SeoProductRow): "in_stock" | "out_of_stoc
 function isMerchantFeedEligible(product: SeoProductRow): boolean {
   if (product.product_type === "affiliate" || product.product_type === "digital") return false;
   if (product.fulfilment_model !== "cossa_stock") return false;
+  if (!productUrl(product.slug)) return false;
   const price = Number(product.price);
   if (!Number.isFinite(price) || price <= 0) return false;
   if (!safeAbsoluteUrl(product.image_urls?.[0])) return false;
@@ -176,14 +186,14 @@ function buildMerchantFeed(products: SeoProductRow[]): string {
   const items = products
     .filter(isMerchantFeedEligible)
     .map((product) => {
-      const link = absoluteStoreUrl(`/product/${encodeURIComponent(product.slug)}`);
+      const link = productUrl(product.slug);
       const imageLink = safeAbsoluteUrl(product.image_urls[0]);
       const description =
         product.seo_description || product.short_description || product.description || product.name;
       const availability = merchantAvailability(product);
       const price = Number(product.price);
 
-      if (!imageLink || !availability) return null;
+      if (!link || !imageLink || !availability) return null;
 
       const optionalBrand = product.brand
         ? `\n      <g:brand>${xmlEscape(product.brand)}</g:brand>`
