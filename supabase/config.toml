@@ -30,3 +30,8 @@ verify_jwt = false
 # Permanent Cossa Lifestyle product provisioning service. It verifies the caller session and owner/admin role itself.
 # Printify writes remain blocked unless PRINTIFY_PRODUCT_PROVISIONING_ENABLED=true.
 verify_jwt = false
+
+[functions.printify-send-to-production]
+# Financial production-authorization boundary. Caller authentication and owner/admin authorization are verified in the function.
+# Requires explicit Manual-approval attestation and PRINTIFY_PRODUCTION_ENABLED=true before production can be requested.
+verify_jwt = false
