@@ -6,7 +6,7 @@ const ORG = "00000000-0000-4000-8000-000000000001";
 const ALLOWED = new Set(["https://store.cossanexusholdings.co.za","https://growth.cossanexusholdings.co.za","http://localhost:3000","http://localhost:5173"]);
 function cors(r:Request):HeadersInit{const o=r.headers.get("origin");return{"Access-Control-Allow-Origin":o&&ALLOWED.has(o)?o:"","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Allow-Credentials":"true",Vary:"Origin"}}
 function json(r:Request,b:unknown,s=200){return new Response(JSON.stringify(b),{status:s,headers:{...cors(r),"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}})}
-function uuid(v:unknown){return typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)}
+function uuid(v:unknown){return typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)}
 function cents(v:unknown){const n=Number(v);return Number.isFinite(n)&&n>=0?Math.round(n):null}
 async function user(r:Request,c:ReturnType<typeof createClient>):Promise<User>{const t=r.headers.get("authorization")?.replace(/^Bearer\s+/i,"").trim();if(!t)throw new Error("Sign in is required.");const {data,error}=await c.auth.getUser(t);if(error||!data.user)throw new Error("Your session could not be verified.");return data.user}
 async function adminRole(a:ReturnType<typeof createClient>,id:string){const [m,g]=await Promise.all([a.from("organisation_members").select("role").eq("organisation_id",ORG).eq("user_id",id).eq("status","active").in("role",["owner","admin"]),a.from("user_roles").select("role").eq("user_id",id).eq("role","admin")]);if(m.error||g.error||(!(m.data??[]).length&&!(g.data??[]).length))throw new Error("An authorised Cossa Store administrator is required.")}
@@ -24,10 +24,18 @@ Deno.serve(async r=>{
   const om=(o.metadata&&typeof o.metadata==="object"&&!Array.isArray(o.metadata)?o.metadata:{}) as Record<string,unknown>;if(om.cancelled===true||om.cancel_requested===true||om.fulfilment_hold===true)throw new Error("Production is blocked by a cancellation or fulfilment hold.");
   if(Deno.env.get("PRINTIFY_MANUAL_APPROVAL_CONFIRMED")!=="true")throw new Error("Production is blocked until Printify Manual order approval has been explicitly confirmed in server configuration.");
 
+  // Human approval is a real authorization gate, not decoration. The latest audited
+  // fulfilment decision for this order must be approve_production. Any later hold,
+  // release, retry, investigation or cancellation requires a fresh approval.
+  const {data:decisions,error:de}=await a.from("store_fulfilment_actions").select("action,actor_user_id,reason,created_at").eq("organisation_id",ORG).eq("store_order_id",o.id).order("created_at",{ascending:false}).limit(1);
+  if(de)throw de;
+  const latestDecision=decisions?.[0];
+  if(!latestDecision||latestDecision.action!=="approve_production")throw new Error("Production is blocked until the latest audited fulfilment decision is Approve production.");
+
   const remote=await printifyRequest(`/shops/${PRINTIFY_SHOP_ID}/orders/${encodeURIComponent(String(f.provider_order_id))}.json`,token,{method:"GET"}) as Record<string,unknown>;
   const remoteStatus=String(remote.status??"");
   if(["sending-to-production","in-production","fulfilled","partially-fulfilled"].includes(remoteStatus))return json(r,{alreadyAuthorized:true,providerOrderId:f.provider_order_id,printifyStatus:remoteStatus});
-  if(["canceled","unfulfillable","has-issues","payment-not-received","source-check-failed"].includes(remoteStatus))throw new Error(`Production is blocked by Printify order status: ${remoteStatus}.`);
+  if(remoteStatus!=="on-hold")throw new Error(`Production is blocked because Printify order status is ${remoteStatus||"unknown"}; expected on-hold.`);
 
   // Printify charges production + shipping when the order is sent to production.
   // Never infer spendable cash from a customer-facing `paid` flag. The worker must
@@ -47,12 +55,12 @@ Deno.serve(async r=>{
   const spendable=Math.max(0,availableFloat-reserveFloor);
   if(liability>spendable)throw new Error(`Production is blocked: supplier liability ${liability} ${billingCurrency} minor units exceeds spendable fulfilment float ${spendable}.`);
 
-  const gates={orderPaid:true,paymentApproved:true,noHold:true,manualApprovalConfirmed:true,floatReconciled:true,floatCurrencyMatched:true,liabilityCovered:true};
-  if(Deno.env.get("PRINTIFY_PRODUCTION_ENABLED")!=="true")return json(r,{authorized:false,dryRun:true,providerOrderId:f.provider_order_id,printifyStatus:remoteStatus,gates,finance:{billingCurrency,productionCost,shippingCost,taxCost,liability,availableFloat,reserveFloor,spendable},killSwitch:"PRINTIFY_PRODUCTION_ENABLED"});
+  const gates={orderPaid:true,paymentApproved:true,noHold:true,manualApprovalConfirmed:true,auditedProductionApproval:true,providerOnHold:true,floatReconciled:true,floatCurrencyMatched:true,liabilityCovered:true};
+  if(Deno.env.get("PRINTIFY_PRODUCTION_ENABLED")!=="true")return json(r,{authorized:false,dryRun:true,providerOrderId:f.provider_order_id,printifyStatus:remoteStatus,gates,approval:{actorUserId:latestDecision.actor_user_id,createdAt:latestDecision.created_at,reason:latestDecision.reason},finance:{billingCurrency,productionCost,shippingCost,taxCost,liability,availableFloat,reserveFloor,spendable},killSwitch:"PRINTIFY_PRODUCTION_ENABLED"});
 
   const response=await printifyRequest(`/shops/${PRINTIFY_SHOP_ID}/orders/${encodeURIComponent(String(f.provider_order_id))}/send_to_production.json`,token,{method:"POST"});
   const now=new Date().toISOString();const fm=(f.metadata&&typeof f.metadata==="object"&&!Array.isArray(f.metadata)?f.metadata:{}) as Record<string,unknown>;
-  const {error:ue}=await a.from("store_fulfilment_orders").update({status:"production_requested",provider_response:{order:remote,send_to_production:response},metadata:{...fm,production_authorized_at:now,production_authorized_by:u.id,manual_approval_attested:true,finance_authorization:{billing_currency:billingCurrency,production_cost:productionCost,shipping_cost:shippingCost,tax_cost:taxCost,liability,available_float:availableFloat,reserve_floor:reserveFloor,spendable_float:spendable}},updated_at:now,last_error:null}).eq("id",f.id);if(ue)throw ue;
+  const {error:ue}=await a.from("store_fulfilment_orders").update({status:"production_requested",provider_response:{order:remote,send_to_production:response},metadata:{...fm,production_authorized_at:now,production_authorized_by:u.id,approval_actor_user_id:latestDecision.actor_user_id,approval_created_at:latestDecision.created_at,manual_approval_attested:true,finance_authorization:{billing_currency:billingCurrency,production_cost:productionCost,shipping_cost:shippingCost,tax_cost:taxCost,liability,available_float:availableFloat,reserve_floor:reserveFloor,spendable_float:spendable}},updated_at:now,last_error:null}).eq("id",f.id);if(ue)throw ue;
   return json(r,{authorized:true,providerOrderId:f.provider_order_id,status:"production_requested",sentToProduction:true,finance:{billingCurrency,liability,spendableBeforeAuthorization:spendable}});
  }catch(e){const message=e instanceof Error?e.message:"Production authorization failed.";console.error(JSON.stringify({event:"printify_production_authorization_failed",message}));return json(r,{error:message},400)}
 });
