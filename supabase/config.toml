@@ -7,3 +7,13 @@ verify_jwt = false
 # User authentication and administrator authorization are verified in the function.
 # This supports Supabase's current opaque publishable API keys.
 verify_jwt = false
+
+[functions.printify-fulfilment-create]
+# The function verifies the caller session and Cossa admin role itself.
+# A separate PRINTIFY_FULFILMENT_ENABLED=true server flag is still required before any order can be submitted.
+verify_jwt = false
+
+[functions.printify-fulfilment-mapping]
+# The function verifies the caller session and Cossa admin role itself.
+# Mapping writes remain blocked unless PRINTIFY_MAPPING_WRITES_ENABLED=true.
+verify_jwt = false
