@@ -21,3 +21,7 @@ verify_jwt = false
 [functions.printify-fulfilment-catalogue]
 # Read-only browser for the connected Printify shop. The function verifies the caller session and Cossa admin role itself.
 verify_jwt = false
+
+[functions.printify-production-readiness]
+# Read-only production readiness gate. The function verifies the caller session and Cossa owner/admin role itself.
+verify_jwt = false
