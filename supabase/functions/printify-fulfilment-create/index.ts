@@ -51,6 +51,21 @@ type ShippingAddress = {
   city: string;
   zip: string;
 };
+type ExistingProductLine = {
+  product_id: string;
+  variant_id: number;
+  quantity: number;
+  external_id: string;
+};
+type CustomArtworkLine = {
+  print_provider_id: number;
+  blueprint_id: number;
+  variant_id: number;
+  print_areas: Record<string, string>;
+  quantity: number;
+  external_id: string;
+};
+type PrintifyLine = ExistingProductLine | CustomArtworkLine;
 
 function corsHeaders(request: Request): HeadersInit {
   const origin = request.headers.get("origin");
@@ -94,6 +109,17 @@ function asObject(value: unknown): Record<string, unknown> {
     ? (value as Record<string, unknown>)
     : {};
 }
+function positiveInteger(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+function explicitProvider(item: StoreOrderItem): string {
+  return text(asObject(item.metadata).provider, 80).toLowerCase();
+}
+function safePrintArea(value: unknown): string {
+  const area = text(value, 40).toLowerCase();
+  return ["front", "back", "left_sleeve", "right_sleeve"].includes(area) ? area : "front";
+}
 
 async function requireUser(request: Request, client: ReturnType<typeof createClient>): Promise<User> {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
@@ -111,7 +137,7 @@ async function requireAdmin(admin: AdminClient, userId: string) {
       .eq("organisation_id", COSSA_ORGANISATION_ID)
       .eq("user_id", userId)
       .eq("status", "active")
-      .in("role", ["owner", "admin", "manager"]),
+      .in("role", ["owner", "admin"]),
     admin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin"),
   ]);
   if (membership.error || role.error || (!(membership.data ?? []).length && !(role.data ?? []).length)) {
@@ -156,7 +182,10 @@ async function loadPaidStoreOrder(admin: AdminClient, storeOrderId: string) {
   return order;
 }
 
-async function resolvePrintifyLine(admin: AdminClient, item: StoreOrderItem) {
+async function resolvePrintifyLine(admin: AdminClient, item: StoreOrderItem): Promise<PrintifyLine | null> {
+  const itemProvider = explicitProvider(item);
+  if (itemProvider && itemProvider !== "printify") return null;
+
   const metadata = asObject(item.metadata);
   let storeProductId = uuid(item.product_id)
     ? String(item.product_id)
@@ -195,12 +224,13 @@ async function resolvePrintifyLine(admin: AdminClient, item: StoreOrderItem) {
   }
 
   if (!storeProductId) {
+    if (!itemProvider) return null;
     throw new Error(`${item.product_name}: Cossa product mapping could not be resolved safely.`);
   }
 
   let mappingQuery = admin
     .from("store_product_fulfilment_mappings")
-    .select("id,provider_product_id,provider_variant_id,store_variant_id")
+    .select("id,provider_product_id,provider_variant_id,store_variant_id,blueprint_id,print_provider_id,artwork_asset_ref,metadata")
     .eq("organisation_id", COSSA_ORGANISATION_ID)
     .eq("store_product_id", storeProductId)
     .eq("provider", "Printify")
@@ -211,14 +241,23 @@ async function resolvePrintifyLine(admin: AdminClient, item: StoreOrderItem) {
     : mappingQuery.is("store_variant_id", null);
 
   const { data: mappings, error } = await mappingQuery.limit(2);
-  if (error || !mappings || mappings.length !== 1) {
+  if (error) throw error;
+  if (!mappings?.length) {
+    if (!itemProvider) return null;
+    throw new Error(`${item.product_name}: no active Printify fulfilment mapping exists.`);
+  }
+  if (mappings.length !== 1) {
     throw new Error(`${item.product_name}: exactly one active Printify fulfilment mapping is required.`);
   }
 
   const mapping = mappings[0] as {
-    provider_product_id: string;
+    provider_product_id: string | null;
     provider_variant_id: string | null;
     store_variant_id: string | null;
+    blueprint_id: string | null;
+    print_provider_id: string | null;
+    artwork_asset_ref: string | null;
+    metadata: Record<string, unknown> | null;
   };
 
   let providerVariantId = mapping.provider_variant_id;
@@ -234,16 +273,40 @@ async function resolvePrintifyLine(admin: AdminClient, item: StoreOrderItem) {
     providerVariantId = variant.provider_variant_id;
   }
 
-  const numericVariantId = Number(providerVariantId);
-  if (!mapping.provider_product_id || !Number.isInteger(numericVariantId) || numericVariantId <= 0) {
-    throw new Error(`${item.product_name}: Printify fulfilment IDs are incomplete.`);
+  const numericVariantId = positiveInteger(providerVariantId);
+  if (!numericVariantId) throw new Error(`${item.product_name}: Printify variant ID is incomplete.`);
+
+  const quantity = Math.max(1, Math.trunc(Number(item.quantity) || 1));
+  const externalId = item.id || `${storeProductId}:${storeVariantId || "default"}`;
+  const blueprintId = positiveInteger(mapping.blueprint_id);
+  const printProviderId = positiveInteger(mapping.print_provider_id);
+  const artworkAssetRef = text(mapping.artwork_asset_ref, 1000);
+
+  // Cossa-owned artwork must not accidentally order another Printify product's design.
+  // When the blueprint, print provider and production artwork are present, create the
+  // product from the order instead of using provider_product_id.
+  if (blueprintId && printProviderId && artworkAssetRef) {
+    const printArea = safePrintArea(asObject(mapping.metadata).print_area);
+    return {
+      print_provider_id: printProviderId,
+      blueprint_id: blueprintId,
+      variant_id: numericVariantId,
+      print_areas: { [printArea]: artworkAssetRef },
+      quantity,
+      external_id: externalId,
+    };
+  }
+
+  const providerProductId = text(mapping.provider_product_id, 160);
+  if (!providerProductId) {
+    throw new Error(`${item.product_name}: custom Cossa artwork needs blueprint ID, print provider ID and production artwork before fulfilment.`);
   }
 
   return {
-    product_id: mapping.provider_product_id,
+    product_id: providerProductId,
     variant_id: numericVariantId,
-    quantity: Math.max(1, Math.trunc(Number(item.quantity) || 1)),
-    external_id: item.id || `${storeProductId}:${storeVariantId || "default"}`,
+    quantity,
+    external_id: externalId,
   };
 }
 
@@ -315,9 +378,13 @@ Deno.serve(async (request) => {
       return json(request, { duplicatePrevented: true, fulfilment: existing.data });
     }
 
-    const lineItems: Array<{ product_id: string; variant_id: number; quantity: number; external_id: string }> = [];
+    const lineItems: PrintifyLine[] = [];
     for (const item of order.store_order_items) {
-      lineItems.push(await resolvePrintifyLine(admin, item));
+      const line = await resolvePrintifyLine(admin, item);
+      if (line) lineItems.push(line);
+    }
+    if (!lineItems.length) {
+      return json(request, { notRequired: true, reason: "This paid order has no Printify-mapped items." });
     }
 
     const addressTo = buildAddress(order, payment);
@@ -330,6 +397,17 @@ Deno.serve(async (request) => {
       send_shipping_notification: false,
       address_to: addressTo,
     };
+
+    // Safe production-like validation mode: resolve the paid order, mappings and exact
+    // Printify payload but do not reserve a fulfilment row and never call Printify.
+    if (Deno.env.get("PRINTIFY_FULFILMENT_DRY_RUN") === "true") {
+      return json(request, {
+        dryRun: true,
+        printifyOrderCreated: false,
+        idempotencyKey,
+        payload,
+      });
+    }
 
     const reservation = await admin
       .from("store_fulfilment_orders")
