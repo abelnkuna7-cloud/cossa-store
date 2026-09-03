@@ -11,6 +11,7 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:5173",
 ]);
 
+type AdminClient = ReturnType<typeof createClient>;
 type PaymentRequest = {
   id: string;
   organisation_id: string;
@@ -19,17 +20,17 @@ type PaymentRequest = {
   store_order_id: string | null;
   status: string;
 };
-
 type StoreOrderItem = {
   id?: string;
+  product_id: string | null;
   product_name: string;
   sku: string | null;
   quantity: number;
   metadata: Record<string, unknown> | null;
 };
-
 type StoreOrder = {
   id: string;
+  organisation_id: string;
   order_number: string;
   status: string;
   customer_name?: string | null;
@@ -38,7 +39,6 @@ type StoreOrder = {
   metadata: Record<string, unknown> | null;
   store_order_items: StoreOrderItem[];
 };
-
 type ShippingAddress = {
   first_name: string;
   last_name: string;
@@ -62,7 +62,6 @@ function corsHeaders(request: Request): HeadersInit {
     Vary: "Origin",
   };
 }
-
 function json(request: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -73,23 +72,16 @@ function json(request: Request, body: unknown, status = 200) {
     },
   });
 }
-
 function text(value: unknown, max = 240) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
-
 function uuid(value: unknown) {
   return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
-
 function splitName(fullName: string) {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  return {
-    firstName: parts[0] || "Customer",
-    lastName: parts.slice(1).join(" ") || "Customer",
-  };
+  return { firstName: parts[0] || "Customer", lastName: parts.slice(1).join(" ") || "Customer" };
 }
-
 function shippingMethodCode(value: unknown) {
   const method = text(value, 40).toLowerCase();
   if (method === "economy") return 4;
@@ -97,17 +89,13 @@ function shippingMethodCode(value: unknown) {
   if (method === "priority" || method === "express") return 2;
   return 1;
 }
-
 function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
 }
 
-async function requireUser(
-  request: Request,
-  client: ReturnType<typeof createClient>,
-): Promise<User> {
+async function requireUser(request: Request, client: ReturnType<typeof createClient>): Promise<User> {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
   if (!token) throw new Error("Sign in is required.");
   const { data, error } = await client.auth.getUser(token);
@@ -115,7 +103,7 @@ async function requireUser(
   return data.user;
 }
 
-async function requireAdmin(admin: ReturnType<typeof createClient>, userId: string) {
+async function requireAdmin(admin: AdminClient, userId: string) {
   const [membership, role] = await Promise.all([
     admin
       .from("organisation_members")
@@ -126,21 +114,18 @@ async function requireAdmin(admin: ReturnType<typeof createClient>, userId: stri
       .in("role", ["owner", "admin", "manager"]),
     admin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin"),
   ]);
-  if (
-    membership.error ||
-    role.error ||
-    (!(membership.data ?? []).length && !(role.data ?? []).length)
-  ) {
+  if (membership.error || role.error || (!(membership.data ?? []).length && !(role.data ?? []).length)) {
     throw new Error("An authorised Cossa Store administrator is required.");
   }
 }
 
-async function loadApprovedStorePayment(admin: ReturnType<typeof createClient>, paymentId: string) {
+async function loadApprovedStorePayment(admin: AdminClient, paymentId: string) {
   if (!uuid(paymentId)) throw new Error("Invalid payment reference.");
   const { data, error } = await admin
     .from("eft_payment_requests")
     .select("id,organisation_id,payer_email,purpose,store_order_id,status")
     .eq("id", paymentId)
+    .eq("organisation_id", COSSA_ORGANISATION_ID)
     .maybeSingle();
   if (error || !data) throw new Error("Payment request was not found.");
   const payment = data as PaymentRequest;
@@ -153,50 +138,60 @@ async function loadApprovedStorePayment(admin: ReturnType<typeof createClient>, 
   return payment;
 }
 
-async function loadStoreOrder(admin: ReturnType<typeof createClient>, storeOrderId: string) {
+async function loadPaidStoreOrder(admin: AdminClient, storeOrderId: string) {
   const { data, error } = await admin
     .from("store_orders")
     .select(
-      "id,order_number,status,customer_name,customer_phone,shipping_method,metadata,store_order_items(id,product_name,sku,quantity,metadata)",
+      "id,organisation_id,order_number,status,customer_name,customer_phone,shipping_method,metadata,store_order_items(id,product_id,product_name,sku,quantity,metadata)",
     )
     .eq("id", storeOrderId)
+    .eq("organisation_id", COSSA_ORGANISATION_ID)
     .maybeSingle();
-  if (error || !data) throw new Error("The paid Store order could not be loaded for fulfilment.");
+  if (error || !data) throw new Error("The Store order could not be loaded for fulfilment.");
   const order = data as unknown as StoreOrder;
+  if (order.status !== "paid") {
+    throw new Error("Printify fulfilment is blocked until the Store order is marked paid.");
+  }
   if (!(order.store_order_items ?? []).length) throw new Error("The Store order has no fulfilment items.");
   return order;
 }
 
-async function resolvePrintifyLine(
-  admin: ReturnType<typeof createClient>,
-  item: StoreOrderItem,
-) {
+async function resolvePrintifyLine(admin: AdminClient, item: StoreOrderItem) {
   const metadata = asObject(item.metadata);
-  let storeProductId = uuid(metadata.store_product_id) ? String(metadata.store_product_id) : null;
-  let storeVariantId = uuid(metadata.store_variant_id) ? String(metadata.store_variant_id) : null;
+  let storeProductId = uuid(item.product_id)
+    ? String(item.product_id)
+    : uuid(metadata.store_product_id)
+      ? String(metadata.store_product_id)
+      : null;
+  let storeVariantId = uuid(metadata.variant_id)
+    ? String(metadata.variant_id)
+    : uuid(metadata.store_variant_id)
+      ? String(metadata.store_variant_id)
+      : null;
 
   if (!storeVariantId && item.sku) {
-    const { data: variant } = await admin
+    const { data: variants, error } = await admin
       .from("store_product_variants")
-      .select("id,product_id,provider_product_id,provider_variant_id")
-      .eq("provider", "Printify")
+      .select("id,product_id")
       .eq("sku", item.sku)
       .eq("is_available", true)
       .limit(2);
-    if ((variant ?? []).length === 1) {
-      storeVariantId = variant![0].id;
-      storeProductId = variant![0].product_id;
+    if (error) throw error;
+    if ((variants ?? []).length === 1) {
+      storeVariantId = variants![0].id;
+      storeProductId = storeProductId || variants![0].product_id;
     }
   }
 
   if (!storeProductId && item.sku) {
-    const { data: product } = await admin
+    const { data: products, error } = await admin
       .from("store_products")
       .select("id")
       .eq("organisation_id", COSSA_ORGANISATION_ID)
       .eq("sku", item.sku)
       .limit(2);
-    if ((product ?? []).length === 1) storeProductId = product![0].id;
+    if (error) throw error;
+    if ((products ?? []).length === 1) storeProductId = products![0].id;
   }
 
   if (!storeProductId) {
@@ -221,7 +216,6 @@ async function resolvePrintifyLine(
   }
 
   const mapping = mappings[0] as {
-    id: string;
     provider_product_id: string;
     provider_variant_id: string | null;
     store_variant_id: string | null;
@@ -233,7 +227,6 @@ async function resolvePrintifyLine(
       .from("store_product_variants")
       .select("provider_variant_id,is_available")
       .eq("id", mapping.store_variant_id)
-      .eq("provider", "Printify")
       .maybeSingle();
     if (variantError || !variant || !variant.is_available) {
       throw new Error(`${item.product_name}: mapped Printify variant is unavailable.`);
@@ -242,7 +235,7 @@ async function resolvePrintifyLine(
   }
 
   const numericVariantId = Number(providerVariantId);
-  if (!mapping.provider_product_id || !Number.isInteger(numericVariantId)) {
+  if (!mapping.provider_product_id || !Number.isInteger(numericVariantId) || numericVariantId <= 0) {
     throw new Error(`${item.product_name}: Printify fulfilment IDs are incomplete.`);
   }
 
@@ -272,7 +265,7 @@ function buildAddress(order: StoreOrder, payment: PaymentRequest): ShippingAddre
     zip: text(raw.zip, 20),
   };
   if (!address.address1 || !address.city || !address.region || !address.zip) {
-    throw new Error("The approved order does not contain a complete delivery address.");
+    throw new Error("The paid order does not contain a complete delivery address.");
   }
   return address;
 }
@@ -284,7 +277,6 @@ Deno.serve(async (request) => {
   const origin = request.headers.get("origin");
   if (origin && !ALLOWED_ORIGINS.has(origin)) return json(request, { error: "Origin not allowed." }, 403);
 
-  // Hard kill-switch. Code may exist in preview without being capable of placing a real order.
   if (Deno.env.get("PRINTIFY_FULFILMENT_ENABLED") !== "true") {
     return json(request, { error: "Printify fulfilment is disabled." }, 503);
   }
@@ -309,7 +301,7 @@ Deno.serve(async (request) => {
     await requireAdmin(admin, user.id);
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const payment = await loadApprovedStorePayment(admin, text(body.paymentId, 64));
-    const order = await loadStoreOrder(admin, payment.store_order_id!);
+    const order = await loadPaidStoreOrder(admin, payment.store_order_id!);
 
     const idempotencyKey = `printify:${order.id}`;
     const existing = await admin
@@ -320,13 +312,10 @@ Deno.serve(async (request) => {
       .maybeSingle();
     if (existing.error) throw existing.error;
     if (existing.data) {
-      return json(request, {
-        duplicatePrevented: true,
-        fulfilment: existing.data,
-      });
+      return json(request, { duplicatePrevented: true, fulfilment: existing.data });
     }
 
-    const lineItems = [] as Array<{ product_id: string; variant_id: number; quantity: number; external_id: string }>;
+    const lineItems: Array<{ product_id: string; variant_id: number; quantity: number; external_id: string }> = [];
     for (const item of order.store_order_items) {
       lineItems.push(await resolvePrintifyLine(admin, item));
     }
@@ -403,11 +392,7 @@ Deno.serve(async (request) => {
       const message = providerError instanceof Error ? providerError.message : "Printify order submission failed.";
       await admin
         .from("store_fulfilment_orders")
-        .update({
-          status: "failed",
-          last_error: message.slice(0, 2000),
-          updated_at: new Date().toISOString(),
-        })
+        .update({ status: "failed", last_error: message.slice(0, 2000), updated_at: new Date().toISOString() })
         .eq("id", reservation.data.id);
       throw new Error(message);
     }
