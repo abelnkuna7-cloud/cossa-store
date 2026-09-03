@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { CatalogueShell } from "@/components/admin/CatalogueShell";
 import { CjProductSyncPanel } from "@/components/admin/CjProductSyncPanel";
+import { CossaLifestylePrintifyMappingPanel } from "@/components/admin/CossaLifestylePrintifyMappingPanel";
 import { PrintifySyncPanel } from "@/components/admin/PrintifySyncPanel";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/common/StateBlocks";
 import { Button } from "@/components/ui/button";
@@ -166,6 +167,7 @@ function CatalogueTable() {
   return (
     <div className="space-y-5">
       <PrintifySyncPanel onSynced={invalidateCatalogue} />
+      <CossaLifestylePrintifyMappingPanel />
       <CjProductSyncPanel onSynced={invalidateCatalogue} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
