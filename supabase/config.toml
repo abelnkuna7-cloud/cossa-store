@@ -9,7 +9,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.printify-fulfilment-create]
-# The function verifies the caller session and Cossa admin role itself.
+# Supports interactive owner/admin calls and authenticated internal worker calls.
 # A separate PRINTIFY_FULFILMENT_ENABLED=true server flag is still required before any order can be submitted.
 verify_jwt = false
 
@@ -34,4 +34,8 @@ verify_jwt = false
 [functions.printify-send-to-production]
 # Financial production-authorization boundary. Caller authentication and owner/admin authorization are verified in the function.
 # Requires explicit Manual-approval attestation and PRINTIFY_PRODUCTION_ENABLED=true before production can be requested.
+verify_jwt = false
+
+[functions.store-fulfilment-worker]
+# Internal autonomous worker. Requires STORE_FULFILMENT_WORKER_SECRET and processes durable outbox jobs.
 verify_jwt = false
