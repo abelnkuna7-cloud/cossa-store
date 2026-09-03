@@ -36,13 +36,20 @@ type ProductRow = {
   updated_at: string;
 };
 
+type ReadinessResponse = {
+  productionReady?: boolean;
+  gate?: "PRODUCTION_READY" | "NOT_PRODUCTION_READY";
+  missingProductFields?: string[];
+  variants?: Array<{ title?: string | null; sku?: string | null; ready?: boolean; missing?: string[] }>;
+  error?: string;
+};
+
 function publicProductUrl(slug: string): string {
   return `${STORE_PRODUCT_URL}/${encodeURIComponent(slug)}`;
 }
 
 async function copyProductLink(row: ProductRow): Promise<void> {
   const url = publicProductUrl(row.slug);
-
   try {
     if (!navigator.clipboard?.writeText) throw new Error("Clipboard access is unavailable");
     await navigator.clipboard.writeText(url);
@@ -54,21 +61,42 @@ async function copyProductLink(row: ProductRow): Promise<void> {
 
 async function shareProduct(row: ProductRow): Promise<void> {
   const url = publicProductUrl(row.slug);
-
   if (navigator.share) {
     try {
-      await navigator.share({
-        title: row.name,
-        text: `Shop ${row.name} from Cossa Store`,
-        url,
-      });
+      await navigator.share({ title: row.name, text: `Shop ${row.name} from Cossa Store`, url });
       return;
     } catch (error) {
       if ((error as { name?: string }).name === "AbortError") return;
     }
   }
-
   await copyProductLink(row);
+}
+
+async function assertCossaLifestyleProductionReady(row: ProductRow): Promise<void> {
+  const isGuarded =
+    row.brand === "Cossa Lifestyle" &&
+    row.product_type === "pod" &&
+    row.fulfilment_model === "print_on_demand";
+  if (!isGuarded) return;
+
+  const { data, error } = await supabase.functions.invoke("printify-production-readiness", {
+    body: { storeProductId: row.id },
+  });
+  if (error) throw new Error((error as { message?: string }).message || "Production readiness could not be checked.");
+  const result = (data ?? {}) as ReadinessResponse;
+  if (result.error) throw new Error(result.error);
+  if (result.productionReady) return;
+
+  const missingProduct = result.missingProductFields ?? [];
+  const unreadyVariants = (result.variants ?? []).filter((variant) => !variant.ready);
+  const details = [
+    missingProduct.length ? `product: ${missingProduct.join(", ")}` : "",
+    unreadyVariants.length ? `${unreadyVariants.length} variant(s) incomplete` : "",
+  ].filter(Boolean).join("; ");
+
+  throw new Error(
+    `NOT PRODUCTION READY — Cossa Lifestyle publication is blocked${details ? ` (${details})` : ""}. Complete the production mapping and run the readiness check again.`,
+  );
 }
 
 export const Route = createFileRoute("/_authenticated/admin/catalogue/")({
@@ -140,11 +168,12 @@ function CatalogueTable() {
   });
 
   const mutation = useMutation({
-    mutationFn: async ({ id, nextStatus }: { id: string; nextStatus: "draft" | "active" | "archived" }) => {
+    mutationFn: async ({ row, nextStatus }: { row: ProductRow; nextStatus: "draft" | "active" | "archived" }) => {
+      if (nextStatus === "active") await assertCossaLifestyleProductionReady(row);
       const { error } = await db
         .from("store_products")
         .update({ status: nextStatus, updated_at: new Date().toISOString() })
-        .eq("id", id)
+        .eq("id", row.id)
         .eq("organisation_id", ORGANISATION_ID);
       if (error) throw error;
     },
@@ -182,70 +211,46 @@ function CatalogueTable() {
         <EmptyBlock
           title="No products yet"
           description="Create your first real product. It will be saved in cossa-growth and only appear on the Store when its status is Active."
-          action={
-            <Button asChild>
-              <Link to="/admin/catalogue/new">Create first product</Link>
-            </Button>
-          }
+          action={<Button asChild><Link to="/admin/catalogue/new">Create first product</Link></Button>}
         />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full min-w-[920px] text-left text-sm">
             <thead className="bg-secondary/60 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="px-3 py-2">Code</th>
-                <th className="px-3 py-2">Product</th>
-                <th className="px-3 py-2">Category</th>
-                <th className="px-3 py-2">Type</th>
-                <th className="px-3 py-2">Fulfilment</th>
-                <th className="px-3 py-2">Price</th>
-                <th className="px-3 py-2">Stock</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Updated</th>
-                <th className="px-3 py-2">Actions</th>
+                <th className="px-3 py-2">Code</th><th className="px-3 py-2">Product</th><th className="px-3 py-2">Category</th>
+                <th className="px-3 py-2">Type</th><th className="px-3 py-2">Fulfilment</th><th className="px-3 py-2">Price</th>
+                <th className="px-3 py-2">Stock</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Updated</th><th className="px-3 py-2">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filtered.map((row) => (
                 <tr key={row.id} className="align-top">
                   <td className="px-3 py-2 font-mono text-xs">{row.sku ?? "—"}</td>
-                  <td className="px-3 py-2">
-                    <div className="font-medium">{row.name}</div>
-                    {row.brand ? <div className="text-xs text-muted-foreground">{row.brand}</div> : null}
-                  </td>
+                  <td className="px-3 py-2"><div className="font-medium">{row.name}</div>{row.brand ? <div className="text-xs text-muted-foreground">{row.brand}</div> : null}</td>
                   <td className="px-3 py-2 text-muted-foreground">{row.category ?? "—"}</td>
                   <td className="px-3 py-2 capitalize text-muted-foreground">{row.product_type.replace(/_/g, " ")}</td>
                   <td className="px-3 py-2 capitalize text-muted-foreground">{row.fulfilment_model.replace(/_/g, " ")}</td>
                   <td className="px-3 py-2">{formatZar(Number(row.price ?? 0))}</td>
                   <td className="px-3 py-2">{row.unlimited_stock ? "Unlimited" : row.stock_quantity}</td>
-                  <td className="px-3 py-2">
-                    <span className="rounded-full border border-border px-2 py-0.5 text-[11px] capitalize">{row.status}</span>
-                  </td>
+                  <td className="px-3 py-2"><span className="rounded-full border border-border px-2 py-0.5 text-[11px] capitalize">{row.status}</span></td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{new Date(row.updated_at).toLocaleDateString("en-ZA")}</td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-1">
-                      <Button asChild size="sm" variant="outline">
-                        <Link to="/admin/catalogue/$id" params={{ id: row.id }}>Edit</Link>
-                      </Button>
+                      <Button asChild size="sm" variant="outline"><Link to="/admin/catalogue/$id" params={{ id: row.id }}>Edit</Link></Button>
                       {row.status === "active" ? (
                         <>
-                          <Button size="sm" variant="ghost" onClick={() => void copyProductLink(row)}>
-                            <Copy className="mr-1 h-3.5 w-3.5" aria-hidden />
-                            Copy link
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => void shareProduct(row)}>
-                            <Share2 className="mr-1 h-3.5 w-3.5" aria-hidden />
-                            Share
-                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => void copyProductLink(row)}><Copy className="mr-1 h-3.5 w-3.5" aria-hidden />Copy link</Button>
+                          <Button size="sm" variant="ghost" onClick={() => void shareProduct(row)}><Share2 className="mr-1 h-3.5 w-3.5" aria-hidden />Share</Button>
                         </>
                       ) : null}
                       {row.status === "active" ? (
-                        <Button size="sm" variant="ghost" disabled={mutation.isPending} onClick={() => mutation.mutate({ id: row.id, nextStatus: "draft" })}>Unpublish</Button>
+                        <Button size="sm" variant="ghost" disabled={mutation.isPending} onClick={() => mutation.mutate({ row, nextStatus: "draft" })}>Unpublish</Button>
                       ) : (
-                        <Button size="sm" variant="ghost" disabled={mutation.isPending} onClick={() => mutation.mutate({ id: row.id, nextStatus: "active" })}>Publish</Button>
+                        <Button size="sm" variant="ghost" disabled={mutation.isPending} onClick={() => mutation.mutate({ row, nextStatus: "active" })}>Publish</Button>
                       )}
                       {row.status !== "archived" ? (
-                        <Button size="sm" variant="ghost" disabled={mutation.isPending} onClick={() => mutation.mutate({ id: row.id, nextStatus: "archived" })}>Archive</Button>
+                        <Button size="sm" variant="ghost" disabled={mutation.isPending} onClick={() => mutation.mutate({ row, nextStatus: "archived" })}>Archive</Button>
                       ) : null}
                     </div>
                   </td>
@@ -264,9 +269,7 @@ function FilterSelect({ label, value, onChange, options }: { label: string; valu
     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
       <span>{label}</span>
       <select className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground" value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => (
-          <option key={option} value={option}>{option === "all" ? "All" : option.replace(/_/g, " ")}</option>
-        ))}
+        {options.map((option) => <option key={option} value={option}>{option === "all" ? "All" : option.replace(/_/g, " ")}</option>)}
       </select>
     </label>
   );
