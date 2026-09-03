@@ -71,7 +71,7 @@ Deno.serve(async (request) => {
 
     const { data: product, error: productError } = await admin
       .from("store_products")
-      .select("id,sku,name,brand,status,price,currency")
+      .select("id,sku,name,brand,status,price,currency,product_type,fulfilment_model")
       .eq("id", String(body.storeProductId))
       .eq("organisation_id", COSSA_ORGANISATION_ID)
       .maybeSingle();
@@ -97,12 +97,11 @@ Deno.serve(async (request) => {
     const activeVariants = variants ?? [];
     const activeMappings = mappings ?? [];
     const mappedByVariant = new Map(activeMappings.filter((m) => m.store_variant_id).map((m) => [m.store_variant_id, m]));
-    const productLevel = activeMappings.find((m) => !m.store_variant_id) ?? null;
 
     const variantChecks = activeVariants.map((variant) => {
-      const mapping = mappedByVariant.get(variant.id) ?? productLevel;
+      const mapping = mappedByVariant.get(variant.id);
       const missing: string[] = [];
-      if (!mapping) missing.push("mapping");
+      if (!mapping) missing.push("exact_variant_mapping");
       if (mapping) {
         if (!mapping.provider_variant_id) missing.push("provider_variant_id");
         const existingProductReady = Boolean(mapping.provider_product_id && mapping.provider_variant_id);
@@ -120,6 +119,8 @@ Deno.serve(async (request) => {
 
     const missingProductFields: string[] = [];
     if (product.brand !== "Cossa Lifestyle") missingProductFields.push("brand_must_be_cossa_lifestyle");
+    if (product.product_type !== "pod") missingProductFields.push("product_type_must_be_pod");
+    if (product.fulfilment_model !== "print_on_demand") missingProductFields.push("fulfilment_model_must_be_print_on_demand");
     if (!product.sku) missingProductFields.push("sku");
     if (!(Number(product.price) > 0)) missingProductFields.push("retail_price");
     if (!activeVariants.length) missingProductFields.push("available_variants");
@@ -131,7 +132,7 @@ Deno.serve(async (request) => {
       gate: ready ? "PRODUCTION_READY" : "NOT_PRODUCTION_READY",
       missingProductFields,
       variants: variantChecks,
-      rule: "Cossa Lifestyle cannot be treated as production-ready until every available variant has one valid synced Printify production mapping.",
+      rule: "Cossa Lifestyle POD publication is blocked until every available variant has its own exact synced Printify production mapping.",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Production readiness check failed.";
