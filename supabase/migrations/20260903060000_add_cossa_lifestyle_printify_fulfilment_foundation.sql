@@ -8,7 +8,9 @@ create table if not exists public.store_product_fulfilment_mappings (
   store_product_id uuid not null references public.store_products(id) on delete restrict,
   store_variant_id uuid references public.store_product_variants(id) on delete restrict,
   provider text not null,
-  provider_product_id text not null,
+  -- Existing-product fulfilment may use provider_product_id. Cossa-owned artwork may
+  -- instead be submitted as a custom Printify order using blueprint/provider/artwork.
+  provider_product_id text,
   provider_variant_id text,
   blueprint_id text,
   print_provider_id text,
@@ -25,7 +27,16 @@ create table if not exists public.store_product_fulfilment_mappings (
   constraint store_product_fulfilment_status_check
     check (fulfilment_status in ('active','paused','disabled')),
   constraint store_product_fulfilment_sync_status_check
-    check (sync_status in ('pending','synced','stale','error'))
+    check (sync_status in ('pending','synced','stale','error')),
+  constraint store_product_fulfilment_target_check
+    check (
+      nullif(btrim(coalesce(provider_product_id, '')), '') is not null
+      or (
+        nullif(btrim(coalesce(blueprint_id, '')), '') is not null
+        and nullif(btrim(coalesce(print_provider_id, '')), '') is not null
+        and nullif(btrim(coalesce(artwork_asset_ref, '')), '') is not null
+      )
+    )
 );
 
 create unique index if not exists uq_store_product_fulfilment_mapping_variant
