@@ -87,7 +87,7 @@ Deno.serve(async (request) => {
 
     const { data: mappings, error: mappingError } = await admin
       .from("store_product_fulfilment_mappings")
-      .select("id,store_variant_id,provider_product_id,provider_variant_id,blueprint_id,print_provider_id,artwork_asset_ref,fulfilment_status,sync_status")
+      .select("id,store_variant_id,provider_product_id,provider_variant_id,blueprint_id,print_provider_id,artwork_asset_ref,fulfilment_status,sync_status,metadata")
       .eq("organisation_id", COSSA_ORGANISATION_ID)
       .eq("store_product_id", product.id)
       .eq("provider", "Printify")
@@ -99,35 +99,27 @@ Deno.serve(async (request) => {
     const mappedByVariant = new Map(activeMappings.filter((m) => m.store_variant_id).map((m) => [m.store_variant_id, m]));
 
     const variantChecks = activeVariants.map((variant) => {
-      const mapping = mappedByVariant.get(variant.id);
+      const mapping = mappedByVariant.get(variant.id) as any;
       const missing: string[] = [];
       let route = "MISSING";
       if (!mapping) {
         missing.push("exact_variant_mapping");
       } else {
-        const hasProviderVariant = Boolean(mapping.provider_variant_id);
-        const customArtworkReady = Boolean(
-          mapping.blueprint_id &&
-          mapping.print_provider_id &&
-          mapping.provider_variant_id &&
-          mapping.artwork_asset_ref,
-        );
-        const existingProductFallback = Boolean(mapping.provider_product_id && mapping.provider_variant_id);
+        const metadata = mapping.metadata && typeof mapping.metadata === "object" ? mapping.metadata : {};
+        const configuredProductOwned = metadata.cossa_owned_configured_product === true;
+        const configuredProductReady = Boolean(mapping.provider_product_id && mapping.provider_variant_id && configuredProductOwned);
+        const customArtworkReady = Boolean(mapping.blueprint_id && mapping.print_provider_id && mapping.provider_variant_id && mapping.artwork_asset_ref);
 
-        if (customArtworkReady) {
-          route = "CUSTOM_ARTWORK";
-        } else if (existingProductFallback) {
-          route = "TECHNICAL_FALLBACK_ONLY";
-          missing.push("custom_artwork_route_required");
-        } else {
-          route = "INCOMPLETE";
-        }
+        if (configuredProductReady) route = "CONFIGURED_COSSA_PRODUCT";
+        else if (customArtworkReady) route = "CUSTOM_ARTWORK_COMPATIBILITY";
+        else if (mapping.provider_product_id && mapping.provider_variant_id) {
+          route = "UNVERIFIED_EXISTING_PRODUCT";
+          missing.push("cossa_owned_configured_product");
+        } else route = "INCOMPLETE";
 
-        if (!hasProviderVariant) missing.push("provider_variant_id");
-        if (!mapping.blueprint_id) missing.push("blueprint_id");
-        if (!mapping.print_provider_id) missing.push("print_provider_id");
-        if (!mapping.artwork_asset_ref) missing.push("artwork_asset_ref");
+        if (!mapping.provider_variant_id) missing.push("provider_variant_id");
         if (mapping.sync_status !== "synced") missing.push("mapping_not_synced");
+        if (!configuredProductReady && !customArtworkReady) missing.push("production_route");
       }
       return {
         variantId: variant.id,
@@ -154,7 +146,7 @@ Deno.serve(async (request) => {
       gate: ready ? "PRODUCTION_READY" : "NOT_PRODUCTION_READY",
       missingProductFields,
       variants: variantChecks,
-      rule: "Cossa Lifestyle POD publication requires every available variant to have its own exact synced Printify custom-artwork route: blueprint ID, print provider ID, provider variant ID and production artwork. Existing Printify product mappings are technical fallback only and are not production-ready.",
+      rule: "Preferred route: every available Cossa Lifestyle variant maps to an exact synced Printify product/variant that was configured in advance with Cossa-owned artwork. Custom-artwork-per-order remains a compatibility route, not the default. Unverified generic Printify products never qualify.",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Production readiness check failed.";
