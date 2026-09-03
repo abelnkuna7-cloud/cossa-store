@@ -22,35 +22,62 @@ Deno.serve(async (request) => {
   for (const job of jobs ?? []) {
     try {
       if (job.provider !== "Printify") throw new Error(`Unsupported fulfilment provider: ${job.provider}`);
-      const paymentId = job.payment_request_id || job.payload?.paymentId;
-      if (!paymentId) throw new Error("Approved payment reference is missing from fulfilment job.");
+      let result: Record<string, unknown> = {};
 
-      // Internal worker invocation. The fulfilment endpoint still performs its own
-      // payment/order/mapping/idempotency checks. A dedicated worker secret avoids
-      // pretending that an interactive administrator is present.
-      const response = await fetch(`${url}/functions/v1/printify-fulfilment-create`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-cossa-worker-secret": workerSecret,
-          "Authorization": `Bearer ${service}`,
-        },
-        body: JSON.stringify({ paymentId, source: "store_fulfilment_outbox", outboxJobId: job.id }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(String(result?.error || `Fulfilment endpoint returned ${response.status}.`));
+      if (job.event_type === "production_approved") {
+        const { data: fulfilment, error: fulfilmentError } = await admin
+          .from("store_fulfilment_orders")
+          .select("id,provider_order_id,status")
+          .eq("organisation_id", job.organisation_id)
+          .eq("store_order_id", job.store_order_id)
+          .eq("provider", "Printify")
+          .maybeSingle();
+        if (fulfilmentError) throw fulfilmentError;
+        if (!fulfilment?.id || !fulfilment.provider_order_id) throw new Error("Production approval is waiting for a persisted Printify fulfilment order.");
+
+        const response = await fetch(`${url}/functions/v1/printify-send-to-production`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-cossa-worker-secret": workerSecret,
+            "Authorization": `Bearer ${service}`,
+          },
+          body: JSON.stringify({ fulfilmentId: fulfilment.id, source: "store_fulfilment_outbox", outboxJobId: job.id }),
+        });
+        result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(String(result?.error || `Production endpoint returned ${response.status}.`));
+        if (result.authorized !== true && result.alreadyAuthorized !== true) {
+          throw new Error(String(result?.error || "Production remains blocked by a safety gate; the worker will retry automatically."));
+        }
+      } else if (job.event_type === "payment_approved") {
+        const paymentId = job.payment_request_id || job.payload?.paymentId;
+        if (!paymentId) throw new Error("Approved payment reference is missing from fulfilment job.");
+        const response = await fetch(`${url}/functions/v1/printify-fulfilment-create`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-cossa-worker-secret": workerSecret,
+            "Authorization": `Bearer ${service}`,
+          },
+          body: JSON.stringify({ paymentId, source: "store_fulfilment_outbox", outboxJobId: job.id }),
+        });
+        result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(String(result?.error || `Fulfilment endpoint returned ${response.status}.`));
+      } else {
+        throw new Error(`Unsupported fulfilment event: ${job.event_type}`);
+      }
 
       const now = new Date().toISOString();
       const { error: completeError } = await admin.from("store_fulfilment_outbox").update({ status: "completed", result, completed_at: now, locked_at: null, locked_by: null, last_error: null, updated_at: now }).eq("id", job.id).eq("status", "processing");
       if (completeError) throw completeError;
-      results.push({ id: job.id, status: "completed" });
+      results.push({ id: job.id, eventType: job.event_type, status: "completed" });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Fulfilment worker failed.";
       const attempts = Number(job.attempts || 1);
       const dead = attempts >= Number(job.max_attempts || 12);
       const availableAt = new Date(Date.now() + backoff(attempts) * 1000).toISOString();
       await admin.from("store_fulfilment_outbox").update({ status: dead ? "dead_letter" : "retry", available_at: availableAt, locked_at: null, locked_by: null, last_error: message.slice(0, 2000), updated_at: new Date().toISOString() }).eq("id", job.id);
-      results.push({ id: job.id, status: dead ? "dead_letter" : "retry", error: message });
+      results.push({ id: job.id, eventType: job.event_type, status: dead ? "dead_letter" : "retry", error: message });
     }
   }
   return json({ workerId, claimed: (jobs ?? []).length, results });
