@@ -101,20 +101,42 @@ Deno.serve(async (request) => {
     const variantChecks = activeVariants.map((variant) => {
       const mapping = mappedByVariant.get(variant.id);
       const missing: string[] = [];
-      if (!mapping) missing.push("exact_variant_mapping");
-      if (mapping) {
-        if (!mapping.provider_variant_id) missing.push("provider_variant_id");
-        const existingProductReady = Boolean(mapping.provider_product_id && mapping.provider_variant_id);
-        const customArtworkReady = Boolean(mapping.blueprint_id && mapping.print_provider_id && mapping.provider_variant_id && mapping.artwork_asset_ref);
-        if (!existingProductReady && !customArtworkReady) {
-          if (!mapping.provider_product_id) missing.push("provider_product_id_or_custom_blueprint");
-          if (!mapping.blueprint_id) missing.push("blueprint_id");
-          if (!mapping.print_provider_id) missing.push("print_provider_id");
-          if (!mapping.artwork_asset_ref) missing.push("artwork_asset_ref");
+      let route = "MISSING";
+      if (!mapping) {
+        missing.push("exact_variant_mapping");
+      } else {
+        const hasProviderVariant = Boolean(mapping.provider_variant_id);
+        const customArtworkReady = Boolean(
+          mapping.blueprint_id &&
+          mapping.print_provider_id &&
+          mapping.provider_variant_id &&
+          mapping.artwork_asset_ref,
+        );
+        const existingProductFallback = Boolean(mapping.provider_product_id && mapping.provider_variant_id);
+
+        if (customArtworkReady) {
+          route = "CUSTOM_ARTWORK";
+        } else if (existingProductFallback) {
+          route = "TECHNICAL_FALLBACK_ONLY";
+          missing.push("custom_artwork_route_required");
+        } else {
+          route = "INCOMPLETE";
         }
+
+        if (!hasProviderVariant) missing.push("provider_variant_id");
+        if (!mapping.blueprint_id) missing.push("blueprint_id");
+        if (!mapping.print_provider_id) missing.push("print_provider_id");
+        if (!mapping.artwork_asset_ref) missing.push("artwork_asset_ref");
         if (mapping.sync_status !== "synced") missing.push("mapping_not_synced");
       }
-      return { variantId: variant.id, sku: variant.sku, title: variant.title, ready: missing.length === 0, missing: [...new Set(missing)] };
+      return {
+        variantId: variant.id,
+        sku: variant.sku,
+        title: variant.title,
+        route,
+        ready: missing.length === 0,
+        missing: [...new Set(missing)],
+      };
     });
 
     const missingProductFields: string[] = [];
@@ -132,7 +154,7 @@ Deno.serve(async (request) => {
       gate: ready ? "PRODUCTION_READY" : "NOT_PRODUCTION_READY",
       missingProductFields,
       variants: variantChecks,
-      rule: "Cossa Lifestyle POD publication is blocked until every available variant has its own exact synced Printify production mapping.",
+      rule: "Cossa Lifestyle POD publication requires every available variant to have its own exact synced Printify custom-artwork route: blueprint ID, print provider ID, provider variant ID and production artwork. Existing Printify product mappings are technical fallback only and are not production-ready.",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Production readiness check failed.";
