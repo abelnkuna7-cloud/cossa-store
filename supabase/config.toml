@@ -25,3 +25,8 @@ verify_jwt = false
 [functions.printify-production-readiness]
 # Read-only production readiness gate. The function verifies the caller session and Cossa owner/admin role itself.
 verify_jwt = false
+
+[functions.printify-product-provision]
+# Permanent Cossa Lifestyle product provisioning service. It verifies the caller session and owner/admin role itself.
+# Printify writes remain blocked unless PRINTIFY_PRODUCT_PROVISIONING_ENABLED=true.
+verify_jwt = false
