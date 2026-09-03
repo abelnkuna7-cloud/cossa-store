@@ -1,0 +1,283 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient, type User } from "https://esm.sh/@supabase/supabase-js@2";
+
+import {
+  PRINTIFY_SHOP_ID,
+  printifyRequest,
+  summarizePrintifyProduct,
+} from "../_shared/printify-catalogue.ts";
+
+const ORG_ID = "00000000-0000-4000-8000-000000000001";
+const ALLOWED_ORIGINS = new Set([
+  "https://store.cossanexusholdings.co.za",
+  "https://growth.cossanexusholdings.co.za",
+  "http://localhost:3000",
+  "http://localhost:5173",
+]);
+
+function cors(request: Request): HeadersInit {
+  const origin = request.headers.get("origin");
+  return {
+    "Access-Control-Allow-Origin": origin && ALLOWED_ORIGINS.has(origin) ? origin : "",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Credentials": "true",
+    Vary: "Origin",
+  };
+}
+
+function json(request: Request, body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...cors(request),
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+function text(value: unknown, max = 240) {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+function uuid(value: unknown) {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+async function requireUser(request: Request, client: ReturnType<typeof createClient>): Promise<User> {
+  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
+  if (!token) throw new Error("Sign in is required.");
+  const { data, error } = await client.auth.getUser(token);
+  if (error || !data.user) throw new Error("Your session could not be verified.");
+  return data.user;
+}
+
+async function requireAdmin(admin: ReturnType<typeof createClient>, userId: string) {
+  const [membership, role] = await Promise.all([
+    admin
+      .from("organisation_members")
+      .select("role")
+      .eq("organisation_id", ORG_ID)
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .in("role", ["owner", "admin"]),
+    admin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin"),
+  ]);
+  if (
+    membership.error ||
+    role.error ||
+    (!(membership.data ?? []).length && !(role.data ?? []).length)
+  ) {
+    throw new Error("Only an authorised Cossa Store administrator can manage fulfilment mappings.");
+  }
+}
+
+async function loadStoreProduct(admin: ReturnType<typeof createClient>, storeProductId: string) {
+  if (!uuid(storeProductId)) throw new Error("A valid Cossa Store product is required.");
+  const { data, error } = await admin
+    .from("store_products")
+    .select("id,sku,name,status,brand,product_type,fulfilment_model")
+    .eq("organisation_id", ORG_ID)
+    .eq("id", storeProductId)
+    .maybeSingle();
+  if (error || !data) throw new Error("The Cossa Store product was not found.");
+  return data;
+}
+
+async function loadStoreVariant(
+  admin: ReturnType<typeof createClient>,
+  storeProductId: string,
+  storeVariantId: string | null,
+) {
+  if (!storeVariantId) return null;
+  if (!uuid(storeVariantId)) throw new Error("The selected Cossa variant is invalid.");
+  const { data, error } = await admin
+    .from("store_product_variants")
+    .select("id,product_id,sku,title,is_available")
+    .eq("id", storeVariantId)
+    .eq("product_id", storeProductId)
+    .maybeSingle();
+  if (error || !data) throw new Error("The selected Cossa variant does not belong to this product.");
+  return data;
+}
+
+async function loadPrintifyProduct(token: string, providerProductId: string) {
+  const id = text(providerProductId, 120);
+  if (!id) throw new Error("A Printify product ID is required.");
+  const raw = await printifyRequest(`/shops/${PRINTIFY_SHOP_ID}/products/${encodeURIComponent(id)}.json`, token);
+  const summary = summarizePrintifyProduct(raw);
+  if (!summary.printifyProductId || summary.printifyProductId !== id) {
+    throw new Error("Printify returned a different product than requested.");
+  }
+  return { raw, summary };
+}
+
+function resolveProviderVariant(summary: ReturnType<typeof summarizePrintifyProduct>, requested: string | null) {
+  if (!requested) return null;
+  const match = summary.variants.find(
+    (variant) => variant.providerVariantId === requested && variant.isEligible && variant.isAvailable,
+  );
+  if (!match) throw new Error("The selected Printify variant is not currently available for fulfilment.");
+  return match;
+}
+
+async function inspectMapping(
+  admin: ReturnType<typeof createClient>,
+  token: string,
+  body: Record<string, unknown>,
+) {
+  const storeProductId = text(body.storeProductId, 64);
+  const storeVariantId = text(body.storeVariantId, 64) || null;
+  const providerProductId = text(body.providerProductId, 120);
+  const providerVariantId = text(body.providerVariantId, 80) || null;
+
+  const [product, variant, printify] = await Promise.all([
+    loadStoreProduct(admin, storeProductId),
+    loadStoreVariant(admin, storeProductId, storeVariantId),
+    loadPrintifyProduct(token, providerProductId),
+  ]);
+  const providerVariant = resolveProviderVariant(printify.summary, providerVariantId);
+
+  const { data: existing, error } = await admin
+    .from("store_product_fulfilment_mappings")
+    .select(
+      "id,store_product_id,store_variant_id,provider,provider_product_id,provider_variant_id,blueprint_id,print_provider_id,artwork_asset_ref,fulfilment_status,sync_status,fallback_provider,fallback_reference,metadata,updated_at",
+    )
+    .eq("organisation_id", ORG_ID)
+    .eq("store_product_id", storeProductId)
+    .eq("provider", "Printify")
+    .eq("store_variant_id", storeVariantId)
+    .maybeSingle();
+  if (error) throw error;
+
+  return {
+    product,
+    variant,
+    printify: {
+      productId: printify.summary.printifyProductId,
+      title: printify.summary.title,
+      images: printify.summary.images,
+      availableVariantCount: printify.summary.availableVariantCount,
+      variant: providerVariant
+        ? {
+            id: providerVariant.providerVariantId,
+            title: providerVariant.title,
+            sku: providerVariant.sku,
+            sourceCost: providerVariant.sourceCost,
+            sourcePrice: providerVariant.sourcePrice,
+            options: providerVariant.options,
+          }
+        : null,
+    },
+    existingMapping: existing ?? null,
+    readyToMap: Boolean(providerProductId && (!storeVariantId || providerVariant)),
+  };
+}
+
+async function saveMapping(
+  admin: ReturnType<typeof createClient>,
+  token: string,
+  body: Record<string, unknown>,
+) {
+  if (Deno.env.get("PRINTIFY_MAPPING_WRITES_ENABLED") !== "true") {
+    throw new Error("Printify mapping writes are disabled. Preview is available, but no mapping can be saved yet.");
+  }
+
+  const preview = await inspectMapping(admin, token, body);
+  if (!preview.readyToMap) throw new Error("This mapping is not ready to save.");
+
+  const storeProductId = text(body.storeProductId, 64);
+  const storeVariantId = text(body.storeVariantId, 64) || null;
+  const providerProductId = text(body.providerProductId, 120);
+  const providerVariantId = text(body.providerVariantId, 80) || null;
+  const blueprintId = text(body.blueprintId, 120) || null;
+  const printProviderId = text(body.printProviderId, 120) || null;
+  const artworkAssetRef = text(body.artworkAssetRef, 500) || null;
+  const fallbackProvider = text(body.fallbackProvider, 120) || null;
+  const fallbackReference = text(body.fallbackReference, 240) || null;
+  const now = new Date().toISOString();
+
+  const row = {
+    organisation_id: ORG_ID,
+    store_product_id: storeProductId,
+    store_variant_id: storeVariantId,
+    provider: "Printify",
+    provider_product_id: providerProductId,
+    provider_variant_id: providerVariantId,
+    blueprint_id: blueprintId,
+    print_provider_id: printProviderId,
+    artwork_asset_ref: artworkAssetRef,
+    fulfilment_status: "active",
+    sync_status: "synced",
+    fallback_provider: fallbackProvider,
+    fallback_reference: fallbackReference,
+    metadata: {
+      cossa_brand: "Cossa Lifestyle",
+      collection: "Leave Your Mark",
+      provider_title: preview.printify.title,
+      provider_variant_title: preview.printify.variant?.title ?? null,
+      mapped_at: now,
+    },
+    updated_at: now,
+  };
+
+  const existingId = (preview.existingMapping as { id?: string } | null)?.id;
+  const result = existingId
+    ? await admin
+        .from("store_product_fulfilment_mappings")
+        .update(row)
+        .eq("id", existingId)
+        .eq("organisation_id", ORG_ID)
+        .select("*")
+        .single()
+    : await admin
+        .from("store_product_fulfilment_mappings")
+        .insert(row)
+        .select("*")
+        .single();
+
+  if (result.error || !result.data) throw result.error || new Error("The fulfilment mapping could not be saved.");
+  return result.data;
+}
+
+Deno.serve(async (request) => {
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(request) });
+  if (request.method !== "POST") return json(request, { error: "Method not allowed." }, 405);
+
+  const origin = request.headers.get("origin");
+  if (origin && !ALLOWED_ORIGINS.has(origin)) return json(request, { error: "Origin not allowed." }, 403);
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const publishableKey = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const printifyToken = Deno.env.get("PRINTIFY_API_TOKEN");
+  if (!supabaseUrl || !publishableKey || !serviceRoleKey || !printifyToken) {
+    return json(request, { error: "Printify mapping service is not configured." }, 503);
+  }
+
+  const customerClient = createClient(supabaseUrl, publishableKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  try {
+    const user = await requireUser(request, customerClient);
+    await requireAdmin(admin, user.id);
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const action = text(body.action, 40) || "preview";
+
+    if (action === "preview") {
+      return json(request, { action, preview: await inspectMapping(admin, printifyToken, body) });
+    }
+    if (action === "save") {
+      return json(request, { action, mapping: await saveMapping(admin, printifyToken, body) });
+    }
+    return json(request, { error: "Unsupported mapping action." }, 400);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Printify mapping failed.";
+    return json(request, { error: message }, 400);
+  }
+});
