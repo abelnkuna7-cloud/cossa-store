@@ -17,3 +17,7 @@ verify_jwt = false
 # The function verifies the caller session and Cossa admin role itself.
 # Mapping writes remain blocked unless PRINTIFY_MAPPING_WRITES_ENABLED=true.
 verify_jwt = false
+
+[functions.printify-fulfilment-catalogue]
+# Read-only browser for the connected Printify shop. The function verifies the caller session and Cossa admin role itself.
+verify_jwt = false
