@@ -422,7 +422,13 @@ export default {
 
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+      const pathname = new URL(request.url).pathname;
+      if (pathname === "/admin/security" || (pathname === "/auth" && new URL(request.url).searchParams.get("mfa") === "required")) {
+        normalized.headers.set("cache-control", "no-store");
+        normalized.headers.set("x-content-type-options", "nosniff");
+      }
+      return normalized;
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {

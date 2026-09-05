@@ -39,10 +39,19 @@ function AuthPage() {
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
+  const [authFlow, setAuthFlow] = useState<"idle" | "checking-mfa" | "mfa">("idle");
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaChallengeId, setMfaChallengeId] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaError, setMfaError] = useState<string | null>(null);
+  const [adminMfaNotice, setAdminMfaNotice] = useState(false);
 
   useEffect(() => {
-    if (!loading && session) navigate({ to: "/account", replace: true });
-  }, [loading, session, navigate]);
+    if (typeof window !== "undefined") {
+      setAdminMfaNotice(new URLSearchParams(window.location.search).get("mfa") === "required");
+    }
+    if (!loading && session && authFlow === "idle") navigate({ to: "/account", replace: true });
+  }, [authFlow, loading, session, navigate]);
 
   function emailConfirmationRedirectUrl() {
     // Keep confirmation links on the Store domain, even if an old Growth
@@ -80,10 +89,12 @@ function AuthPage() {
       return;
     }
 
+    setAuthFlow("checking-mfa");
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) {
       if (error.code === "email_not_confirmed") {
+        setAuthFlow("idle");
         setMode("signup");
         setCheckEmail(true);
         toast.error("Email address not confirmed", {
@@ -91,9 +102,56 @@ function AuthPage() {
         });
         return;
       }
+      setAuthFlow("idle");
       toast.error("Sign in failed", { description: "Check your email address and password." });
       return;
     }
+
+    const { data: factorData, error: factorError } = await supabase.auth.mfa.listFactors();
+    const verifiedFactor = factorData?.totp?.find((factor) => factor.status === "verified");
+    if (!factorError && verifiedFactor) {
+      const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({
+        factorId: verifiedFactor.id,
+      });
+      if (challengeError || !challenge?.id) {
+        setAuthFlow("idle");
+        await supabase.auth.signOut();
+        toast.error("Additional verification unavailable", { description: "Try signing in again or contact Store support." });
+        return;
+      }
+      setMfaFactorId(verifiedFactor.id);
+      setMfaChallengeId(challenge.id);
+      setMfaCode("");
+      setMfaError(null);
+      setAuthFlow("mfa");
+      setBusy(false);
+      return;
+    }
+    setAuthFlow("idle");
+    navigate({ to: "/account", replace: true });
+  }
+
+  async function onVerifyMfa(event: React.FormEvent) {
+    event.preventDefault();
+    if (!mfaFactorId || !mfaChallengeId || !/^\d{6}$/.test(mfaCode)) {
+      setMfaError("Enter the current six-digit code from your authenticator app.");
+      return;
+    }
+    setBusy(true);
+    setMfaError(null);
+    const { error } = await supabase.auth.mfa.verify({
+      factorId: mfaFactorId,
+      challengeId: mfaChallengeId,
+      code: mfaCode,
+    });
+    if (error) {
+      setBusy(false);
+      setMfaError("That code was not accepted. Enter the newest code and try again.");
+      return;
+    }
+    await supabase.auth.refreshSession();
+    setBusy(false);
+    setAuthFlow("idle");
     navigate({ to: "/account", replace: true });
   }
 
@@ -157,7 +215,37 @@ function AuthPage() {
           </div>
         ) : null}
 
-        <form onSubmit={onSubmit} className="space-y-4 rounded-lg border border-border bg-card p-6">
+        {adminMfaNotice ? (
+          <div className="mb-4 rounded-md border border-accent/40 bg-accent/10 px-4 py-3 text-sm text-muted-foreground">
+            Administrator access requires the approved owner's authenticator code after sign-in.
+          </div>
+        ) : null}
+
+        {authFlow === "mfa" ? (
+          <form onSubmit={onVerifyMfa} className="space-y-4 rounded-lg border border-border bg-card p-6">
+            <div>
+              <h2 className="text-lg font-semibold">Additional verification required</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Enter the current code from the approved Store administrator's authenticator app.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sign-in-totp-code">Authenticator code</Label>
+              <Input
+                id="sign-in-totp-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                value={mfaCode}
+                onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                required
+              />
+            </div>
+            {mfaError ? <p className="text-sm text-destructive">{mfaError}</p> : null}
+            <Button type="submit" className="w-full" disabled={busy || mfaCode.length !== 6}>
+              {busy ? "Verifying…" : "Verify and continue"}
+            </Button>
+          </form>
+        ) : <form onSubmit={onSubmit} className="space-y-4 rounded-lg border border-border bg-card p-6">
           {mode === "signup" ? (
             <>
               <div className="space-y-2">
@@ -227,7 +315,7 @@ function AuthPage() {
           <p className="text-xs text-muted-foreground">
             Customer purchases and digital downloads stay linked to this account. Approved Cossa catalogue staff can manage products through the internal catalogue tools.
           </p>
-        </form>
+        </form>}
       </div>
     </div>
   );

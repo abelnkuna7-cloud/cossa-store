@@ -27,6 +27,20 @@ export const Route = createFileRoute("/security")({
       sections={[ 
         { heading: "Last updated", body: ["5 September 2026"] },
         {
+          heading: "Security review framework",
+          body: [
+            "Our security review covers identity and authentication; authorisation and admin access; session and token handling; privacy and personal information; API and server boundaries; database permissions and row-level security; payment and webhook integrity; checkout, orders and fulfilment; delivery and supplier integrations; catalogue and content integrity; infrastructure, deployment and secrets; monitoring, incident response and recovery; and independent testing and assurance.",
+            "This public summary describes the areas under review without publishing internal routes, identifiers, credentials or operational security details.",
+          ],
+        },
+        {
+          heading: "Current control status",
+          body: [
+            "Email-confirmed access, server-side Store administrator authorization, protected admin sessions, payment-provider hosted card entry and server-side payment verification are active controls.",
+            "Administrator authenticator enrollment is ready for the approved owner and remains private. Customer single-session enforcement, independent external penetration testing and a formal recurring review cadence are still being completed or planned; they are not represented as finished controls here.",
+          ],
+        },
+        {
           heading: "Our commitment",
           body: [
             "Cossa Store is operated by Cossa Nexus Holdings (Pty) Ltd. We use reasonable technical and organisational safeguards to protect customer accounts, orders, delivery information and other personal information.",
