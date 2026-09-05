@@ -9,7 +9,7 @@ import { NoticeBlock } from "@/components/common/StateBlocks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useSession } from "@/lib/auth";
+import { useRoles, useSession } from "@/lib/auth";
 import { useCommerce } from "@/lib/commerce-store";
 import {
   checkoutQuoteFingerprint,
@@ -21,16 +21,24 @@ import {
 import { formatZar } from "@/lib/format";
 import { productsByIdsQuery } from "@/lib/queries";
 import {
+  confirmStoreDelivery,
+  listMyStoreDeliveryQuoteRequests,
   quoteStoreEftCheckout,
+  requestStoreDeliveryQuote,
   startStoreEftPayment,
   submitEftProof,
   type EftPaymentDetail,
   type StoreCheckoutQuote,
+  type StoreDeliveryQuoteRequest,
 } from "@/services/eft-payments";
+import {
+  getStoreYocoTestAttempt,
+  recordStoreYocoTestReturn,
+  startStoreYocoTestCheckout,
+} from "@/services/yoco-payments";
 
 const TITLE = "Checkout | Cossa Store";
-const DESCRIPTION =
-  "Create a secure Cossa Store EFT payment request and submit proof of payment for review.";
+const DESCRIPTION = "Create a secure Cossa Store EFT payment request or Yoco test card checkout.";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
@@ -52,6 +60,8 @@ function newRequestId(): string {
 
 function CheckoutPage() {
   const { session, loading: authLoading } = useSession();
+  const roles = useRoles(session?.user.id);
+  const canTestYoco = (roles.data ?? []).includes("admin");
   const { selectedCartLines, hydrated, removePaidCartLines } = useCommerce();
   const [acceptedPolicies, setAcceptedPolicies] = useState(false);
   const [customerName, setCustomerName] = useState("");
@@ -69,10 +79,17 @@ function CheckoutPage() {
   const [quotedFor, setQuotedFor] = useState<string | null>(null);
   const [quoteProblem, setQuoteProblem] = useState<string | null>(null);
   const [payment, setPayment] = useState<EftPaymentDetail | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"eft" | "yoco">("eft");
+  const [yocoReturnMessage, setYocoReturnMessage] = useState<string | null>(null);
   const [proof, setProof] = useState<File | null>(null);
   const [payerNote, setPayerNote] = useState("");
   const [starting, setStarting] = useState(false);
   const [quoting, setQuoting] = useState(false);
+  const [confirmingDelivery, setConfirmingDelivery] = useState(false);
+  const [deliveryEvidence, setDeliveryEvidence] = useState("");
+  const [requestingDeliveryQuote, setRequestingDeliveryQuote] = useState(false);
+  const [submittedDeliveryQuote, setSubmittedDeliveryQuote] =
+    useState<StoreDeliveryQuoteRequest | null>(null);
   const [submittingProof, setSubmittingProof] = useState(false);
 
   useEffect(() => {
@@ -85,6 +102,63 @@ function CheckoutPage() {
     session?.user.user_metadata?.full_name,
   ]);
 
+  useEffect(() => {
+    if (!canTestYoco && paymentMethod === "yoco") setPaymentMethod("eft");
+  }, [canTestYoco, paymentMethod]);
+
+  useEffect(() => {
+    if (!session?.user || typeof window === "undefined") return;
+    const search = new URLSearchParams(window.location.search);
+    const attemptId = search.get("yocoAttemptId");
+    const returnState = search.get("yoco");
+    if (
+      !attemptId ||
+      (returnState !== "success" && returnState !== "cancelled" && returnState !== "failed")
+    ) {
+      return;
+    }
+
+    let mounted = true;
+    void (async () => {
+      try {
+        const returned = await recordStoreYocoTestReturn(attemptId, returnState);
+        const latest = await getStoreYocoTestAttempt(attemptId);
+        if (!mounted) return;
+        if (latest.attempt.status === "succeeded") {
+          setYocoReturnMessage(
+            "Your Yoco test payment was verified by its signed webhook. Test mode does not release fulfilment, digital goods or stock.",
+          );
+          toast.success("Yoco test payment verified");
+        } else if (returnState === "success") {
+          setYocoReturnMessage(
+            "Yoco returned you successfully. We are waiting for Yoco’s signed webhook before treating the test payment as verified.",
+          );
+        } else if (returned.attempt.status === "cancelled") {
+          setYocoReturnMessage(
+            "Yoco test checkout was cancelled. No payment was taken and your cart is unchanged.",
+          );
+        } else {
+          setYocoReturnMessage(
+            "Yoco did not complete the test checkout. No payment was taken and your cart is unchanged.",
+          );
+        }
+      } catch (error) {
+        if (mounted) {
+          setYocoReturnMessage(
+            error instanceof Error
+              ? error.message
+              : "We could not confirm the Yoco checkout return.",
+          );
+        }
+      } finally {
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [session?.user]);
+
   const productIds = useMemo(
     () => Array.from(new Set(selectedCartLines.map((line) => line.product_id))),
     [selectedCartLines],
@@ -92,6 +166,12 @@ function CheckoutPage() {
   const cartProductsQuery = useQuery({
     ...productsByIdsQuery(productIds),
     enabled: hydrated && productIds.length > 0,
+  });
+  const myDeliveryQuotesQuery = useQuery({
+    queryKey: ["checkout", "my-delivery-quote-requests", session?.user.id],
+    queryFn: listMyStoreDeliveryQuoteRequests,
+    enabled: Boolean(session?.user),
+    staleTime: 15_000,
   });
   const cartProducts = cartProductsQuery.data ?? [];
   const cartProductsResolved =
@@ -137,7 +217,14 @@ function CheckoutPage() {
     !quoting;
 
   const canRequestQuote =
-    Boolean(session?.user) && hydrated && selectedCartLines.length > 0 && cartProductsResolved && !quoting;
+    Boolean(session?.user) &&
+    hydrated &&
+    selectedCartLines.length > 0 &&
+    cartProductsResolved &&
+    !quoting;
+
+  const canRequestStaffDeliveryQuote =
+    canQuote && requiresDelivery && !requestingDeliveryQuote && !activeQuote;
 
   const canStartPayment =
     Boolean(session?.user) &&
@@ -153,6 +240,7 @@ function CheckoutPage() {
     setQuote(null);
     setQuotedFor(null);
     setQuoteProblem(null);
+    setSubmittedDeliveryQuote(null);
   }
 
   async function calculateQuote() {
@@ -201,12 +289,96 @@ function CheckoutPage() {
     }
   }
 
+  async function confirmDeliveryEligibility() {
+    setShowAddressErrors(true);
+    if (!canTestYoco || !canQuote || !requiresDelivery || deliveryEvidence.trim().length < 3) {
+      if (deliveryEvidence.trim().length < 3) {
+        toast.error("Record the carrier or supplier evidence before confirming delivery.");
+      }
+      return;
+    }
+
+    setConfirmingDelivery(true);
+    setQuoteProblem(null);
+    try {
+      const result = await confirmStoreDelivery({
+        evidenceNote: deliveryEvidence,
+        cart: selectedCartLines.map((line) => ({
+          productId: line.product_id,
+          variantId: line.variant_id,
+          quantity: line.quantity,
+        })),
+        shippingAddress: deliveryAddress,
+      });
+      if (!result.quote) {
+        throw new Error("The verified delivery rate could not be applied to this order.");
+      }
+      setQuote(result.quote);
+      setQuotedFor(quoteFingerprint);
+      toast.success("Delivery eligibility recorded", {
+        description:
+          "The verified delivery total is valid for this exact cart and address for 24 hours.",
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "The delivery eligibility check could not be recorded.";
+      setQuoteProblem(message);
+      toast.error("Delivery eligibility needs attention", { description: message });
+    } finally {
+      setConfirmingDelivery(false);
+    }
+  }
+
+  async function requestStaffDeliveryQuote() {
+    setShowAddressErrors(true);
+    if (!canRequestStaffDeliveryQuote) {
+      if (customerName.trim().length < 2) {
+        toast.error("Enter your full name before requesting a delivery quote.");
+      }
+      return;
+    }
+
+    setRequestingDeliveryQuote(true);
+    setQuoteProblem(null);
+    try {
+      const result = await requestStoreDeliveryQuote({
+        customerName,
+        customerPhone,
+        // Quote requests use their own idempotency key. A later address or
+        // cart change must be able to create a separate exact-scope request.
+        clientRequestId: newRequestId(),
+        cart: selectedCartLines.map((line) => ({
+          productId: line.product_id,
+          variantId: line.variant_id,
+          quantity: line.quantity,
+        })),
+        shippingAddress: deliveryAddress,
+      });
+      setSubmittedDeliveryQuote(result.request);
+      void myDeliveryQuotesQuery.refetch();
+      toast.success("Delivery quote requested", {
+        description: "Cossa staff will verify the carrier charge for this exact cart and address.",
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Your delivery quote request could not be submitted.";
+      setQuoteProblem(message);
+      toast.error("Delivery quote needs attention", { description: message });
+    } finally {
+      setRequestingDeliveryQuote(false);
+    }
+  }
+
   async function createPaymentRequest() {
     if (!canStartPayment) return;
 
     setStarting(true);
     try {
-      const result = await startStoreEftPayment({
+      const checkoutInput = {
         customerName,
         customerPhone,
         clientRequestId: requestId,
@@ -216,6 +388,14 @@ function CheckoutPage() {
           quantity: line.quantity,
         })),
         shippingAddress: requiresDelivery ? deliveryAddress : undefined,
+      };
+      if (paymentMethod === "yoco") {
+        const result = await startStoreYocoTestCheckout(checkoutInput);
+        window.location.assign(result.redirectUrl);
+        return;
+      }
+      const result = await startStoreEftPayment({
+        ...checkoutInput,
       });
       setPayment(result);
       removePaidCartLines(selectedCartLines);
@@ -224,10 +404,15 @@ function CheckoutPage() {
           "Use the exact amount and unique reference below, then upload your proof of payment.",
       });
     } catch (error) {
-      toast.error("Your EFT order could not be created", {
-        description:
-          error instanceof Error ? error.message : "Please review your cart and try again.",
-      });
+      toast.error(
+        paymentMethod === "yoco"
+          ? "Yoco checkout could not be created"
+          : "Your EFT order could not be created",
+        {
+          description:
+            error instanceof Error ? error.message : "Please review your cart and try again.",
+        },
+      );
     } finally {
       setStarting(false);
     }
@@ -257,14 +442,20 @@ function CheckoutPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Checkout" title="Secure EFT checkout" description={DESCRIPTION} />
+      <PageHeader eyebrow="Checkout" title="Secure checkout" description={DESCRIPTION} />
 
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-10 sm:px-6 lg:px-8">
-        <NoticeBlock tone="pending" title="Pay by EFT while online payments are being activated">
-          Cossa Store will generate a unique payment reference and exact amount for this order. Your
-          order is only paid after Cossa reviews your proof of payment; paid digital products are
-          then released securely to your member account.
+        <NoticeBlock tone="pending" title="EFT and Yoco test checkout">
+          EFT remains available. Yoco card checkout is in test mode: a signed Yoco webhook, never a
+          browser redirect, is required before a test payment is considered verified. Test payments
+          cannot release fulfilment, digital goods or stock.
         </NoticeBlock>
+
+        {yocoReturnMessage ? (
+          <NoticeBlock tone="pending" title="Yoco test checkout">
+            {yocoReturnMessage}
+          </NoticeBlock>
+        ) : null}
 
         {payment ? (
           <>
@@ -529,10 +720,12 @@ function CheckoutPage() {
             </section>
 
             <section className="rounded-lg border border-border bg-card p-6">
-              <h2 className="font-display text-lg font-semibold">Create your EFT order</h2>
+              <h2 className="font-display text-lg font-semibold">Create your order</h2>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                This EFT order contains {hydrated ? selectedCartLines.length : "…"} selected product
-                {hydrated && selectedCartLines.length === 1 ? "" : "s"}. Products left in your cart are not sent to checkout. The exact product and delivery total is confirmed securely before you pay.
+                This order contains {hydrated ? selectedCartLines.length : "…"} selected product
+                {hydrated && selectedCartLines.length === 1 ? "" : "s"}. Products left in your cart
+                are not sent to checkout. The exact product and delivery total is confirmed securely
+                before you pay.
               </p>
 
               {session?.user.email ? (
@@ -581,7 +774,7 @@ function CheckoutPage() {
                   <h3 className="font-semibold">South African delivery address</h3>
                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                     This address is required for physical products. Delivery is confirmed securely
-                    using your exact cart and address before an EFT amount can be issued.
+                    using your exact cart and address before a payment amount can be issued.
                   </p>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2 sm:col-span-2">
@@ -776,8 +969,8 @@ function CheckoutPage() {
                 )}
                 {requiresDelivery && !activeQuote ? (
                   <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-                    A customer-paid delivery fee must be verified before an EFT payment request can
-                    be issued. Cossa Store does not assume free delivery.
+                    A customer-paid delivery fee must be verified before a payment request can be
+                    issued. Cossa Store does not assume free delivery.
                   </p>
                 ) : null}
                 {quoteProblem ? (
@@ -785,7 +978,125 @@ function CheckoutPage() {
                     {quoteProblem}
                   </p>
                 ) : null}
+                {requiresDelivery && !activeQuote && !canTestYoco ? (
+                  <section className="mt-4 rounded-md border border-primary/35 bg-primary/5 p-4">
+                    <h4 className="font-medium">Request a staff delivery quote</h4>
+                    {submittedDeliveryQuote?.status === "requested" ? (
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        Your request has been sent to Cossa staff. We will verify the carrier charge
+                        for this exact cart and address before payment is enabled.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        A Cossa administrator will check the current carrier or supplier rate,
+                        destination eligibility and packed parcel requirements. Payment remains
+                        unavailable until that verified amount is attached to this exact cart and
+                        address.
+                      </p>
+                    )}
+                    <Button
+                      className="mt-3"
+                      type="button"
+                      variant="outline"
+                      disabled={!canRequestStaffDeliveryQuote}
+                      onClick={() => void requestStaffDeliveryQuote()}
+                    >
+                      {requestingDeliveryQuote ? (
+                        <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      {requestingDeliveryQuote
+                        ? "Sending delivery request…"
+                        : submittedDeliveryQuote?.status === "requested"
+                          ? "Delivery quote requested"
+                          : "Request delivery quote"}
+                    </Button>
+                    {myDeliveryQuotesQuery.data?.requests.some(
+                      (request) => request.status === "requested",
+                    ) && !submittedDeliveryQuote ? (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        You also have a delivery quote request awaiting review. If Cossa approves a
+                        quote for this exact cart and address, select “Confirm delivery &amp; total”
+                        again to load it.
+                      </p>
+                    ) : null}
+                  </section>
+                ) : null}
+                {canTestYoco && requiresDelivery && !activeQuote ? (
+                  <section className="mt-4 rounded-md border border-primary/35 bg-primary/5 p-4">
+                    <h4 className="font-medium">Administrator delivery confirmation</h4>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      Use this only after you have verified the current supplier or carrier rate,
+                      the exact destination, and that the packed parcel meets its delivery rules.
+                      Cossa Store still determines the price on the server; this form cannot set or
+                      override a delivery fee.
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      <Label htmlFor="delivery-evidence">Verification evidence</Label>
+                      <textarea
+                        id="delivery-evidence"
+                        className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        maxLength={2000}
+                        placeholder="For example: Supplier quote reference, carrier eligibility result, and parcel check."
+                        value={deliveryEvidence}
+                        onChange={(event) => setDeliveryEvidence(event.target.value)}
+                      />
+                    </div>
+                    <Button
+                      className="mt-3"
+                      type="button"
+                      variant="outline"
+                      disabled={
+                        confirmingDelivery || !canQuote || deliveryEvidence.trim().length < 3
+                      }
+                      onClick={() => void confirmDeliveryEligibility()}
+                    >
+                      {confirmingDelivery ? (
+                        <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      {confirmingDelivery
+                        ? "Recording delivery check…"
+                        : "Record verified delivery check"}
+                    </Button>
+                  </section>
+                ) : null}
               </section>
+
+              <fieldset className="mt-5 space-y-3 rounded-md border border-border bg-background/40 p-4">
+                <legend className="px-1 text-sm font-semibold">Payment method</legend>
+                <label className="flex cursor-pointer items-start gap-3 text-sm">
+                  <input
+                    type="radio"
+                    name="payment-method"
+                    checked={paymentMethod === "eft"}
+                    onChange={() => setPaymentMethod("eft")}
+                    className="mt-1 accent-current"
+                  />
+                  <span>
+                    <span className="font-medium">EFT bank transfer</span>
+                    <span className="mt-1 block text-muted-foreground">
+                      Receive Cossa banking details and upload proof for review.
+                    </span>
+                  </span>
+                </label>
+                {canTestYoco ? (
+                  <label className="flex cursor-pointer items-start gap-3 text-sm">
+                    <input
+                      type="radio"
+                      name="payment-method"
+                      checked={paymentMethod === "yoco"}
+                      onChange={() => setPaymentMethod("yoco")}
+                      className="mt-1 accent-current"
+                    />
+                    <span>
+                      <span className="font-medium">Yoco card checkout — test mode</span>
+                      <span className="mt-1 block text-muted-foreground">
+                        Staff-only test path. Yoco hosts the card form; Cossa Store never receives
+                        card details.
+                      </span>
+                    </span>
+                  </label>
+                ) : null}
+              </fieldset>
 
               <div className="mt-5 flex flex-wrap gap-3">
                 <Button
@@ -805,7 +1116,13 @@ function CheckoutPage() {
                   onClick={() => void createPaymentRequest()}
                 >
                   {starting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {starting ? "Creating EFT request…" : "Create EFT payment request"}
+                  {starting
+                    ? paymentMethod === "yoco"
+                      ? "Opening Yoco test checkout…"
+                      : "Creating EFT request…"
+                    : paymentMethod === "yoco"
+                      ? "Continue to Yoco test checkout"
+                      : "Create EFT payment request"}
                 </Button>
                 <Button asChild variant="outline" size="lg">
                   <Link to="/cart">Back to cart</Link>
@@ -813,7 +1130,7 @@ function CheckoutPage() {
               </div>
               {!hydrated || selectedCartLines.length === 0 ? (
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Select active Cossa Store products in your cart before creating an EFT payment request.
+                  Select active Cossa Store products in your cart before creating a payment request.
                 </p>
               ) : null}
               {activeQuote && !acceptedPolicies ? (

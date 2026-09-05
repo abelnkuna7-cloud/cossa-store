@@ -279,17 +279,14 @@ async function authUser(r: Request, c: ReturnType<typeof createClient>): Promise
   return data.user;
 }
 async function requireAdmin(a: Admin, u: string) {
-  const [m, r] = await Promise.all([
-    a
-      .from("organisation_members")
-      .select("role")
-      .eq("organisation_id", ORG_ID)
-      .eq("user_id", u)
-      .eq("status", "active")
-      .in("role", ["owner", "admin"]),
-    a.from("user_roles").select("role").eq("user_id", u).eq("role", "admin"),
-  ]);
-  if (m.error || r.error || (!(m.data ?? []).length && !(r.data ?? []).length)) throw 0;
+  const m = await a
+    .from("organisation_members")
+    .select("role")
+    .eq("organisation_id", ORG_ID)
+    .eq("user_id", u)
+    .eq("status", "active")
+    .in("role", ["owner", "admin"]);
+  if (m.error || !(m.data ?? []).length) throw 0;
 }
 async function scheduledAutomation(a: Admin, r: Request) {
   const value = r.headers.get("x-cossa-automation-token")?.trim() ?? "";

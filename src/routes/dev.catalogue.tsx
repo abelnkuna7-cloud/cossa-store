@@ -3,9 +3,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { PageHeader } from "@/components/common/PageHeader";
+import { EmptyBlock, LoadingBlock } from "@/components/common/StateBlocks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DEMO_CATALOGUE } from "@/data/demo-catalogue";
+import { useCossaStoreAdminAccess } from "@/lib/auth";
 import { productsQuery } from "@/lib/queries";
 import { formatZar } from "@/lib/format";
 import { FULFILMENT_LABELS } from "@/types/catalog";
@@ -27,11 +29,34 @@ export const Route = createFileRoute("/dev/catalogue")({
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
-  component: CatalogueInspector,
+  component: ProtectedCatalogueInspector,
 });
 
 type Source = "all" | "demo" | "real";
 type Status = "all" | "draft" | "published";
+
+function ProtectedCatalogueInspector() {
+  const access = useCossaStoreAdminAccess();
+
+  if (access.loading) return <LoadingBlock label="Checking access…" />;
+  if (!access.isAdmin) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <EmptyBlock
+          title="Cossa Store administrator access required"
+          description="Catalogue inspection and supplier information are private Store operations."
+          action={
+            <Button asChild variant="outline">
+              <Link to="/shop">Return to the Store</Link>
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  return <CatalogueInspector />;
+}
 
 function CatalogueInspector() {
   const live = useQuery(productsQuery({}));

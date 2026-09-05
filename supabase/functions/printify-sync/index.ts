@@ -90,18 +90,14 @@ async function requireUser(
 }
 
 async function requireAdmin(admin: ReturnType<typeof createClient>, userId: string) {
-  const [{ data: memberships, error: membershipError }, { data: roles, error: roleError }] =
-    await Promise.all([
-      admin
-        .from("organisation_members")
-        .select("role")
-        .eq("organisation_id", ORG_ID)
-        .eq("user_id", userId)
-        .eq("status", "active")
-        .in("role", ["owner", "admin"]),
-      admin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin"),
-    ]);
-  if (membershipError || roleError || (!(memberships ?? []).length && !(roles ?? []).length)) {
+  const { data: memberships, error: membershipError } = await admin
+    .from("organisation_members")
+    .select("role")
+    .eq("organisation_id", ORG_ID)
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .in("role", ["owner", "admin"]);
+  if (membershipError || !(memberships ?? []).length) {
     throw new Error("Only the authorised Cossa Store administrator can run Printify sync.");
   }
 }

@@ -52,8 +52,12 @@ export type EftPaymentDetail = {
   order?: EftOrder;
 };
 
-export type EftReviewPayment = {
-  payment: EftPayment;
+/**
+ * The staff review endpoint deliberately returns the public payment fields at
+ * the top level, together with reviewer-only details. Keeping that wire shape
+ * explicit prevents a pending proof from crashing the approvals screen.
+ */
+export type EftReviewPayment = EftPayment & {
   payerEmail: string | null;
   payerNote: string | null;
   proofFileName: string | null;
@@ -70,6 +74,37 @@ export type StoreCheckoutQuote = {
     requiresDelivery: boolean;
     total: number;
   };
+};
+
+export type StoreDeliveryConfirmation = {
+  confirmation: {
+    classification: "STANDARD_RATE_ELIGIBLE";
+    verifiedAt: string;
+    expiresAt: string;
+    deliveryMethod: string | null;
+    deliveryAmount: number | null;
+  };
+  quote: StoreCheckoutQuote["quote"] | null;
+};
+
+export type StoreDeliveryQuoteRequest = {
+  id: string;
+  status: "requested" | "quoted" | "rejected" | "cancelled";
+  deliveryMethod: string | null;
+  deliveryAmount: number | null;
+  currency: "ZAR" | null;
+  staffNote: string | null;
+  createdAt: string | null;
+  quotedAt: string | null;
+  expiresAt: string | null;
+};
+
+export type AdminStoreDeliveryQuoteRequest = StoreDeliveryQuoteRequest & {
+  customerName: string;
+  customerPhone: string | null;
+  requesterEmail: string | null;
+  items: Array<{ productId?: string; name?: string; quantity?: number }>;
+  shippingAddress: Partial<StoreShippingAddress>;
 };
 
 type CheckoutLine = { productId: string; variantId?: string | null; quantity: number };
@@ -179,6 +214,120 @@ export async function quoteStoreEftCheckout(input: {
     throw new Error(await errorMessage(error, data, "The secure Store checkout is unavailable."));
   if (!data) throw new Error("The secure Store checkout returned no delivery quote.");
   return data as StoreCheckoutQuote;
+}
+
+/**
+ * An administrator can attest to the carrier's eligibility check for this
+ * exact cart and destination. The browser supplies evidence only; the server
+ * still resolves the rate, parcel requirements and supplier configuration.
+ */
+export async function confirmStoreDelivery(input: {
+  cart: CheckoutLine[];
+  shippingAddress: StoreShippingAddress;
+  evidenceNote: string;
+}): Promise<StoreDeliveryConfirmation> {
+  const payload = {
+    action: "confirm_delivery",
+    cart: preserveVariantIdentity(input.cart),
+    shippingAddress: input.shippingAddress,
+    deliveryConfirmation: {
+      eligibilityClassification: "STANDARD_RATE_ELIGIBLE",
+      evidenceNote: input.evidenceNote,
+    },
+  };
+  const { data, error } = await supabase.functions.invoke("store-eft-checkout", { body: payload });
+  if (error)
+    throw new Error(
+      await errorMessage(error, data, "The secure delivery confirmation service is unavailable."),
+    );
+  if (!data) throw new Error("The secure delivery confirmation service returned no result.");
+  return data as StoreDeliveryConfirmation;
+}
+
+/**
+ * Submits the exact server-validated cart and address for a staff quote. The
+ * client provides no delivery amount, supplier, rate or eligibility result.
+ */
+export async function requestStoreDeliveryQuote(input: {
+  customerName: string;
+  customerPhone: string;
+  cart: CheckoutLine[];
+  clientRequestId: string;
+  shippingAddress: StoreShippingAddress;
+}): Promise<{ request: StoreDeliveryQuoteRequest }> {
+  const payload = {
+    action: "request_delivery_quote",
+    ...input,
+    cart: preserveVariantIdentity(input.cart),
+  };
+  const { data, error } = await supabase.functions.invoke("store-eft-checkout", { body: payload });
+  if (error)
+    throw new Error(
+      await errorMessage(error, data, "The delivery quote request service is unavailable."),
+    );
+  if (!data) throw new Error("The delivery quote request service returned no result.");
+  return data as { request: StoreDeliveryQuoteRequest };
+}
+
+export async function listMyStoreDeliveryQuoteRequests(): Promise<{
+  requests: StoreDeliveryQuoteRequest[];
+}> {
+  const { data, error } = await supabase.functions.invoke("store-eft-checkout", {
+    body: { action: "list_my_delivery_quote_requests" },
+  });
+  if (error)
+    throw new Error(
+      await errorMessage(error, data, "Your delivery quote requests could not be loaded."),
+    );
+  if (!data) throw new Error("The delivery quote service returned no result.");
+  return data as { requests: StoreDeliveryQuoteRequest[] };
+}
+
+export async function listStoreDeliveryQuoteQueue(): Promise<{
+  requests: AdminStoreDeliveryQuoteRequest[];
+}> {
+  const { data, error } = await supabase.functions.invoke("store-eft-checkout", {
+    body: { action: "list_delivery_quote_requests" },
+  });
+  if (error)
+    throw new Error(
+      await errorMessage(error, data, "The delivery quote queue could not be loaded."),
+    );
+  if (!data) throw new Error("The delivery quote queue returned no result.");
+  return data as { requests: AdminStoreDeliveryQuoteRequest[] };
+}
+
+export async function approveStoreDeliveryQuote(input: {
+  requestId: string;
+  deliveryAmount: number;
+  deliveryMethod: string;
+  evidenceNote: string;
+  staffNote?: string;
+}): Promise<{ request: StoreDeliveryQuoteRequest }> {
+  const { data, error } = await supabase.functions.invoke("store-eft-checkout", {
+    body: { action: "approve_delivery_quote", ...input },
+  });
+  if (error)
+    throw new Error(
+      await errorMessage(error, data, "The verified delivery quote could not be saved."),
+    );
+  if (!data) throw new Error("The delivery quote service returned no result.");
+  return data as { request: StoreDeliveryQuoteRequest };
+}
+
+export async function rejectStoreDeliveryQuote(input: {
+  requestId: string;
+  staffNote: string;
+}): Promise<{ request: StoreDeliveryQuoteRequest }> {
+  const { data, error } = await supabase.functions.invoke("store-eft-checkout", {
+    body: { action: "reject_delivery_quote", ...input },
+  });
+  if (error)
+    throw new Error(
+      await errorMessage(error, data, "The delivery quote request could not be rejected."),
+    );
+  if (!data) throw new Error("The delivery quote service returned no result.");
+  return data as { request: StoreDeliveryQuoteRequest };
 }
 
 export async function listMyEftPayments(): Promise<{ payments: EftPaymentDetail[] }> {

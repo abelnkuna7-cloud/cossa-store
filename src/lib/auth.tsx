@@ -70,3 +70,42 @@ export function useRoles(userId: string | undefined) {
     },
   });
 }
+
+const COSSA_STORE_ORGANISATION_ID = "00000000-0000-4000-8000-000000000001";
+
+/**
+ * Store administration is deliberately separate from being a customer, a
+ * catalogue applicant, or a legacy staff-role holder. The database remains
+ * the authority; this hook keeps private navigation out of customer screens.
+ */
+export function useCossaStoreAdminAccess() {
+  const { user, loading } = useSession();
+  const db = supabase as unknown as { from: (table: string) => any };
+  const membership = useQuery({
+    queryKey: ["cossa-store-admin", user?.id],
+    enabled: Boolean(user?.id),
+    retry: false,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
+    staleTime: 0,
+    queryFn: async (): Promise<boolean> => {
+      const { data, error } = await db
+        .from("organisation_members")
+        .select("role")
+        .eq("organisation_id", COSSA_STORE_ORGANISATION_ID)
+        .eq("user_id", user?.id)
+        .eq("status", "active")
+        .in("role", ["owner", "admin"])
+        .maybeSingle();
+      if (error) throw error;
+      return Boolean(data);
+    },
+  });
+
+  return {
+    loading: loading || (Boolean(user) && membership.isPending),
+    isMember: Boolean(user),
+    // Fail closed if membership cannot be read.
+    isAdmin: Boolean(user) && !loading && !membership.isError && membership.data === true,
+  };
+}

@@ -8,34 +8,7 @@ verify_jwt = false
 # This supports Supabase's current opaque publishable API keys.
 verify_jwt = false
 
-[functions.printify-fulfilment-create]
-# Supports interactive owner/admin calls and authenticated internal worker calls.
-# A separate PRINTIFY_FULFILMENT_ENABLED=true server flag is still required before any order can be submitted.
-verify_jwt = false
-
-[functions.printify-fulfilment-mapping]
-# The function verifies the caller session and Cossa admin role itself.
-# Mapping writes remain blocked unless PRINTIFY_MAPPING_WRITES_ENABLED=true.
-verify_jwt = false
-
-[functions.printify-fulfilment-catalogue]
-# Read-only browser for the connected Printify shop. The function verifies the caller session and Cossa admin role itself.
-verify_jwt = false
-
-[functions.printify-production-readiness]
-# Read-only production readiness gate. The function verifies the caller session and Cossa owner/admin role itself.
-verify_jwt = false
-
-[functions.printify-product-provision]
-# Permanent Cossa Lifestyle product provisioning service. It verifies the caller session and owner/admin role itself.
-# Printify writes remain blocked unless PRINTIFY_PRODUCT_PROVISIONING_ENABLED=true.
-verify_jwt = false
-
-[functions.printify-send-to-production]
-# Financial production-authorization boundary. Caller authentication and owner/admin authorization are verified in the function.
-# Requires explicit Manual-approval attestation and PRINTIFY_PRODUCTION_ENABLED=true before production can be requested.
-verify_jwt = false
-
-[functions.store-fulfilment-worker]
-# Internal autonomous worker. Requires STORE_FULFILMENT_WORKER_SECRET and processes durable outbox jobs.
+[functions.yoco-webhook]
+# Yoco webhooks carry no Supabase JWT. This endpoint verifies the Yoco HMAC
+# over the raw body before it reads or changes any payment-attempt state.
 verify_jwt = false
