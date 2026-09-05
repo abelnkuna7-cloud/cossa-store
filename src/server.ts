@@ -272,6 +272,8 @@ const APPROVED_STORE_ADMIN_ID = "fe80a00e-ec49-497f-b28b-c5b984c964b6";
 const APPROVED_STORE_ADMIN_EMAIL = "cossa@cossanexusholdings.co.za";
 const ADMIN_IDLE_TIMEOUT_SECONDS = 15 * 60;
 const ADMIN_ABSOLUTE_TIMEOUT_SECONDS = 4 * 60 * 60;
+const CUSTOMER_IDLE_TIMEOUT_SECONDS = 30 * 60;
+const CUSTOMER_ABSOLUTE_TIMEOUT_SECONDS = 12 * 60 * 60;
 
 function requestCookie(request: Request, name: string): string | null {
   const raw = request.headers.get("cookie") ?? "";
@@ -279,6 +281,90 @@ function requestCookie(request: Request, name: string): string | null {
     const [key, ...value] = part.trim().split("=");
     if (key === name) return decodeURIComponent(value.join("="));
   }
+  return null;
+}
+
+function isCustomerPrivatePath(pathname: string): boolean {
+  return pathname === "/account" || pathname.startsWith("/account/");
+}
+
+async function guardCustomerRequest(request: Request): Promise<Response | null> {
+  const pathname = new URL(request.url).pathname;
+  if (!isCustomerPrivatePath(pathname)) return null;
+
+  const token = requestCookie(request, "cossa_store_session");
+  const redirect = new URL("/auth", request.url);
+  redirect.searchParams.set("redirect", pathname);
+  if (!token) return Response.redirect(redirect, 302);
+
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  const key =
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) return new Response("Customer access unavailable", { status: 503 });
+
+  const client = createClient(url, key, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: claims, error: claimsError } = await client.auth.getClaims(token);
+  const tokenClaims = claims?.claims as Record<string, unknown> | undefined;
+  const userId = typeof tokenClaims?.sub === "string" ? tokenClaims.sub : null;
+  const sessionId = typeof tokenClaims?.session_id === "string" ? tokenClaims.session_id : null;
+  const issuedAt = typeof tokenClaims?.iat === "number" ? tokenClaims.iat : null;
+  if (claimsError || !userId || !sessionId || !issuedAt) {
+    const response = Response.redirect(redirect, 302);
+    response.headers.append("set-cookie", "cossa_store_session=; Path=/; Max-Age=0; SameSite=Lax; Secure");
+    return response;
+  }
+
+  const { supabaseAdmin } = await import("./integrations/supabase/client.server");
+  const now = Date.now();
+  const issued = new Date(issuedAt * 1000);
+  const absoluteExpiry = new Date((issuedAt + CUSTOMER_ABSOLUTE_TIMEOUT_SECONDS) * 1000);
+  const { data: activeSession, error: sessionReadError } = await (supabaseAdmin as any)
+    .from("store_customer_sessions")
+    .select("user_id, session_id, issued_at, last_seen_at, absolute_expires_at, revoked_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (sessionReadError) return new Response("Customer access unavailable", { status: 503 });
+
+  const lastSeen = activeSession?.last_seen_at ? Date.parse(activeSession.last_seen_at) : 0;
+  const absoluteExpiresAt = activeSession?.absolute_expires_at
+    ? Date.parse(activeSession.absolute_expires_at)
+    : absoluteExpiry.getTime();
+  const timedOut =
+    Boolean(activeSession?.revoked_at) ||
+    (lastSeen > 0 && now - lastSeen > CUSTOMER_IDLE_TIMEOUT_SECONDS * 1000) ||
+    now >= absoluteExpiresAt;
+  const incomingIssuedAt = issued.getTime();
+  const existingIssuedAt = activeSession?.issued_at ? Date.parse(activeSession.issued_at) : 0;
+  if (timedOut || (activeSession && activeSession.session_id !== sessionId && incomingIssuedAt <= existingIssuedAt)) {
+    const response = Response.redirect(redirect, 302);
+    response.headers.append("set-cookie", "cossa_store_session=; Path=/; Max-Age=0; SameSite=Lax; Secure");
+    return response;
+  }
+
+  if (!activeSession || activeSession.session_id !== sessionId) {
+    const { error } = await (supabaseAdmin as any).from("store_customer_sessions").upsert({
+      user_id: userId,
+      session_id: sessionId,
+      issued_at: issued.toISOString(),
+      last_seen_at: new Date().toISOString(),
+      absolute_expires_at: absoluteExpiry.toISOString(),
+      revoked_at: null,
+    });
+    if (error) return new Response("Customer access unavailable", { status: 503 });
+  } else {
+    const { error } = await (supabaseAdmin as any)
+      .from("store_customer_sessions")
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .eq("session_id", sessionId);
+    if (error) return new Response("Customer access unavailable", { status: 503 });
+  }
+
   return null;
 }
 
@@ -419,6 +505,9 @@ export default {
 
       const adminResponse = await guardAdminRequest(request);
       if (adminResponse) return adminResponse;
+
+      const customerResponse = await guardCustomerRequest(request);
+      if (customerResponse) return customerResponse;
 
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
