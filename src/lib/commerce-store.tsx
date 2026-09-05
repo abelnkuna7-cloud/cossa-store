@@ -540,6 +540,51 @@ export function CommerceProvider({
     };
   }, [remoteReady, state.cart, userId]);
 
+  // Keep another already-open device/profile current without requiring the
+  // customer to sign out and back in. The account row is authoritative for
+  // existing lines; local persistence still covers temporary offline edits.
+  useEffect(() => {
+    if (!remoteReady || !userId || typeof window === "undefined") return;
+
+    let cancelled = false;
+    const syncRemoteCart = async () => {
+      const { data, error } = await supabase
+        .from("store_customer_carts")
+        .select("cart")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (cancelled || error || !data) return;
+
+      const remoteCart = normaliseCartLines(data.cart);
+      setState((previous) => {
+        if (JSON.stringify(previous.cart) === JSON.stringify(remoteCart)) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          cart: remoteCart,
+          selectedCartLineKeys: normaliseSelectedCartLineKeys(
+            remoteCart,
+            previous.selectedCartLineKeys,
+          ),
+        };
+      });
+    };
+
+    const interval = window.setInterval(() => {
+      void syncRemoteCart();
+    }, 5000);
+    window.addEventListener("focus", syncRemoteCart);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", syncRemoteCart);
+    };
+  }, [remoteReady, userId]);
+
   /* ------------------------------------------------------------------------ */
   /* CART                                                                     */
   /* ------------------------------------------------------------------------ */
