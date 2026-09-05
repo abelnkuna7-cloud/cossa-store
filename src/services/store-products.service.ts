@@ -287,7 +287,7 @@ async function loadVariants(productIds: string[]): Promise<StoreVariantRow[]> {
 }
 
 async function loadRows(): Promise<PublicStoreProductRow[]> {
-  const { data, error } = await db.from("store_public_products").select(PUBLIC_PRODUCT_SELECT).order("updated_at", { ascending: false });
+  const { data, error } = await db.from("store_customer_products").select(PUBLIC_PRODUCT_SELECT).order("updated_at", { ascending: false });
   if (error) {
     console.error("[Cossa Store] Failed to load public products", error);
     throw error;
@@ -329,7 +329,7 @@ export async function listProducts(query: ProductQuery = {}): Promise<Product[]>
 export async function fetchProductBySlug(slug: string): Promise<Product | null> {
   const normalizedSlug = slug.trim().toLowerCase();
   if (!normalizedSlug) return null;
-  const { data, error } = await db.from("store_public_products").select(PUBLIC_PRODUCT_SELECT).eq("slug", normalizedSlug).maybeSingle();
+  const { data, error } = await db.from("store_customer_products").select(PUBLIC_PRODUCT_SELECT).eq("slug", normalizedSlug).maybeSingle();
   if (error) {
     console.error("[Cossa Store] Failed to load product", error);
     throw error;
@@ -342,7 +342,7 @@ export async function fetchProductBySlug(slug: string): Promise<Product | null> 
 export async function fetchProductsByIds(ids: string[]): Promise<Product[]> {
   const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
   if (uniqueIds.length === 0) return [];
-  const { data, error } = await db.from("store_public_products").select(PUBLIC_PRODUCT_SELECT).in("id", uniqueIds);
+  const { data, error } = await db.from("store_customer_products").select(PUBLIC_PRODUCT_SELECT).in("id", uniqueIds);
   if (error) {
     console.error("[Cossa Store] Failed to load products by IDs", error);
     throw error;

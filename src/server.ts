@@ -118,10 +118,10 @@ function xmlFailureResponse(kind: "sitemap" | "merchant-feed"): Response {
 
 async function loadSeoProducts(): Promise<SeoProductRow[]> {
   // Keep crawler endpoints cheap: never load the 20k+ variant catalogue here.
-  // store_public_products is already the Store's published/public catalogue boundary,
-  // so the sitemap cannot accidentally expose private drafts or archived source rows.
+  // store_customer_products is the Store's published customer-safe catalogue
+  // boundary, so the sitemap cannot expose provider, supplier, or draft fields.
   const { data, error } = await db
-    .from("store_public_products")
+    .from("store_customer_products")
     .select(SEO_PRODUCT_SELECT)
     .order("updated_at", { ascending: false });
 
