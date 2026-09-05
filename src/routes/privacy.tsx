@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 
 import { SITE_URL } from "@/config/seo";
 import { PolicyPage } from "@/components/common/PolicyPage";
@@ -220,6 +220,11 @@ export const Route = createFileRoute("/privacy")({
           ],
         },
       ]}
+      footer={
+        <p className="text-sm text-muted-foreground">
+          Read our <Link to="/security" className="underline">Security &amp; Data Protection</Link> page for a high-level overview of account and Store safeguards.
+        </p>
+      }
     />
   ),
 });

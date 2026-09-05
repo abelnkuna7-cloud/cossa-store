@@ -395,6 +395,12 @@ export function SiteFooter() {
             </li>
 
             <li>
+              <Link to="/security" className="hover:underline">
+                Security &amp; Data Protection
+              </Link>
+            </li>
+
+            <li>
               <Link to="/terms" className="hover:underline">
                 Terms and Conditions
               </Link>
