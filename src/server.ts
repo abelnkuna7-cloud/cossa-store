@@ -308,7 +308,16 @@ async function guardCustomerRequest(request: Request): Promise<Response | null> 
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data: claims, error: claimsError } = await client.auth.getClaims(token);
+  let claims: Awaited<ReturnType<typeof client.auth.getClaims>>["data"];
+  let claimsError: Awaited<ReturnType<typeof client.auth.getClaims>>["error"];
+  try {
+    const result = await client.auth.getClaims(token);
+    claims = result.data;
+    claimsError = result.error;
+  } catch {
+    claims = null;
+    claimsError = new Error("Invalid customer session token");
+  }
   const tokenClaims = claims?.claims as Record<string, unknown> | undefined;
   const userId = typeof tokenClaims?.sub === "string" ? tokenClaims.sub : null;
   const sessionId = typeof tokenClaims?.session_id === "string" ? tokenClaims.session_id : null;
@@ -388,7 +397,16 @@ async function guardAdminRequest(request: Request): Promise<Response | null> {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data: claims, error: claimsError } = await client.auth.getClaims(token);
+  let claims: Awaited<ReturnType<typeof client.auth.getClaims>>["data"];
+  let claimsError: Awaited<ReturnType<typeof client.auth.getClaims>>["error"];
+  try {
+    const result = await client.auth.getClaims(token);
+    claims = result.data;
+    claimsError = result.error;
+  } catch {
+    claims = null;
+    claimsError = new Error("Invalid customer session token");
+  }
   const tokenClaims = claims?.claims as Record<string, unknown> | undefined;
   const userId = typeof tokenClaims?.sub === "string" ? tokenClaims.sub : null;
   const email = typeof tokenClaims?.email === "string" ? tokenClaims.email.toLowerCase() : null;
