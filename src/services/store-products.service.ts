@@ -24,16 +24,6 @@ type PublicStoreProductRow = {
   slug: string;
   sku: string | null;
   product_type: "physical" | "digital" | "affiliate" | "pod" | "dropshipping";
-  fulfilment_model: Extract<
-    FulfilmentType,
-    | "cossa_stock"
-    | "local_supplier"
-    | "local_dropshipping"
-    | "international_dropshipping"
-    | "print_on_demand"
-    | "affiliate"
-    | "digital"
-  >;
   status: "active";
   short_description: string | null;
   description: string | null;
@@ -66,7 +56,7 @@ type StoreVariantRow = {
 };
 
 const PUBLIC_PRODUCT_SELECT =
-  "id,name,slug,sku,product_type,status,short_description,description,category,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at,fulfilment_model";
+  "id,name,slug,sku,product_type,status,short_description,description,category,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at,customer_features,customer_specifications,customer_delivery_notice,customer_returns_notice,customer_warranty_notice";
 
 const PUBLIC_VARIANT_SELECT =
   "id,product_id,sku,title,price_zar,is_default,is_available,sort_order";
@@ -89,7 +79,13 @@ function asNumber(value: unknown): number {
 }
 
 function fulfilmentFor(row: PublicStoreProductRow): FulfilmentType {
-  return row.fulfilment_model;
+  switch (row.product_type) {
+    case "digital": return "digital";
+    case "affiliate": return "affiliate";
+    case "pod": return "print_on_demand";
+    case "dropshipping": return "international_dropshipping";
+    default: return "cossa_stock";
+  }
 }
 
 function stockStatusFor(row: PublicStoreProductRow) {
