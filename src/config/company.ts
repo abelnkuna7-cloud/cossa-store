@@ -258,6 +258,8 @@ export const companyConfig = {
   backgrounds: {
     heroEagle:
       "/assets/backgrounds/cossa-eagle-hero.webp",
+    heroEagleVideo:
+      "/assets/backgrounds/eagle-nexus-hero-video.mp4",
   },
 
   /* ---------------------------------------------------------------------- */

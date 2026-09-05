@@ -19,5 +19,7 @@ export const MERCHANDISING = {
  */
 export const MERCH_TAGS = {
   trending: "trending",
+  /** Set only after an administrator verifies a genuine demand signal. */
+  popular: "popular",
   businessDeal: "business-deal",
 } as const;
