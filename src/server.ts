@@ -296,6 +296,11 @@ async function guardCustomerRequest(request: Request): Promise<Response | null> 
   const redirect = new URL("/auth", request.url);
   redirect.searchParams.set("redirect", pathname);
   if (!token) return Response.redirect(redirect, 302);
+  if (token.split(".").length !== 3) {
+    const response = Response.redirect(redirect, 302);
+    response.headers.append("set-cookie", "cossa_store_session=; Path=/; Max-Age=0; SameSite=Lax; Secure");
+    return response;
+  }
 
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
   const key =
