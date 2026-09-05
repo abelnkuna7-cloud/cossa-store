@@ -284,6 +284,17 @@ function requestCookie(request: Request, name: string): string | null {
   return null;
 }
 
+function redirectWithClearedSession(target: URL): Response {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      location: target.toString(),
+      "set-cookie": "cossa_store_session=; Path=/; Max-Age=0; SameSite=Lax; Secure",
+      "cache-control": "no-store",
+    },
+  });
+}
+
 function isCustomerPrivatePath(pathname: string): boolean {
   return pathname === "/account" || pathname.startsWith("/account/");
 }
@@ -297,9 +308,7 @@ async function guardCustomerRequest(request: Request): Promise<Response | null> 
   redirect.searchParams.set("redirect", pathname);
   if (!token) return Response.redirect(redirect, 302);
   if (token.split(".").length !== 3) {
-    const response = Response.redirect(redirect, 302);
-    response.headers.append("set-cookie", "cossa_store_session=; Path=/; Max-Age=0; SameSite=Lax; Secure");
-    return response;
+    return redirectWithClearedSession(redirect);
   }
 
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
@@ -328,9 +337,7 @@ async function guardCustomerRequest(request: Request): Promise<Response | null> 
   const sessionId = typeof tokenClaims?.session_id === "string" ? tokenClaims.session_id : null;
   const issuedAt = typeof tokenClaims?.iat === "number" ? tokenClaims.iat : null;
   if (claimsError || !userId || !sessionId || !issuedAt) {
-    const response = Response.redirect(redirect, 302);
-    response.headers.append("set-cookie", "cossa_store_session=; Path=/; Max-Age=0; SameSite=Lax; Secure");
-    return response;
+    return redirectWithClearedSession(redirect);
   }
 
   const { supabaseAdmin } = await import("./integrations/supabase/client.server");
@@ -355,9 +362,7 @@ async function guardCustomerRequest(request: Request): Promise<Response | null> 
   const incomingIssuedAt = issued.getTime();
   const existingIssuedAt = activeSession?.issued_at ? Date.parse(activeSession.issued_at) : 0;
   if (timedOut || (activeSession && activeSession.session_id !== sessionId && incomingIssuedAt <= existingIssuedAt)) {
-    const response = Response.redirect(redirect, 302);
-    response.headers.append("set-cookie", "cossa_store_session=; Path=/; Max-Age=0; SameSite=Lax; Secure");
-    return response;
+    return redirectWithClearedSession(redirect);
   }
 
   if (!activeSession || activeSession.session_id !== sessionId) {
@@ -466,9 +471,7 @@ async function guardAdminRequest(request: Request): Promise<Response | null> {
   if (mfaError) return new Response("Admin access unavailable", { status: 503 });
   const aal = typeof tokenClaims.aal === "string" ? tokenClaims.aal : null;
   if (mfaRequired === true && aal !== "aal2") {
-    const response = Response.redirect(new URL(`/auth?redirect=${encodeURIComponent(pathname)}&mfa=required`, request.url), 302);
-    response.headers.append("set-cookie", "cossa_store_session=; Path=/; Max-Age=0; SameSite=Lax; Secure");
-    return response;
+    return redirectWithClearedSession(new URL(`/auth?redirect=${encodeURIComponent(pathname)}&mfa=required`, request.url));
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -492,9 +495,7 @@ async function guardAdminRequest(request: Request): Promise<Response | null> {
   const incomingIssuedAt = issued.getTime();
   const existingIssuedAt = activeSession?.issued_at ? Date.parse(activeSession.issued_at) : 0;
   if (timedOut || (activeSession && activeSession.session_id !== sessionId && incomingIssuedAt <= existingIssuedAt)) {
-    const response = Response.redirect(redirect, 302);
-    response.headers.append("set-cookie", "cossa_store_session=; Path=/; Max-Age=0; SameSite=Lax; Secure");
-    return response;
+    return redirectWithClearedSession(redirect);
   }
 
   if (!activeSession || activeSession.session_id !== sessionId) {
