@@ -268,6 +268,10 @@ function isH3SwallowedErrorBody(body: string): boolean {
 }
 
 const STORE_ORGANISATION_ID = "00000000-0000-4000-8000-000000000001";
+const APPROVED_STORE_ADMIN_ID = "fe80a00e-ec49-497f-b28b-c5b984c964b6";
+const APPROVED_STORE_ADMIN_EMAIL = "cossa@cossanexusholdings.co.za";
+const ADMIN_IDLE_TIMEOUT_SECONDS = 15 * 60;
+const ADMIN_ABSOLUTE_TIMEOUT_SECONDS = 4 * 60 * 60;
 
 function requestCookie(request: Request, name: string): string | null {
   const raw = request.headers.get("cookie") ?? "";
@@ -296,9 +300,39 @@ async function guardAdminRequest(request: Request): Promise<Response | null> {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data: claims, error: claimsError } = await client.auth.getClaims(token);
-  if (claimsError || !claims?.claims?.sub) return Response.redirect(redirect, 302);
+  const tokenClaims = claims?.claims as Record<string, unknown> | undefined;
+  const userId = typeof tokenClaims?.sub === "string" ? tokenClaims.sub : null;
+  const email = typeof tokenClaims?.email === "string" ? tokenClaims.email.toLowerCase() : null;
+  const sessionId = typeof tokenClaims?.session_id === "string" ? tokenClaims.session_id : null;
+  const issuedAt = typeof tokenClaims?.iat === "number" ? tokenClaims.iat : null;
+  if (claimsError || !userId || !sessionId || !issuedAt) return Response.redirect(redirect, 302);
 
-  const { data: membership, error: membershipError } = await client
+  // The browser-visible membership check is not an authorization boundary.
+  // Bind Store admin access to the verified owner identity and a server-side
+  // session record, while keeping the service-role client server-only.
+  if (userId !== APPROVED_STORE_ADMIN_ID || email !== APPROVED_STORE_ADMIN_EMAIL) {
+    return new Response("Store administrator access required", {
+      status: 403,
+      headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" },
+    });
+  }
+
+  const { supabaseAdmin } = await import("./integrations/supabase/client.server");
+  const { data: authUser, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (
+    authUserError ||
+    !authUser.user ||
+    authUser.user.id !== APPROVED_STORE_ADMIN_ID ||
+    authUser.user.email?.toLowerCase() !== APPROVED_STORE_ADMIN_EMAIL ||
+    !authUser.user.email_confirmed_at
+  ) {
+    return new Response("Store administrator access required", {
+      status: 403,
+      headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" },
+    });
+  }
+
+  const { data: membership, error: membershipError } = await supabaseAdmin
     .from("organisation_members")
     .select("role")
     .eq("organisation_id", STORE_ORGANISATION_ID)
@@ -311,6 +345,53 @@ async function guardAdminRequest(request: Request): Promise<Response | null> {
       status: 403,
       headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" },
     });
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const issued = new Date(issuedAt * 1000);
+  const absoluteExpiry = new Date((issuedAt + ADMIN_ABSOLUTE_TIMEOUT_SECONDS) * 1000);
+  const { data: activeSession, error: sessionReadError } = await (supabaseAdmin as any)
+    .from("store_admin_sessions")
+    .select("user_id, session_id, issued_at, last_seen_at, absolute_expires_at, revoked_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (sessionReadError) return new Response("Admin access unavailable", { status: 503 });
+
+  const lastSeen = activeSession?.last_seen_at ? Date.parse(activeSession.last_seen_at) : 0;
+  const absoluteExpiresAt = activeSession?.absolute_expires_at
+    ? Date.parse(activeSession.absolute_expires_at)
+    : absoluteExpiry.getTime();
+  const timedOut =
+    Boolean(activeSession?.revoked_at) ||
+    (lastSeen > 0 && now * 1000 - lastSeen > ADMIN_IDLE_TIMEOUT_SECONDS * 1000) ||
+    now * 1000 >= absoluteExpiresAt;
+  const incomingIssuedAt = issued.getTime();
+  const existingIssuedAt = activeSession?.issued_at ? Date.parse(activeSession.issued_at) : 0;
+  if (timedOut || (activeSession && activeSession.session_id !== sessionId && incomingIssuedAt <= existingIssuedAt)) {
+    const response = Response.redirect(redirect, 302);
+    response.headers.append("set-cookie", "cossa_store_session=; Path=/; Max-Age=0; SameSite=Lax; Secure");
+    return response;
+  }
+
+  if (!activeSession || activeSession.session_id !== sessionId) {
+    const { error: sessionWriteError } = await (supabaseAdmin as any)
+      .from("store_admin_sessions")
+      .upsert({
+        user_id: userId,
+        session_id: sessionId,
+        issued_at: issued.toISOString(),
+        last_seen_at: new Date().toISOString(),
+        absolute_expires_at: absoluteExpiry.toISOString(),
+        revoked_at: null,
+      });
+    if (sessionWriteError) return new Response("Admin access unavailable", { status: 503 });
+  } else {
+    const { error: sessionTouchError } = await (supabaseAdmin as any)
+      .from("store_admin_sessions")
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .eq("session_id", sessionId);
+    if (sessionTouchError) return new Response("Admin access unavailable", { status: 503 });
   }
   return null;
 }

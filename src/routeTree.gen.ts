@@ -24,6 +24,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RequestAQuoteRouteImport } from './routes/request-a-quote'
 import { Route as ReturnsRouteImport } from './routes/returns'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as SecurityRouteImport } from './routes/security'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as ShopByProjectRouteImport } from './routes/shop-by-project'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -117,6 +118,11 @@ const ReturnsRoute = ReturnsRouteImport.update({
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SecurityRoute = SecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopRoute = ShopRouteImport.update({
@@ -242,6 +248,7 @@ export interface FileRoutesByFullPath {
   '/request-a-quote': typeof RequestAQuoteRoute
   '/returns': typeof ReturnsRoute
   '/search': typeof SearchRoute
+  '/security': typeof SecurityRoute
   '/shop': typeof ShopRoute
   '/shop-by-project': typeof ShopByProjectRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -277,6 +284,7 @@ export interface FileRoutesByTo {
   '/request-a-quote': typeof RequestAQuoteRoute
   '/returns': typeof ReturnsRoute
   '/search': typeof SearchRoute
+  '/security': typeof SecurityRoute
   '/shop': typeof ShopRoute
   '/shop-by-project': typeof ShopByProjectRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -315,6 +323,7 @@ export interface FileRoutesById {
   '/request-a-quote': typeof RequestAQuoteRoute
   '/returns': typeof ReturnsRoute
   '/search': typeof SearchRoute
+  '/security': typeof SecurityRoute
   '/shop': typeof ShopRoute
   '/shop-by-project': typeof ShopByProjectRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -353,6 +362,7 @@ export interface FileRouteTypes {
     | '/request-a-quote'
     | '/returns'
     | '/search'
+    | '/security'
     | '/shop'
     | '/shop-by-project'
     | '/sitemap.xml'
@@ -388,6 +398,7 @@ export interface FileRouteTypes {
     | '/request-a-quote'
     | '/returns'
     | '/search'
+    | '/security'
     | '/shop'
     | '/shop-by-project'
     | '/sitemap.xml'
@@ -425,6 +436,7 @@ export interface FileRouteTypes {
     | '/request-a-quote'
     | '/returns'
     | '/search'
+    | '/security'
     | '/shop'
     | '/shop-by-project'
     | '/sitemap.xml'
@@ -463,6 +475,7 @@ export interface RootRouteChildren {
   RequestAQuoteRoute: typeof RequestAQuoteRoute
   ReturnsRoute: typeof ReturnsRoute
   SearchRoute: typeof SearchRoute
+  SecurityRoute: typeof SecurityRoute
   ShopRoute: typeof ShopRoute
   ShopByProjectRoute: typeof ShopByProjectRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -579,6 +592,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/security': {
+      id: '/security'
+      path: '/security'
+      fullPath: '/security'
+      preLoaderRoute: typeof SecurityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop': {
@@ -782,6 +802,7 @@ const rootRouteChildren: RootRouteChildren = {
   RequestAQuoteRoute: RequestAQuoteRoute,
   ReturnsRoute: ReturnsRoute,
   SearchRoute: SearchRoute,
+  SecurityRoute: SecurityRoute,
   ShopRoute: ShopRoute,
   ShopByProjectRoute: ShopByProjectRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
