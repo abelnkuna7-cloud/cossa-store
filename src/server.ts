@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { SITE_URL } from "./config/seo";
 import { supabase } from "./integrations/supabase/client";
+import { createClient } from "@supabase/supabase-js";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
@@ -266,11 +267,62 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+const STORE_ORGANISATION_ID = "00000000-0000-4000-8000-000000000001";
+
+function requestCookie(request: Request, name: string): string | null {
+  const raw = request.headers.get("cookie") ?? "";
+  for (const part of raw.split(";")) {
+    const [key, ...value] = part.trim().split("=");
+    if (key === name) return decodeURIComponent(value.join("="));
+  }
+  return null;
+}
+
+async function guardAdminRequest(request: Request): Promise<Response | null> {
+  const pathname = new URL(request.url).pathname;
+  if (!pathname.startsWith("/admin")) return null;
+
+  const token = requestCookie(request, "cossa_store_session");
+  const redirect = new URL("/auth", request.url);
+  redirect.searchParams.set("redirect", pathname);
+  if (!token) return Response.redirect(redirect, 302);
+
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) return new Response("Admin access unavailable", { status: 503 });
+
+  const client = createClient(url, key, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: claims, error: claimsError } = await client.auth.getClaims(token);
+  if (claimsError || !claims?.claims?.sub) return Response.redirect(redirect, 302);
+
+  const { data: membership, error: membershipError } = await client
+    .from("organisation_members")
+    .select("role")
+    .eq("organisation_id", STORE_ORGANISATION_ID)
+    .eq("user_id", claims.claims.sub)
+    .eq("status", "active")
+    .in("role", ["owner", "admin"])
+    .maybeSingle();
+  if (membershipError || !membership) {
+    return new Response("Store administrator access required", {
+      status: 403,
+      headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" },
+    });
+  }
+  return null;
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const seoFeedResponse = await handleSeoFeedRequest(request);
       if (seoFeedResponse) return seoFeedResponse;
+
+      const adminResponse = await guardAdminRequest(request);
+      if (adminResponse) return adminResponse;
 
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);

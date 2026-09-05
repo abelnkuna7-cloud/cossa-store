@@ -14,10 +14,12 @@ export function useSession() {
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
       setSession(data.session ?? null);
+      syncServerSessionCookie(data.session?.access_token ?? null);
       setLoading(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next ?? null);
+      syncServerSessionCookie(next?.access_token ?? null);
       setLoading(false);
     });
     return () => {
@@ -69,6 +71,14 @@ export function useRoles(userId: string | undefined) {
       return (data ?? []).map((r) => r.role as CossaRole);
     },
   });
+}
+
+function syncServerSessionCookie(accessToken: string | null) {
+  if (typeof document === "undefined") return;
+  const base = "Path=/; Max-Age=3600; SameSite=Lax; Secure";
+  document.cookie = accessToken
+    ? `cossa_store_session=${encodeURIComponent(accessToken)}; ${base}`
+    : `cossa_store_session=; ${base}; Max-Age=0`;
 }
 
 const COSSA_STORE_ORGANISATION_ID = "00000000-0000-4000-8000-000000000001";
