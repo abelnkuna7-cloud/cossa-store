@@ -291,8 +291,8 @@ async function guardAdminRequest(request: Request): Promise<Response | null> {
   redirect.searchParams.set("redirect", pathname);
   if (!token) return Response.redirect(redirect, 302);
 
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_PUBLISHABLE_KEY;
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) return new Response("Admin access unavailable", { status: 503 });
 
   const client = createClient(url, key, {
