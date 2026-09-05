@@ -6,7 +6,6 @@ import {
   Download,
   FileUp,
   LoaderCircle,
-  MapPin,
   PackageCheck,
   ReceiptText,
   Truck,
@@ -48,14 +47,10 @@ type OrderItem = {
   line_total: number | string;
 };
 
-type SupplierFulfilment = {
+type CustomerFulfilment = {
   id: string;
   store_order_id: string;
-  supplier: string;
   status: string;
-  logistics_method: string | null;
-  origin_country_code: string | null;
-  destination_country_code: string | null;
   tracking_number: string | null;
   updated_at: string;
 };
@@ -75,7 +70,7 @@ type CustomerOrder = {
   created_at: string;
   store_order_items: OrderItem[] | null;
   store_digital_entitlements: DigitalEntitlement[] | null;
-  supplier_fulfilments: SupplierFulfilment[];
+  fulfilments: CustomerFulfilment[];
 };
 
 export const Route = createFileRoute("/account/orders")({
@@ -85,7 +80,7 @@ export const Route = createFileRoute("/account/orders")({
       {
         name: "description",
         content:
-          "View your Cossa Store order status, supplier fulfilment tracking and approved digital purchases securely.",
+          "View your Cossa Store order status, delivery tracking and approved digital purchases securely.",
       },
       { name: "robots", content: "noindex" },
     ],
@@ -158,17 +153,18 @@ function fulfilmentLabel(status: string) {
     case "submitted":
     case "paid":
     case "processing":
-      return "Processing with supplier";
     case "action_required":
-      return "Supplier processing pending";
+      return "Preparing your order";
     case "shipped":
       return "Shipped";
     case "delivered":
       return "Delivered";
     case "failed":
-      return "Fulfilment needs attention";
+      return "Delivery needs attention";
+    case "cancelled":
+      return "Cancelled";
     default:
-      return status.replace(/_/g, " ");
+      return "Delivery update pending";
   }
 }
 
@@ -226,24 +222,26 @@ function OrdersPage() {
 
       const orderRows = (data ?? []) as Omit<
         CustomerOrder,
-        "supplier_fulfilments"
+        "fulfilments"
       >[];
       const orderIds = orderRows.map((order) => order.id);
 
       if (!orderIds.length) return [];
 
+      // This customer projection excludes supplier records, costs and payloads.
+      // The database limits its rows to orders owned by the signed-in customer.
       const { data: fulfilmentRows, error: fulfilmentError } = await db
-        .from("supplier_fulfilment_orders")
+        .from("store_customer_fulfilments")
         .select(
-          "id,store_order_id,supplier,status,logistics_method,origin_country_code,destination_country_code,tracking_number,updated_at",
+          "id,store_order_id,status,tracking_number,updated_at",
         )
         .in("store_order_id", orderIds)
         .order("updated_at", { ascending: false });
 
       if (fulfilmentError) throw fulfilmentError;
 
-      const fulfilmentsByOrder = new Map<string, SupplierFulfilment[]>();
-      for (const fulfilment of (fulfilmentRows ?? []) as SupplierFulfilment[]) {
+      const fulfilmentsByOrder = new Map<string, CustomerFulfilment[]>();
+      for (const fulfilment of (fulfilmentRows ?? []) as CustomerFulfilment[]) {
         const current = fulfilmentsByOrder.get(fulfilment.store_order_id) ?? [];
         current.push(fulfilment);
         fulfilmentsByOrder.set(fulfilment.store_order_id, current);
@@ -251,7 +249,7 @@ function OrdersPage() {
 
       return orderRows.map((order) => ({
         ...order,
-        supplier_fulfilments: fulfilmentsByOrder.get(order.id) ?? [],
+        fulfilments: fulfilmentsByOrder.get(order.id) ?? [],
       }));
     },
   });
@@ -601,9 +599,9 @@ function OrdersPage() {
               </NoticeBlock>
             ) : null}
 
-            {order.supplier_fulfilments.length ? (
+            {order.fulfilments.length ? (
               <div className="space-y-3 border-b border-border bg-muted/20 p-5">
-                {order.supplier_fulfilments.map((fulfilment) => (
+                {order.fulfilments.map((fulfilment) => (
                   <div
                     key={fulfilment.id}
                     className="rounded-lg border border-border bg-background/60 p-4"
@@ -617,9 +615,7 @@ function OrdersPage() {
                             <Truck className="h-4 w-4 text-primary" />
                           )}
                           <p className="text-sm font-semibold">
-                            {fulfilment.supplier === "CJ Dropshipping"
-                              ? "International fulfilment"
-                              : "Supplier fulfilment"}
+                            Delivery tracking
                           </p>
                         </div>
                         <p
@@ -627,20 +623,6 @@ function OrdersPage() {
                         >
                           {fulfilmentLabel(fulfilment.status)}
                         </p>
-                        {fulfilment.logistics_method ? (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Delivery method: {fulfilment.logistics_method}
-                          </p>
-                        ) : null}
-                        {fulfilment.origin_country_code ||
-                        fulfilment.destination_country_code ? (
-                          <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-                            <MapPin className="h-3.5 w-3.5" />
-                            {fulfilment.origin_country_code || "International"}
-                            {" → "}
-                            {fulfilment.destination_country_code || "ZA"}
-                          </p>
-                        ) : null}
                       </div>
 
                       <div className="sm:text-right">

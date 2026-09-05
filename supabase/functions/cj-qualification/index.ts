@@ -216,17 +216,14 @@ async function authenticatedUser(
 }
 
 async function requireCossaStoreAdmin(client: ServiceClient, userId: string): Promise<void> {
-  const [member, role] = await Promise.all([
-    client
-      .from("organisation_members")
-      .select("role")
-      .eq("organisation_id", ORG_ID)
-      .eq("user_id", userId)
-      .eq("status", "active")
-      .in("role", ["owner", "admin"]),
-    client.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin"),
-  ]);
-  if (member.error || role.error || (!(member.data ?? []).length && !(role.data ?? []).length)) {
+  const member = await client
+    .from("organisation_members")
+    .select("role")
+    .eq("organisation_id", ORG_ID)
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .in("role", ["owner", "admin"]);
+  if (member.error || !(member.data ?? []).length) {
     throw new Error("forbidden");
   }
 }

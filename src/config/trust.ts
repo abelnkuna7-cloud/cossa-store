@@ -86,7 +86,7 @@ export const COMPLIANCE_BADGES: ComplianceBadge[] = [
 
 /** Payment gateways. `live` stays false until merchant keys are verified. */
 export interface PaymentGateway {
-  id: "payfast" | "ozow";
+  id: "payfast" | "ozow" | "yoco";
   name: string;
   method: string;
   description: string;
@@ -112,6 +112,14 @@ export const PAYMENT_GATEWAYS: PaymentGateway[] = [
     description:
       "Pay directly from your South African bank account. No card required, cleared instantly.",
     requiredKeys: ["OZOW_SITE_CODE", "OZOW_PRIVATE_KEY", "OZOW_API_KEY"],
+    live: false,
+  },
+  {
+    id: "yoco",
+    name: "Yoco",
+    method: "Credit & debit cards",
+    description: "Secure Yoco-hosted card checkout. Test mode only while validation is in progress.",
+    requiredKeys: ["YOCO_TEST_PUBLIC_KEY", "YOCO_TEST_SECRET_KEY"],
     live: false,
   },
 ];

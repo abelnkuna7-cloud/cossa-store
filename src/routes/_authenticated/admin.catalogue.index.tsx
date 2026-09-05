@@ -86,7 +86,7 @@ function CatalogueManager() {
   return (
     <CatalogueShell
       title="Catalogue manager"
-      description="Create, review and publish real Cossa Store products from the consolidated Growth database."
+      description="Create, review and publish real Cossa Store products."
       actions={<Button onClick={() => navigate({ to: "/admin/catalogue/new" })}>Create product</Button>}
     >
       <CatalogueTable />
@@ -156,7 +156,7 @@ function CatalogueTable() {
   });
 
   if (products.isPending) return <LoadingBlock label="Loading the catalogue…" />;
-  if (products.isError) return <ErrorBlock description="The catalogue could not be loaded from cossa-growth." />;
+  if (products.isError) return <ErrorBlock description="The private Store catalogue could not be loaded." />;
 
   const invalidateCatalogue = () => {
     queryClient.invalidateQueries({ queryKey: ["admin", "store-products"] });
@@ -179,7 +179,7 @@ function CatalogueTable() {
       {filtered.length === 0 ? (
         <EmptyBlock
           title="No products yet"
-          description="Create your first real product. It will be saved in cossa-growth and only appear on the Store when its status is Active."
+          description="Create your first real product. It remains private until you set its status to Active."
           action={
             <Button asChild>
               <Link to="/admin/catalogue/new">Create first product</Link>

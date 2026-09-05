@@ -56,8 +56,6 @@ type PublicStoreProductRow = {
 type StoreVariantRow = {
   id: string;
   product_id: string;
-  provider: string;
-  provider_variant_id: string;
   sku: string | null;
   title: string;
   price_zar: number | string;
@@ -70,7 +68,7 @@ const PUBLIC_PRODUCT_SELECT =
   "id,name,slug,sku,product_type,status,short_description,description,category,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at,fulfilment_model,partner_name";
 
 const PUBLIC_VARIANT_SELECT =
-  "id,product_id,provider,provider_variant_id,sku,title,price_zar,is_default,is_available,sort_order";
+  "id,product_id,sku,title,price_zar,is_default,is_available,sort_order";
 
 const ALL_PROVINCES = [
   "Gauteng",
@@ -280,7 +278,7 @@ function mapRow(row: PublicStoreProductRow, variantRows: StoreVariantRow[] = [])
 async function loadVariants(productIds: string[]): Promise<StoreVariantRow[]> {
   if (productIds.length === 0) return [];
   const { data, error } = await db
-    .from("store_product_variants")
+    .from("store_public_product_variants")
     .select(PUBLIC_VARIANT_SELECT)
     .in("product_id", productIds)
     .eq("is_available", true)

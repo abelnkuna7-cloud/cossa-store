@@ -7,3 +7,8 @@ verify_jwt = false
 # User authentication and administrator authorization are verified in the function.
 # This supports Supabase's current opaque publishable API keys.
 verify_jwt = false
+
+[functions.yoco-webhook]
+# Yoco webhooks carry no Supabase JWT. This endpoint verifies the Yoco HMAC
+# over the raw body before it reads or changes any payment-attempt state.
+verify_jwt = false

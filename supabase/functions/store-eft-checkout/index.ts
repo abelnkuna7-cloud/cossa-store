@@ -75,6 +75,47 @@ function money(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+function yocoAttemptPublic(attempt: Record<string, unknown>) {
+  return {
+    id: String(attempt.id),
+    status: String(attempt.status),
+    returnState: attempt.return_state ?? null,
+    yocoCheckoutId: attempt.yoco_checkout_id ?? null,
+    paymentId: attempt.yoco_payment_id ?? null,
+    amountCents: Number(attempt.amount_cents),
+    currency: "ZAR",
+    verifiedAt: attempt.verified_at ?? null,
+  };
+}
+
+function deliveryQuoteRequestPublic(request: Record<string, unknown>) {
+  return {
+    id: String(request.id),
+    status: String(request.status),
+    deliveryMethod: typeof request.delivery_method === "string" ? request.delivery_method : null,
+    deliveryAmount: finiteNumber(request.delivery_amount),
+    currency: typeof request.currency === "string" ? request.currency : null,
+    staffNote: typeof request.staff_note === "string" ? request.staff_note : null,
+    createdAt: request.created_at ?? null,
+    quotedAt: request.quoted_at ?? null,
+    expiresAt: request.expires_at ?? null,
+  };
+}
+
+function deliveryQuoteRequestForAdmin(request: Record<string, unknown>) {
+  return {
+    ...deliveryQuoteRequestPublic(request),
+    customerName: typeof request.customer_name === "string" ? request.customer_name : "Customer",
+    customerPhone: typeof request.customer_phone === "string" ? request.customer_phone : null,
+    requesterEmail: typeof request.requester_email === "string" ? request.requester_email : null,
+    items: Array.isArray(request.items) ? request.items : [],
+    shippingAddress:
+      request.shipping_address && typeof request.shipping_address === "object"
+        ? request.shipping_address
+        : {},
+  };
+}
+
 type ShippingAddress = {
   address1: string;
   address2: string;
@@ -263,7 +304,13 @@ function deliveryConfirmation(row: Record<string, unknown>): LoadedDeliveryConfi
   ) {
     return null;
   }
-  if (!row.supplier_id || !row.fulfilment_profile_id || !row.evidence_note || !row.verified_at || !row.expires_at) {
+  if (
+    !row.supplier_id ||
+    !row.fulfilment_profile_id ||
+    !row.evidence_note ||
+    !row.verified_at ||
+    !row.expires_at
+  ) {
     return null;
   }
   return {
@@ -271,7 +318,8 @@ function deliveryConfirmation(row: Record<string, unknown>): LoadedDeliveryConfi
     supplierId: String(row.supplier_id),
     fulfilmentProfileId: String(row.fulfilment_profile_id),
     eligibilityClassification,
-    rateConfigurationId: typeof row.rate_configuration_id === "string" ? row.rate_configuration_id : null,
+    rateConfigurationId:
+      typeof row.rate_configuration_id === "string" ? row.rate_configuration_id : null,
     deliveryMethod: typeof row.delivery_method === "string" ? row.delivery_method : null,
     deliveryAmount: finiteNumber(row.delivery_amount),
     currency: typeof row.currency === "string" ? row.currency : null,
@@ -326,7 +374,8 @@ async function deliveryConfirmationTargets(admin: any, lines: ConfiguredPhysical
     .from("store_inventory_intakes")
     .select("publication_store_product_id,supplier_id,fulfilment_profile_id")
     .in("publication_store_product_id", productIds);
-  if (error || !data) throw new Error(`${DELIVERY_QUOTE_REQUIRED} Delivery configuration is unavailable.`);
+  if (error || !data)
+    throw new Error(`${DELIVERY_QUOTE_REQUIRED} Delivery configuration is unavailable.`);
 
   const targets = new Map<string, DeliveryConfirmationTarget>();
   for (const productId of productIds) {
@@ -334,7 +383,9 @@ async function deliveryConfirmationTargets(admin: any, lines: ConfiguredPhysical
       (row) => row.publication_store_product_id === productId,
     );
     if (matches.length !== 1) {
-      throw new Error(`${DELIVERY_QUOTE_REQUIRED} A unique supplier fulfilment record is required.`);
+      throw new Error(
+        `${DELIVERY_QUOTE_REQUIRED} A unique supplier fulfilment record is required.`,
+      );
     }
     const supplierId = typeof matches[0].supplier_id === "string" ? matches[0].supplier_id : "";
     const fulfilmentProfileId =
@@ -393,36 +444,37 @@ async function quoteConfiguredPhysicalDelivery(
 
   const supplierIds = [...new Set(resolvedLines.map((line) => line.supplierId))];
   const profileIds = [...new Set(resolvedLines.map((line) => line.fulfilmentProfileId))];
-  const [attributesResult, suppliersResult, profilesResult, ratesResult, confirmationsResult] = await Promise.all([
-    admin
-      .from("store_product_delivery_attributes")
-      .select(
-        "store_product_id,length_cm,width_cm,height_cm,weight_kg,dimension_kind,dimensions_verified_at,weight_verified_at",
-      )
-      .in("store_product_id", productIds),
-    admin.from("store_suppliers").select("id,name,status").in("id", supplierIds),
-    admin
-      .from("store_fulfilment_profiles")
-      .select("id,supplier_id,delivery_payer,is_active")
-      .in("id", profileIds),
-    admin
-      .from("store_delivery_rate_configurations")
-      .select(
-        "id,supplier_id,fulfilment_profile_id,method_code,customer_label,price,currency,is_active,customer_selectable,is_default,classification,eligibility_requirements,source_url,source_evidence,verified_at,operational_notes",
-      )
-      .in("fulfilment_profile_id", profileIds),
-    admin
-      .from("store_delivery_quote_confirmations")
-      .select(
-        "id,supplier_id,fulfilment_profile_id,rate_configuration_id,eligibility_classification,delivery_method,delivery_amount,currency,evidence_note,verified_at,expires_at",
-      )
-      .in("fulfilment_profile_id", profileIds)
-      .eq("cart_fingerprint", scope.cartFingerprint)
-      .eq("address_fingerprint", scope.addressFingerprint)
-      .eq("is_active", true)
-      .gt("expires_at", new Date().toISOString())
-      .order("verified_at", { ascending: false }),
-  ]);
+  const [attributesResult, suppliersResult, profilesResult, ratesResult, confirmationsResult] =
+    await Promise.all([
+      admin
+        .from("store_product_delivery_attributes")
+        .select(
+          "store_product_id,length_cm,width_cm,height_cm,weight_kg,dimension_kind,dimensions_verified_at,weight_verified_at",
+        )
+        .in("store_product_id", productIds),
+      admin.from("store_suppliers").select("id,name,status").in("id", supplierIds),
+      admin
+        .from("store_fulfilment_profiles")
+        .select("id,supplier_id,delivery_payer,is_active")
+        .in("id", profileIds),
+      admin
+        .from("store_delivery_rate_configurations")
+        .select(
+          "id,supplier_id,fulfilment_profile_id,method_code,customer_label,price,currency,is_active,customer_selectable,is_default,classification,eligibility_requirements,source_url,source_evidence,verified_at,operational_notes",
+        )
+        .in("fulfilment_profile_id", profileIds),
+      admin
+        .from("store_delivery_quote_confirmations")
+        .select(
+          "id,supplier_id,fulfilment_profile_id,rate_configuration_id,eligibility_classification,delivery_method,delivery_amount,currency,evidence_note,verified_at,expires_at",
+        )
+        .in("fulfilment_profile_id", profileIds)
+        .eq("cart_fingerprint", scope.cartFingerprint)
+        .eq("address_fingerprint", scope.addressFingerprint)
+        .eq("is_active", true)
+        .gt("expires_at", new Date().toISOString())
+        .order("verified_at", { ascending: false }),
+    ]);
   if (
     attributesResult.error ||
     suppliersResult.error ||
@@ -479,6 +531,13 @@ async function quoteConfiguredPhysicalDelivery(
   const providers: string[] = [];
   const configuredRates: Array<{ rateId: string; methodCode: string; verifiedAt: string | null }> =
     [];
+  const manualQuotes: Array<{
+    confirmationId: string | null;
+    deliveryMethod: string;
+    deliveryAmount: number;
+    verifiedAt: string;
+    expiresAt: string;
+  }> = [];
   const confirmationTargets: Array<{
     supplierId: string;
     fulfilmentProfileId: string;
@@ -504,7 +563,43 @@ async function quoteConfiguredPhysicalDelivery(
             fulfilmentProfileId,
             eligibilityClassification: pendingStaffConfirmation.eligibilityClassification,
           }
-        : confirmationsByTarget.get(key) ?? null;
+        : (confirmationsByTarget.get(key) ?? null);
+
+    // A staff-approved manual quote remains bound to this exact cart and
+    // address by the confirmation lookup above. It deliberately bypasses the
+    // configured-rate resolver only after the trusted staff workflow has
+    // supplied a non-zero amount, method and audit evidence server-side.
+    if (
+      storedConfirmation &&
+      storedConfirmation.eligibilityClassification === "MANUAL_DELIVERY_QUOTE_REQUIRED"
+    ) {
+      const confirmation = storedConfirmation as LoadedDeliveryConfirmation;
+      const quotedAmount = confirmation.deliveryAmount;
+      if (
+        supplier.status !== "active" ||
+        profile.is_active !== true ||
+        profile.delivery_payer !== "customer" ||
+        !confirmation.deliveryMethod ||
+        confirmation.currency !== "ZAR" ||
+        quotedAmount === null ||
+        quotedAmount <= 0 ||
+        quotedAmount > 100000
+      ) {
+        throw configurationUnavailable();
+      }
+      const deliveryAmount = money(quotedAmount);
+      shippingTotal = money(shippingTotal + deliveryAmount);
+      shippingMethods.push(confirmation.deliveryMethod);
+      providers.push(typeof supplier.name === "string" ? supplier.name : "configured supplier");
+      manualQuotes.push({
+        confirmationId: confirmation.id ?? null,
+        deliveryMethod: confirmation.deliveryMethod,
+        deliveryAmount,
+        verifiedAt: confirmation.verifiedAt,
+        expiresAt: confirmation.expiresAt,
+      });
+      continue;
+    }
     const delivery = resolveConfiguredDeliveryGroup({
       supplierId,
       fulfilmentProfileId,
@@ -543,7 +638,10 @@ async function quoteConfiguredPhysicalDelivery(
     });
 
     if (delivery.status !== "quoted") throw new Error(delivery.message);
-    if (!storedConfirmation || storedConfirmation.eligibilityClassification !== "STANDARD_RATE_ELIGIBLE") {
+    if (
+      !storedConfirmation ||
+      storedConfirmation.eligibilityClassification !== "STANDARD_RATE_ELIGIBLE"
+    ) {
       throw configurationUnavailable();
     }
     if (!pendingStaffConfirmation) {
@@ -580,7 +678,10 @@ async function quoteConfiguredPhysicalDelivery(
     shippingTotal,
     shippingMethod: shippingMethods.join(" + "),
     provider: providers.join(" + "),
-    quoteMetadata: { configured_rates: configuredRates },
+    quoteMetadata: {
+      configured_rates: configuredRates,
+      manual_quotes: manualQuotes,
+    },
     confirmationTargets,
   };
 }
@@ -633,10 +734,162 @@ Deno.serve(async (request) => {
         ? "quote"
         : body.action === "confirm_delivery"
           ? "confirm_delivery"
-        : body.action === "create" || !body.action
-          ? "create"
-          : null;
+          : body.action === "request_delivery_quote"
+            ? "request_delivery_quote"
+            : body.action === "list_my_delivery_quote_requests"
+              ? "list_my_delivery_quote_requests"
+              : body.action === "list_delivery_quote_requests"
+                ? "list_delivery_quote_requests"
+                : body.action === "approve_delivery_quote"
+                  ? "approve_delivery_quote"
+                  : body.action === "reject_delivery_quote"
+                    ? "reject_delivery_quote"
+                    : body.action === "yoco_create"
+                      ? "yoco_create"
+                      : body.action === "yoco_status"
+                        ? "yoco_status"
+                        : body.action === "yoco_return"
+                          ? "yoco_return"
+                          : body.action === "create" || !body.action
+                            ? "create"
+                            : null;
     if (!action) throw new Error("Unsupported checkout action.");
+
+    // The Yoco integration is deliberately a merchant-only test path. This
+    // prevents public customers from creating test orders on the live store
+    // while the gateway is being validated.
+    if (action === "yoco_create" || action === "yoco_status" || action === "yoco_return") {
+      await requireCossaStoreAdmin(admin, userData.user.id);
+    }
+
+    if (action === "yoco_status" || action === "yoco_return") {
+      stage = "yoco_attempt_status";
+      const attemptId = text(body.attemptId, 64);
+      if (!uuid(attemptId)) throw new Error("The Yoco test payment attempt is invalid.");
+      const { data: attemptData, error: attemptError } = await admin
+        .from("store_yoco_test_payment_attempts")
+        .select("*")
+        .eq("id", attemptId)
+        .eq("payer_user_id", userData.user.id)
+        .maybeSingle();
+      if (attemptError || !attemptData)
+        throw new Error("This Yoco test payment attempt was not found.");
+
+      if (action === "yoco_status") {
+        return json(request, {
+          attempt: yocoAttemptPublic(attemptData as Record<string, unknown>),
+        });
+      }
+
+      const returnState = text(body.returnState, 20);
+      if (returnState !== "success" && returnState !== "cancelled" && returnState !== "failed") {
+        throw new Error("The Yoco return state is invalid.");
+      }
+      const update: Record<string, unknown> = {
+        return_state: returnState,
+        return_recorded_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      // A browser return is never payment proof. Cancellation and failure are
+      // customer-visible attempt states only; a later signed Yoco event can
+      // still record an actual payment if one completed concurrently.
+      if (returnState !== "success" && attemptData.status !== "succeeded") {
+        update.status = returnState;
+      }
+      const { data: updatedAttempt, error: updateError } = await admin
+        .from("store_yoco_test_payment_attempts")
+        .update(update)
+        .eq("id", attemptId)
+        .select("*")
+        .single();
+      if (updateError || !updatedAttempt)
+        throw new Error("The Yoco return state could not be recorded.");
+      return json(request, {
+        attempt: yocoAttemptPublic(updatedAttempt as Record<string, unknown>),
+      });
+    }
+
+    if (action === "list_my_delivery_quote_requests") {
+      stage = "delivery_quote_request_list";
+      const { data, error } = await admin
+        .from("store_delivery_quote_requests")
+        .select(
+          "id,status,delivery_method,delivery_amount,currency,staff_note,created_at,quoted_at,expires_at",
+        )
+        .eq("organisation_id", COSSA_ORGANISATION_ID)
+        .eq("requester_user_id", userData.user.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error) throw new Error("Your delivery quote requests could not be loaded.");
+      return json(request, {
+        requests: (data ?? []).map((row: Record<string, unknown>) =>
+          deliveryQuoteRequestPublic(row),
+        ),
+      });
+    }
+
+    if (
+      action === "list_delivery_quote_requests" ||
+      action === "approve_delivery_quote" ||
+      action === "reject_delivery_quote"
+    ) {
+      await requireCossaStoreAdmin(admin, userData.user.id);
+      stage = "delivery_quote_administration";
+
+      if (action === "list_delivery_quote_requests") {
+        const { data, error } = await admin
+          .from("store_delivery_quote_requests")
+          .select(
+            "id,status,customer_name,customer_phone,requester_email,items,shipping_address,delivery_method,delivery_amount,currency,staff_note,created_at,quoted_at,expires_at",
+          )
+          .eq("organisation_id", COSSA_ORGANISATION_ID)
+          .eq("status", "requested")
+          .order("created_at", { ascending: true })
+          .limit(100);
+        if (error) throw new Error("The delivery quote queue could not be loaded.");
+        return json(request, {
+          requests: (data ?? []).map((row: Record<string, unknown>) =>
+            deliveryQuoteRequestForAdmin(row),
+          ),
+        });
+      }
+
+      const requestId = text(body.requestId, 64);
+      if (!uuid(requestId)) throw new Error("The delivery quote request is invalid.");
+
+      if (action === "approve_delivery_quote") {
+        const deliveryAmount = finiteNumber(body.deliveryAmount);
+        const deliveryMethod = text(body.deliveryMethod, 160);
+        const evidenceNote = text(body.evidenceNote, 2000);
+        const staffNote = text(body.staffNote, 1000) || null;
+        const { data, error } = await admin.rpc("approve_store_delivery_quote_request", {
+          p_request_id: requestId,
+          p_staff_user_id: userData.user.id,
+          p_delivery_amount: deliveryAmount,
+          p_delivery_method: deliveryMethod,
+          p_evidence_note: evidenceNote,
+          p_staff_note: staffNote,
+        });
+        if (error || !data) {
+          throw new Error(error?.message || "The verified delivery quote could not be saved.");
+        }
+        const quoted = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>;
+        return json(request, { request: deliveryQuoteRequestPublic(quoted) });
+      }
+
+      const staffNote = text(body.staffNote, 1000);
+      const { data, error } = await admin.rpc("reject_store_delivery_quote_request", {
+        p_request_id: requestId,
+        p_staff_user_id: userData.user.id,
+        p_staff_note: staffNote,
+      });
+      if (error || !data) {
+        throw new Error(error?.message || "The delivery quote request could not be rejected.");
+      }
+      const rejected = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>;
+      return json(request, { request: deliveryQuoteRequestPublic(rejected) });
+    }
+
     const customerName = text(body.customerName, 140);
     const customerPhone = text(body.customerPhone, 40);
     const clientRequestId = text(body.clientRequestId, 64);
@@ -810,9 +1063,120 @@ Deno.serve(async (request) => {
         }
       : null;
 
+    if (action === "request_delivery_quote") {
+      if (
+        !shippingAddress ||
+        !deliveryScope ||
+        !configuredPhysicalLines.length ||
+        printifyLines.length
+      ) {
+        throw new Error(
+          "Staff delivery quotes currently support one configured physical fulfilment group.",
+        );
+      }
+      const targets = await deliveryConfirmationTargets(admin, configuredPhysicalLines);
+      if (targets.length !== 1) {
+        throw new Error(
+          "This cart needs separate delivery quotes for each supplier fulfilment group.",
+        );
+      }
+
+      stage = "delivery_quote_request";
+      const { data: existing, error: existingError } = await admin
+        .from("store_delivery_quote_requests")
+        .select(
+          "id,status,delivery_method,delivery_amount,currency,staff_note,created_at,quoted_at,expires_at",
+        )
+        .eq("requester_user_id", userData.user.id)
+        .eq("client_request_id", clientRequestId)
+        .maybeSingle();
+      if (existingError) throw new Error("Your delivery quote request could not be checked.");
+      if (existing) {
+        return json(request, {
+          request: deliveryQuoteRequestPublic(existing as Record<string, unknown>),
+        });
+      }
+
+      const { data: openRequest, error: openRequestError } = await admin
+        .from("store_delivery_quote_requests")
+        .select(
+          "id,status,delivery_method,delivery_amount,currency,staff_note,created_at,quoted_at,expires_at",
+        )
+        .eq("requester_user_id", userData.user.id)
+        .eq("cart_fingerprint", deliveryScope.cartFingerprint)
+        .eq("address_fingerprint", deliveryScope.addressFingerprint)
+        .eq("status", "requested")
+        .maybeSingle();
+      if (openRequestError) throw new Error("Your delivery quote request could not be checked.");
+      if (openRequest) {
+        return json(request, {
+          request: deliveryQuoteRequestPublic(openRequest as Record<string, unknown>),
+        });
+      }
+
+      const target = targets[0];
+      const requestItems = configuredPhysicalLines.map((line) => ({
+        productId: line.productId,
+        name: line.name,
+        quantity: line.quantity,
+      }));
+      const { data: created, error: createError } = await admin
+        .from("store_delivery_quote_requests")
+        .insert({
+          organisation_id: COSSA_ORGANISATION_ID,
+          requester_user_id: userData.user.id,
+          client_request_id: clientRequestId,
+          customer_name: customerName,
+          customer_phone: customerPhone || null,
+          requester_email: userData.user.email,
+          items: requestItems,
+          shipping_address: shippingAddress,
+          cart_fingerprint: deliveryScope.cartFingerprint,
+          address_fingerprint: deliveryScope.addressFingerprint,
+          supplier_id: target.supplierId,
+          fulfilment_profile_id: target.fulfilmentProfileId,
+        })
+        .select(
+          "id,status,delivery_method,delivery_amount,currency,staff_note,created_at,quoted_at,expires_at",
+        )
+        .single();
+      if (createError || !created) {
+        // A second click can race the first request. The unique client ID
+        // makes it safe to return the original instead of creating a duplicate.
+        if (createError?.code === "23505") {
+          const { data: raced } = await admin
+            .from("store_delivery_quote_requests")
+            .select(
+              "id,status,delivery_method,delivery_amount,currency,staff_note,created_at,quoted_at,expires_at",
+            )
+            .eq("requester_user_id", userData.user.id)
+            .eq("cart_fingerprint", deliveryScope.cartFingerprint)
+            .eq("address_fingerprint", deliveryScope.addressFingerprint)
+            .eq("status", "requested")
+            .maybeSingle();
+          if (raced) {
+            return json(request, {
+              request: deliveryQuoteRequestPublic(raced as Record<string, unknown>),
+            });
+          }
+        }
+        throw new Error("Your delivery quote request could not be submitted.");
+      }
+      return json(request, {
+        request: deliveryQuoteRequestPublic(created as Record<string, unknown>),
+      });
+    }
+
     if (action === "confirm_delivery") {
-      if (!shippingAddress || !deliveryScope || !configuredPhysicalLines.length || printifyLines.length) {
-        throw new Error("Staff delivery confirmation currently supports one configured physical fulfilment group.");
+      if (
+        !shippingAddress ||
+        !deliveryScope ||
+        !configuredPhysicalLines.length ||
+        printifyLines.length
+      ) {
+        throw new Error(
+          "Staff delivery confirmation currently supports one configured physical fulfilment group.",
+        );
       }
       const staffConfirmation = readStaffConfirmation(body.deliveryConfirmation);
       if (!staffConfirmation) {
@@ -820,7 +1184,9 @@ Deno.serve(async (request) => {
       }
       const targets = await deliveryConfirmationTargets(admin, configuredPhysicalLines);
       if (targets.length !== 1) {
-        throw new Error("Staff delivery confirmation requires exactly one supplier fulfilment group.");
+        throw new Error(
+          "Staff delivery confirmation requires exactly one supplier fulfilment group.",
+        );
       }
       const target = targets[0];
       let rateConfigurationId: string | null = null;
@@ -837,7 +1203,9 @@ Deno.serve(async (request) => {
         );
         const confirmedGroup = configuredDelivery.confirmationTargets[0];
         if (!confirmedGroup || configuredDelivery.confirmationTargets.length !== 1) {
-          throw new Error(`${DELIVERY_QUOTE_REQUIRED} A single configured delivery rate is required.`);
+          throw new Error(
+            `${DELIVERY_QUOTE_REQUIRED} A single configured delivery rate is required.`,
+          );
         }
         rateConfigurationId = confirmedGroup.rateId;
         deliveryMethod = confirmedGroup.methodCode;
@@ -858,25 +1226,28 @@ Deno.serve(async (request) => {
         .eq("cart_fingerprint", deliveryScope.cartFingerprint)
         .eq("address_fingerprint", deliveryScope.addressFingerprint)
         .eq("is_active", true);
-      if (deactivate.error) throw new Error("The prior delivery confirmation could not be superseded.");
+      if (deactivate.error)
+        throw new Error("The prior delivery confirmation could not be superseded.");
 
-      const { error: confirmationError } = await admin.from("store_delivery_quote_confirmations").insert({
-        organisation_id: COSSA_ORGANISATION_ID,
-        supplier_id: target.supplierId,
-        fulfilment_profile_id: target.fulfilmentProfileId,
-        rate_configuration_id: rateConfigurationId,
-        cart_fingerprint: deliveryScope.cartFingerprint,
-        address_fingerprint: deliveryScope.addressFingerprint,
-        eligibility_classification: staffConfirmation.eligibilityClassification,
-        delivery_method: deliveryMethod,
-        delivery_amount: deliveryAmount,
-        currency: deliveryAmount === null ? null : "ZAR",
-        evidence_note: staffConfirmation.evidenceNote,
-        verified_by: userData.user.id,
-        verified_at: new Date().toISOString(),
-        expires_at: expiresAt,
-        is_active: true,
-      });
+      const { error: confirmationError } = await admin
+        .from("store_delivery_quote_confirmations")
+        .insert({
+          organisation_id: COSSA_ORGANISATION_ID,
+          supplier_id: target.supplierId,
+          fulfilment_profile_id: target.fulfilmentProfileId,
+          rate_configuration_id: rateConfigurationId,
+          cart_fingerprint: deliveryScope.cartFingerprint,
+          address_fingerprint: deliveryScope.addressFingerprint,
+          eligibility_classification: staffConfirmation.eligibilityClassification,
+          delivery_method: deliveryMethod,
+          delivery_amount: deliveryAmount,
+          currency: deliveryAmount === null ? null : "ZAR",
+          evidence_note: staffConfirmation.evidenceNote,
+          verified_by: userData.user.id,
+          verified_at: new Date().toISOString(),
+          expires_at: expiresAt,
+          is_active: true,
+        });
       if (confirmationError) throw new Error("The delivery confirmation could not be saved.");
 
       return json(request, {
@@ -934,6 +1305,155 @@ Deno.serve(async (request) => {
           requiresDelivery,
           total,
         },
+      });
+    }
+
+    if (action === "yoco_create") {
+      stage = "yoco_test_attempt_creation";
+      const yocoTestSecret = Deno.env.get("YOCO_TEST_SECRET_KEY");
+      if (!yocoTestSecret) throw new Error("Yoco test checkout is not configured.");
+      const { data: attemptData, error: attemptError } = await admin.rpc(
+        "create_store_yoco_test_payment_attempt_with_delivery",
+        {
+          p_payer_user_id: userData.user.id,
+          p_payer_email: userData.user.email,
+          p_customer_name: customerName,
+          p_customer_phone: customerPhone || null,
+          p_items: resolvedCart,
+          p_client_request_id: clientRequestId,
+          p_shipping_total: shippingTotal,
+          p_shipping_address: shippingAddress ?? {},
+          p_shipping_method: shippingMethod,
+          p_shipping_provider: shippingProviders.join(" + ") || null,
+          p_shipping_quote_metadata: shippingQuoteMetadata,
+        },
+      );
+      if (attemptError || !attemptData) {
+        throw new Error(
+          attemptError?.message || "Your Yoco test payment attempt could not be created.",
+        );
+      }
+      const attempt = (Array.isArray(attemptData) ? attemptData[0] : attemptData) as Record<
+        string,
+        unknown
+      >;
+      const priorResponse =
+        attempt.yoco_response && typeof attempt.yoco_response === "object"
+          ? (attempt.yoco_response as Record<string, unknown>)
+          : {};
+      const priorRedirectUrl = text(priorResponse.redirectUrl, 2000);
+      if (attempt.status === "succeeded") {
+        throw new Error(
+          "This Yoco test payment has already been verified. Create a new test order to pay again.",
+        );
+      }
+      if (attempt.yoco_checkout_id && priorRedirectUrl) {
+        return json(request, {
+          attempt: yocoAttemptPublic(attempt),
+          redirectUrl: priorRedirectUrl,
+        });
+      }
+
+      const returnOrigin = request.headers.get("origin");
+      if (!returnOrigin || !isAllowedOrigin(returnOrigin)) {
+        throw new Error("The Yoco return origin is not allowed.");
+      }
+
+      // Yoco returns this signing secret only once. On the first test
+      // checkout, register the single shared webhook and place its secret in
+      // Supabase Vault; neither value is ever returned to the browser.
+      const { data: storedWebhookSecret, error: storedWebhookSecretError } = await admin.rpc(
+        "get_yoco_test_webhook_secret",
+      );
+      if (storedWebhookSecretError || !storedWebhookSecret) {
+        stage = "yoco_test_webhook_registration";
+        const webhookResponse = await fetch("https://payments.yoco.com/api/webhooks", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${yocoTestSecret}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: "cossa-store-yoco-test",
+            url: `${supabaseUrl}/functions/v1/yoco-webhook`,
+          }),
+        });
+        const webhookBody = (await webhookResponse.json().catch(() => ({}))) as Record<
+          string,
+          unknown
+        >;
+        const webhookSecret = text(webhookBody.secret, 1000);
+        if (!webhookResponse.ok || !webhookSecret.startsWith("whsec_")) {
+          throw new Error(
+            "Yoco could not register the test payment webhook. No checkout was created.",
+          );
+        }
+        const { error: saveWebhookSecretError } = await admin.rpc(
+          "store_yoco_test_webhook_secret",
+          { p_secret: webhookSecret },
+        );
+        if (saveWebhookSecretError) {
+          throw new Error(
+            "Yoco registered the test webhook, but its signing secret could not be secured.",
+          );
+        }
+      }
+
+      stage = "yoco_test_checkout_creation";
+      const returnBase = `${returnOrigin}/checkout?yocoAttemptId=${encodeURIComponent(String(attempt.id))}`;
+      const yocoResponse = await fetch("https://payments.yoco.com/api/checkouts", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${yocoTestSecret}`,
+          "Content-Type": "application/json",
+          "Idempotency-Key": String(attempt.id),
+        },
+        body: JSON.stringify({
+          amount: Number(attempt.amount_cents),
+          currency: "ZAR",
+          clientReferenceId: String(attempt.store_order_id),
+          externalId: String(attempt.id),
+          metadata: { cossaYocoTestAttemptId: attempt.id, mode: "test" },
+          successUrl: `${returnBase}&yoco=success`,
+          cancelUrl: `${returnBase}&yoco=cancelled`,
+          failureUrl: `${returnBase}&yoco=failed`,
+        }),
+      });
+      const yocoBody = (await yocoResponse.json().catch(() => ({}))) as Record<string, unknown>;
+      const redirectUrl = text(yocoBody.redirectUrl, 2000);
+      const yocoCheckoutId = text(yocoBody.id, 240);
+      if (!yocoResponse.ok || !redirectUrl || !yocoCheckoutId) {
+        await admin
+          .from("store_yoco_test_payment_attempts")
+          .update({
+            status: "failed",
+            last_error:
+              text(yocoBody.message ?? yocoBody.error, 500) || "Yoco rejected checkout creation.",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", attempt.id);
+        throw new Error("Yoco could not create the test checkout. No payment was taken.");
+      }
+      const { data: updatedAttempt, error: updateError } = await admin
+        .from("store_yoco_test_payment_attempts")
+        .update({
+          yoco_checkout_id: yocoCheckoutId,
+          yoco_response: yocoBody,
+          status: "created",
+          last_error: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", attempt.id)
+        .select("*")
+        .single();
+      if (updateError || !updatedAttempt) {
+        throw new Error(
+          "Yoco checkout was created but could not be recorded. Retrying will not create a second checkout.",
+        );
+      }
+      return json(request, {
+        attempt: yocoAttemptPublic(updatedAttempt as Record<string, unknown>),
+        redirectUrl,
       });
     }
 

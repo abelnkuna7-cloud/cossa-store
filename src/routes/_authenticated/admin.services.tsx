@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ExternalLink, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { CatalogueShell } from "@/components/admin/CatalogueShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +58,17 @@ export const Route = createFileRoute("/_authenticated/admin/services")({
 });
 
 function ServicesAdminPage() {
+  return (
+    <CatalogueShell
+      title="Cossa services directory"
+      description="Manage and publish the services shown in the Store."
+    >
+      <ServicesManager />
+    </CatalogueShell>
+  );
+}
+
+function ServicesManager() {
   const [rows, setRows] = useState<ServiceRow[]>([]);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [loading, setLoading] = useState(true);
@@ -162,15 +174,7 @@ function ServicesAdminPage() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Store administration</p>
-        <h1 className="mt-2 font-display text-3xl font-bold">Cossa services directory</h1>
-        <p className="mt-2 max-w-3xl text-base text-muted-foreground">
-          Add, edit, publish, reorder or archive Cossa group services without changing GitHub or redeploying the Store.
-        </p>
-      </div>
-
+    <main>
       <section className="rounded-xl border border-border bg-card p-5 sm:p-6">
         <div className="mb-5 flex items-center justify-between gap-3">
           <h2 className="text-xl font-semibold">{form.id ? "Edit service" : "Add service"}</h2>

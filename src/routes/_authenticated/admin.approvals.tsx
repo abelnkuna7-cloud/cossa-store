@@ -17,8 +17,12 @@ import {
   type ReviewProductRow,
 } from "@/services/moderation";
 import {
+  approveStoreDeliveryQuote,
   listEftReviewQueue,
+  listStoreDeliveryQuoteQueue,
+  rejectStoreDeliveryQuote,
   reviewEftPayment,
+  type AdminStoreDeliveryQuoteRequest,
   type EftReviewPayment,
 } from "@/services/eft-payments";
 import { formatZar } from "@/lib/format";
@@ -38,7 +42,7 @@ function ApprovalsPage() {
   return (
     <CatalogueShell
       title="Approvals dashboard"
-      description="Review payment proofs and listings submitted by catalogue managers."
+      description="Review EFT payment proofs and staff-confirmed delivery quotes."
     >
       <AdminOnly />
     </CatalogueShell>
@@ -61,11 +65,272 @@ function AdminOnly() {
       <PaymentReviewQueue />
       {access.isAdmin ? (
         <>
-          <ReviewQueue />
-          <MemberAccess />
+          <DeliveryQuoteQueue />
+          <section className="rounded-lg border border-border bg-card p-5">
+            <h2 className="text-lg font-semibold">Store catalogue</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Create, edit, publish and archive Store products in the current catalogue manager.
+            </p>
+            <Button asChild className="mt-4" variant="outline">
+              <Link to="/admin/catalogue">Open My products</Link>
+            </Button>
+          </section>
         </>
       ) : null}
     </div>
+  );
+}
+
+type DeliveryQuoteDraft = {
+  deliveryAmount: string;
+  deliveryMethod: string;
+  evidenceNote: string;
+  staffNote: string;
+};
+
+function DeliveryQuoteQueue() {
+  const queryClient = useQueryClient();
+  const queue = useQuery({
+    queryKey: ["admin", "delivery-quote-requests"],
+    queryFn: listStoreDeliveryQuoteQueue,
+  });
+  const [drafts, setDrafts] = useState<Record<string, DeliveryQuoteDraft>>({});
+
+  const updateDraft = (id: string, patch: Partial<DeliveryQuoteDraft>) => {
+    setDrafts((current) => ({
+      ...current,
+      [id]: {
+        deliveryAmount: current[id]?.deliveryAmount ?? "",
+        deliveryMethod: current[id]?.deliveryMethod ?? "",
+        evidenceNote: current[id]?.evidenceNote ?? "",
+        staffNote: current[id]?.staffNote ?? "",
+        ...patch,
+      },
+    }));
+  };
+
+  const approve = useMutation({
+    mutationFn: (request: AdminStoreDeliveryQuoteRequest) => {
+      const draft = drafts[request.id];
+      return approveStoreDeliveryQuote({
+        requestId: request.id,
+        deliveryAmount: Number(draft?.deliveryAmount),
+        deliveryMethod: draft?.deliveryMethod ?? "",
+        evidenceNote: draft?.evidenceNote ?? "",
+        staffNote: draft?.staffNote ?? "",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "delivery-quote-requests"] });
+      toast.success("Delivery quote approved", {
+        description: "It is valid only for the customer’s exact cart and address for 24 hours.",
+      });
+    },
+    onError: (error) =>
+      toast.error("Delivery quote could not be approved", {
+        description: error instanceof Error ? error.message : undefined,
+      }),
+  });
+
+  const reject = useMutation({
+    mutationFn: (request: AdminStoreDeliveryQuoteRequest) =>
+      rejectStoreDeliveryQuote({
+        requestId: request.id,
+        staffNote: drafts[request.id]?.staffNote ?? "",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "delivery-quote-requests"] });
+      toast.success("Delivery quote request rejected");
+    },
+    onError: (error) =>
+      toast.error("Delivery quote request could not be rejected", {
+        description: error instanceof Error ? error.message : undefined,
+      }),
+  });
+
+  if (queue.isPending) return <LoadingBlock label="Loading delivery quote requests…" />;
+  if (queue.isError)
+    return <ErrorBlock description="The delivery quote queue could not be loaded." />;
+
+  const requests = queue.data?.requests ?? [];
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">Staff delivery quotes</h2>
+        <p className="text-sm text-muted-foreground">
+          Confirm the live carrier or supplier amount, destination eligibility and packed parcel
+          details before approving. The quote is locked to the exact cart and address for 24 hours.
+        </p>
+      </div>
+
+      {requests.length === 0 ? (
+        <EmptyBlock
+          title="No delivery quotes awaiting review"
+          description="Customer delivery-quote requests appear here when an automatic rate is unavailable."
+        />
+      ) : (
+        <ul className="space-y-3">
+          {requests.map((request) => {
+            const draft = drafts[request.id] ?? {
+              deliveryAmount: "",
+              deliveryMethod: "",
+              evidenceNote: "",
+              staffNote: "",
+            };
+            const address = request.shippingAddress;
+            return (
+              <li key={request.id} className="rounded-lg border border-border bg-card p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{request.customerName}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {request.requesterEmail ?? "Customer email unavailable"}
+                      {request.customerPhone ? ` · ${request.customerPhone}` : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Requested{" "}
+                      {request.createdAt
+                        ? new Date(request.createdAt).toLocaleString("en-ZA")
+                        : "just now"}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-border px-2 py-0.5 text-[11px] capitalize">
+                    {request.status}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid gap-3 rounded-md border border-border bg-background/40 p-3 text-sm md:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Delivery address
+                    </p>
+                    <p className="mt-1 whitespace-pre-line">
+                      {[
+                        address.address1,
+                        address.address2,
+                        address.suburb,
+                        address.city,
+                        address.region,
+                        address.zip,
+                      ]
+                        .filter(Boolean)
+                        .join("\n")}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Items
+                    </p>
+                    <ul className="mt-1 space-y-1">
+                      {request.items.map((item, index) => (
+                        <li key={`${item.productId ?? item.name ?? "item"}-${index}`}>
+                          {item.name ?? "Store product"} · quantity {item.quantity ?? 1}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label
+                      className="text-sm font-medium"
+                      htmlFor={`delivery-amount-${request.id}`}
+                    >
+                      Verified delivery amount (ZAR)
+                    </label>
+                    <Input
+                      id={`delivery-amount-${request.id}`}
+                      type="number"
+                      inputMode="decimal"
+                      min="0.01"
+                      max="100000"
+                      step="0.01"
+                      value={draft.deliveryAmount}
+                      onChange={(event) =>
+                        updateDraft(request.id, { deliveryAmount: event.target.value })
+                      }
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label
+                      className="text-sm font-medium"
+                      htmlFor={`delivery-method-${request.id}`}
+                    >
+                      Delivery method
+                    </label>
+                    <Input
+                      id={`delivery-method-${request.id}`}
+                      value={draft.deliveryMethod}
+                      maxLength={160}
+                      onChange={(event) =>
+                        updateDraft(request.id, { deliveryMethod: event.target.value })
+                      }
+                      placeholder="For example: DMC Locker-to-Door"
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <label
+                      className="text-sm font-medium"
+                      htmlFor={`delivery-evidence-${request.id}`}
+                    >
+                      Carrier or supplier evidence
+                    </label>
+                    <textarea
+                      id={`delivery-evidence-${request.id}`}
+                      className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      maxLength={2000}
+                      value={draft.evidenceNote}
+                      onChange={(event) =>
+                        updateDraft(request.id, { evidenceNote: event.target.value })
+                      }
+                      placeholder="Quote reference, live carrier rate and eligibility/parcel check."
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <label
+                      className="text-sm font-medium"
+                      htmlFor={`delivery-staff-note-${request.id}`}
+                    >
+                      Customer note {"(required if rejecting)"}
+                    </label>
+                    <textarea
+                      id={`delivery-staff-note-${request.id}`}
+                      className="min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      maxLength={1000}
+                      value={draft.staffNote}
+                      onChange={(event) =>
+                        updateDraft(request.id, { staffNote: event.target.value })
+                      }
+                      placeholder="Optional when approving; explain the next step if rejecting."
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    disabled={approve.isPending || reject.isPending}
+                    onClick={() => approve.mutate(request)}
+                  >
+                    Approve delivery quote
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={approve.isPending || reject.isPending}
+                    onClick={() => reject.mutate(request)}
+                  >
+                    Reject request
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -75,8 +340,11 @@ function PaymentReviewQueue() {
   const [notes, setNotes] = useState<Record<string, string>>({});
 
   const review = useMutation({
-    mutationFn: (job: { paymentId: string; decision: "approve" | "reject"; reviewerNote: string }) =>
-      reviewEftPayment(job),
+    mutationFn: (job: {
+      paymentId: string;
+      decision: "approve" | "reject";
+      reviewerNote: string;
+    }) => reviewEftPayment(job),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "eft-review-queue"] });
       toast.success("Payment review recorded", { description: result.message });
@@ -88,7 +356,8 @@ function PaymentReviewQueue() {
   });
 
   if (queue.isPending) return <LoadingBlock label="Loading payment proofs…" />;
-  if (queue.isError) return <ErrorBlock description="The payment-proof queue could not be loaded." />;
+  if (queue.isError)
+    return <ErrorBlock description="The payment-proof queue could not be loaded." />;
 
   const payments = queue.data?.payments ?? [];
 
@@ -97,7 +366,8 @@ function PaymentReviewQueue() {
       <div>
         <h2 className="text-lg font-semibold">EFT payment proofs</h2>
         <p className="text-sm text-muted-foreground">
-          Approve only after confirming the payment. Rejection keeps the order private and lets the customer upload a replacement proof.
+          Approve only after confirming the payment. Rejection keeps the order private and lets the
+          customer upload a replacement proof.
         </p>
       </div>
 
@@ -110,23 +380,25 @@ function PaymentReviewQueue() {
         <ul className="space-y-3">
           {payments.map((payment) => (
             <PaymentReviewCard
-              key={payment.payment.id}
+              key={payment.id}
               payment={payment}
               busy={review.isPending}
-              note={notes[payment.payment.id] ?? ""}
-              onNote={(value) => setNotes((current) => ({ ...current, [payment.payment.id]: value }))}
+              note={notes[payment.id] ?? ""}
+              onNote={(value) =>
+                setNotes((current) => ({ ...current, [payment.id]: value }))
+              }
               onApprove={() =>
                 review.mutate({
-                  paymentId: payment.payment.id,
+                  paymentId: payment.id,
                   decision: "approve",
-                  reviewerNote: notes[payment.payment.id] ?? "",
+                  reviewerNote: notes[payment.id] ?? "",
                 })
               }
               onReject={() =>
                 review.mutate({
-                  paymentId: payment.payment.id,
+                  paymentId: payment.id,
                   decision: "reject",
-                  reviewerNote: notes[payment.payment.id] ?? "",
+                  reviewerNote: notes[payment.id] ?? "",
                 })
               }
             />
@@ -158,17 +430,24 @@ function PaymentReviewCard({
     <li className="rounded-lg border border-border bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-medium">{payment.payment.reference}</p>
+          <p className="font-medium">{payment.reference}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {payment.payerEmail ?? "Customer email unavailable"} · {formatZar(payment.payment.amount)}
+            {payment.payerEmail ?? "Customer email unavailable"} ·{" "}
+            {formatZar(payment.amount)}
           </p>
           {order ? (
             <p className="mt-1 text-xs text-muted-foreground">
-              Order {order.orderNumber} · {order.items.length} {order.items.length === 1 ? "item" : "items"} · {order.requiresDelivery ? `delivery ${formatZar(order.shippingTotal)}` : "digital delivery"}
+              Order {order.orderNumber} · {order.items.length}{" "}
+              {order.items.length === 1 ? "item" : "items"} ·{" "}
+              {order.requiresDelivery
+                ? `delivery ${formatZar(order.shippingTotal)}`
+                : "digital delivery"}
             </p>
           ) : null}
           {payment.payerNote ? (
-            <p className="mt-3 rounded-md bg-secondary/50 px-3 py-2 text-sm">Customer note: {payment.payerNote}</p>
+            <p className="mt-3 rounded-md bg-secondary/50 px-3 py-2 text-sm">
+              Customer note: {payment.payerNote}
+            </p>
           ) : null}
         </div>
         {payment.proofUrl ? (
@@ -205,9 +484,10 @@ function ReviewQueue() {
   const [notes, setNotes] = useState<Record<string, string>>({});
 
   const act = useMutation({
-    mutationFn: async (job:
-      | { type: "approve" | "publish"; id: string }
-      | { type: "reject"; id: string; notes: string }) => {
+    mutationFn: async (
+      job:
+        { type: "approve" | "publish"; id: string } | { type: "reject"; id: string; notes: string },
+    ) => {
       if (job.type === "reject") return rejectProduct(job.id, job.notes);
       return approveProduct(job.id, job.type === "publish");
     },
@@ -251,7 +531,9 @@ function ReviewQueue() {
               onNote={(value) => setNotes((prev) => ({ ...prev, [row.id]: value }))}
               onApprove={() => act.mutate({ type: "approve", id: row.id })}
               onPublish={() => act.mutate({ type: "publish", id: row.id })}
-              onReject={() => act.mutate({ type: "reject", id: row.id, notes: notes[row.id] ?? "" })}
+              onReject={() =>
+                act.mutate({ type: "reject", id: row.id, notes: notes[row.id] ?? "" })
+              }
             />
           ))}
         </ul>
@@ -283,8 +565,8 @@ function QueueCard({
         <div>
           <p className="font-medium">{row.name}</p>
           <p className="text-xs text-muted-foreground">
-            <span className="font-mono">{row.sku}</span> · {row.item_type ?? "—"} ·{" "}
-            {row.imageCount} image{row.imageCount === 1 ? "" : "s"} · {row.variantCount} variant
+            <span className="font-mono">{row.sku}</span> · {row.item_type ?? "—"} · {row.imageCount}{" "}
+            image{row.imageCount === 1 ? "" : "s"} · {row.variantCount} variant
             {row.variantCount === 1 ? "" : "s"}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">

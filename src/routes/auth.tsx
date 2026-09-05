@@ -44,6 +44,12 @@ function AuthPage() {
     if (!loading && session) navigate({ to: "/account", replace: true });
   }, [loading, session, navigate]);
 
+  function emailConfirmationRedirectUrl() {
+    // Keep confirmation links on the Store domain, even if an old Growth
+    // preview or bookmarked host opened the auth page.
+    return "https://store.cossanexusholdings.co.za/auth";
+  }
+
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -53,7 +59,7 @@ function AuthPage() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
+          emailRedirectTo: emailConfirmationRedirectUrl(),
           data: { full_name: fullName, business_name: businessName, phone },
         },
       });
@@ -64,8 +70,9 @@ function AuthPage() {
       }
       if (!data.session) {
         setCheckEmail(true);
-        toast.success("Account created", {
-          description: "Check your inbox and confirm your email address to finish signing up.",
+        toast.success("Check your email", {
+          description:
+            "If this is a new or unconfirmed Store account, use the newest confirmation link to finish signing up.",
         });
         return;
       }
@@ -76,10 +83,38 @@ function AuthPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) {
+      if (error.code === "email_not_confirmed") {
+        setMode("signup");
+        setCheckEmail(true);
+        toast.error("Email address not confirmed", {
+          description: "Request a new confirmation email, then use the newest link in your inbox.",
+        });
+        return;
+      }
       toast.error("Sign in failed", { description: "Check your email address and password." });
       return;
     }
     navigate({ to: "/account", replace: true });
+  }
+
+  async function onResendConfirmation() {
+    setBusy(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: emailConfirmationRedirectUrl() },
+    });
+    setBusy(false);
+
+    if (error) {
+      toast.error("Could not resend confirmation", { description: error.message });
+      return;
+    }
+
+    toast.success("Confirmation request sent", {
+      description:
+        "If this Store account still needs confirmation, use the newest email link to finish creating it.",
+    });
   }
 
   return (
@@ -111,9 +146,15 @@ function AuthPage() {
         </div>
 
         {checkEmail ? (
-          <p className="mb-4 rounded-md border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-            Almost there â€” confirm your email address using the link we sent, then sign in.
-          </p>
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+            <p>
+              Confirm your email address with the newest link, then sign in. Existing confirmed
+              accounts can sign in directly and do not receive another confirmation email.
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={onResendConfirmation} disabled={busy}>
+              Resend email
+            </Button>
+          </div>
         ) : null}
 
         <form onSubmit={onSubmit} className="space-y-4 rounded-lg border border-border bg-card p-6">
