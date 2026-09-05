@@ -55,8 +55,8 @@ export function NewsletterForm() {
         {error ? <p className="mt-2 text-xs text-destructive-foreground">{error}</p> : null}
         {state === "pending" ? (
           <p className="mt-2 text-xs text-primary-foreground/80">
-            Saved locally as {reference}. Email delivery is not connected yet, so no message has
-            been sent.
+            Request reference {reference}. Email delivery is not connected yet, so no message has
+            been sent and your email was not stored in this browser.
           </p>
         ) : null}
         {state === "error" ? (

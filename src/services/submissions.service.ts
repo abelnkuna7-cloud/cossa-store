@@ -2,8 +2,8 @@
  * Contact-message and newsletter submissions.
  *
  * Contact messages are recorded through the central Cossa Growth lead intake.
- * Newsletter sign-ups remain local until a dedicated consent-aware subscription
- * service is connected.
+ * Newsletter sign-ups remain in-memory until a dedicated consent-aware subscription
+ * service is connected. Personal email payloads are never persisted in browser storage.
  */
 import { submitCentralStoreLead } from "@/services/centralLeadIntake";
 
@@ -15,28 +15,15 @@ export interface PendingSubmission {
   received_at: string;
 }
 
-const STORAGE_KEY = "cossa.pending-submissions.v1";
-
 function reference(prefix: string): string {
   const stamp = Date.now().toString(36).toUpperCase();
   return `${prefix}-${stamp}`;
 }
 
-function persist(kind: string, reference: string, payload: unknown) {
-  if (typeof window === "undefined") return;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    const list = raw ? (JSON.parse(raw) as unknown[]) : [];
-    list.push({ kind, reference, payload, received_at: new Date().toISOString() });
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-  } catch {
-    /* storage unavailable — the pending state is still shown to the user */
-  }
-}
-
 async function submit(kind: string, prefix: string, payload: unknown): Promise<PendingSubmission> {
   const ref = reference(prefix);
-  persist(kind, ref, payload);
+  void kind;
+  void payload;
   await new Promise((resolve) => setTimeout(resolve, 400));
   return { reference: ref, status: "pending_backend", received_at: new Date().toISOString() };
 }
