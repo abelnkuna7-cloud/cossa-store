@@ -41,6 +41,7 @@ import { Route as ProjectSlugRouteImport } from './routes/project.$slug'
 import { Route as AuthenticatedAdminApprovalsRouteImport } from './routes/_authenticated/admin.approvals'
 import { Route as AuthenticatedAdminEmailOperationsRouteImport } from './routes/_authenticated/admin.email-operations'
 import { Route as AuthenticatedAdminFulfilmentOperationsRouteImport } from './routes/_authenticated/admin.fulfilment-operations'
+import { Route as AuthenticatedAdminSecurityRouteImport } from './routes/_authenticated/admin.security'
 import { Route as AuthenticatedAdminServicesRouteImport } from './routes/_authenticated/admin.services'
 import { Route as AuthenticatedAdminCatalogueIndexRouteImport } from './routes/_authenticated/admin.catalogue.index'
 import { Route as AuthenticatedAdminCatalogueIdRouteImport } from './routes/_authenticated/admin.catalogue.$id'
@@ -208,6 +209,12 @@ const AuthenticatedAdminFulfilmentOperationsRoute =
     path: '/admin/fulfilment-operations',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminSecurityRoute =
+  AuthenticatedAdminSecurityRouteImport.update({
+    id: '/admin/security',
+    path: '/admin/security',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminServicesRoute =
   AuthenticatedAdminServicesRouteImport.update({
     id: '/admin/services',
@@ -265,6 +272,7 @@ export interface FileRoutesByFullPath {
   '/admin/approvals': typeof AuthenticatedAdminApprovalsRoute
   '/admin/email-operations': typeof AuthenticatedAdminEmailOperationsRoute
   '/admin/fulfilment-operations': typeof AuthenticatedAdminFulfilmentOperationsRoute
+  '/admin/security': typeof AuthenticatedAdminSecurityRoute
   '/admin/services': typeof AuthenticatedAdminServicesRoute
   '/admin/catalogue/$id': typeof AuthenticatedAdminCatalogueIdRoute
   '/admin/catalogue/new': typeof AuthenticatedAdminCatalogueNewRoute
@@ -301,6 +309,7 @@ export interface FileRoutesByTo {
   '/admin/approvals': typeof AuthenticatedAdminApprovalsRoute
   '/admin/email-operations': typeof AuthenticatedAdminEmailOperationsRoute
   '/admin/fulfilment-operations': typeof AuthenticatedAdminFulfilmentOperationsRoute
+  '/admin/security': typeof AuthenticatedAdminSecurityRoute
   '/admin/services': typeof AuthenticatedAdminServicesRoute
   '/admin/catalogue/$id': typeof AuthenticatedAdminCatalogueIdRoute
   '/admin/catalogue/new': typeof AuthenticatedAdminCatalogueNewRoute
@@ -340,6 +349,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/approvals': typeof AuthenticatedAdminApprovalsRoute
   '/_authenticated/admin/email-operations': typeof AuthenticatedAdminEmailOperationsRoute
   '/_authenticated/admin/fulfilment-operations': typeof AuthenticatedAdminFulfilmentOperationsRoute
+  '/_authenticated/admin/security': typeof AuthenticatedAdminSecurityRoute
   '/_authenticated/admin/services': typeof AuthenticatedAdminServicesRoute
   '/_authenticated/admin/catalogue/$id': typeof AuthenticatedAdminCatalogueIdRoute
   '/_authenticated/admin/catalogue/new': typeof AuthenticatedAdminCatalogueNewRoute
@@ -379,6 +389,7 @@ export interface FileRouteTypes {
     | '/admin/approvals'
     | '/admin/email-operations'
     | '/admin/fulfilment-operations'
+    | '/admin/security'
     | '/admin/services'
     | '/admin/catalogue/$id'
     | '/admin/catalogue/new'
@@ -415,6 +426,7 @@ export interface FileRouteTypes {
     | '/admin/approvals'
     | '/admin/email-operations'
     | '/admin/fulfilment-operations'
+    | '/admin/security'
     | '/admin/services'
     | '/admin/catalogue/$id'
     | '/admin/catalogue/new'
@@ -453,6 +465,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/approvals'
     | '/_authenticated/admin/email-operations'
     | '/_authenticated/admin/fulfilment-operations'
+    | '/_authenticated/admin/security'
     | '/_authenticated/admin/services'
     | '/_authenticated/admin/catalogue/$id'
     | '/_authenticated/admin/catalogue/new'
@@ -713,6 +726,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminFulfilmentOperationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/security': {
+      id: '/_authenticated/admin/security'
+      path: '/admin/security'
+      fullPath: '/admin/security'
+      preLoaderRoute: typeof AuthenticatedAdminSecurityRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/services': {
       id: '/_authenticated/admin/services'
       path: '/admin/services'
@@ -748,6 +768,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminApprovalsRoute: typeof AuthenticatedAdminApprovalsRoute
   AuthenticatedAdminEmailOperationsRoute: typeof AuthenticatedAdminEmailOperationsRoute
   AuthenticatedAdminFulfilmentOperationsRoute: typeof AuthenticatedAdminFulfilmentOperationsRoute
+  AuthenticatedAdminSecurityRoute: typeof AuthenticatedAdminSecurityRoute
   AuthenticatedAdminServicesRoute: typeof AuthenticatedAdminServicesRoute
   AuthenticatedAdminCatalogueIdRoute: typeof AuthenticatedAdminCatalogueIdRoute
   AuthenticatedAdminCatalogueNewRoute: typeof AuthenticatedAdminCatalogueNewRoute
@@ -760,6 +781,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedAdminEmailOperationsRoute,
   AuthenticatedAdminFulfilmentOperationsRoute:
     AuthenticatedAdminFulfilmentOperationsRoute,
+  AuthenticatedAdminSecurityRoute: AuthenticatedAdminSecurityRoute,
   AuthenticatedAdminServicesRoute: AuthenticatedAdminServicesRoute,
   AuthenticatedAdminCatalogueIdRoute: AuthenticatedAdminCatalogueIdRoute,
   AuthenticatedAdminCatalogueNewRoute: AuthenticatedAdminCatalogueNewRoute,
