@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -17,18 +18,23 @@ import {
   selectedCartLineKeys as normaliseSelectedCartLineKeys,
   selectedCartLines as filterSelectedCartLines,
 } from "@/lib/cart-lines";
+import { supabase } from "@/integrations/supabase/client";
+import { useSession } from "@/lib/auth";
 
 /**
  * Cossa Store browser commerce state.
  *
  * CURRENT PHASE
  * -------------
- * Cart, wishlist and quotation basket are persisted in localStorage.
+ * Wishlist and quotation basket are persisted in localStorage. Anonymous
+ * carts remain browser-local; authenticated customer carts are also synced to
+ * Supabase so the same account can continue shopping on another device.
  *
  * FUTURE PHASE
  * ------------
- * These structures can later migrate into Supabase-backed commerce tables
- * so authenticated customers can retain baskets across devices.
+ * The account-linked cart stores only product/variant identifiers and
+ * quantities. Orders and fulfilment data remain protected by their own
+ * session-bound RLS policies.
  *
  * IMPORTANT
  * ---------
@@ -142,6 +148,7 @@ const CommerceContext = createContext<CommerceState | null>(null);
 
 const KEY = "cossa.commerce.v2";
 const LEGACY_KEY = "cossa.commerce.v1";
+const userStorageKey = (userId: string) => `${KEY}.user.${userId}`;
 
 interface Persisted {
   cart: CommerceCartLine[];
@@ -205,6 +212,19 @@ function mergeDuplicateCartLines(
   lines: CommerceCartLine[],
 ): CommerceCartLine[] {
   return mergeCartLines(lines);
+}
+
+function mergeRemoteCartWithLocal(
+  remote: CommerceCartLine[],
+  local: CommerceCartLine[],
+): CommerceCartLine[] {
+  const remoteKeys = new Set(remote.map((line) => cartLineKey(line)));
+  const localOnly = local.filter((line) => !remoteKeys.has(cartLineKey(line)));
+
+  // The account row is authoritative for lines it already knows about. Only
+  // local-only additions are merged, preventing quantities from doubling on
+  // every device refresh.
+  return mergeDuplicateCartLines([...remote, ...localOnly]);
 }
 
 function mergeDuplicateQuoteLines(
@@ -346,7 +366,7 @@ function parsePersisted(raw: string): Persisted {
   }
 }
 
-function read(): Persisted {
+function read(userId: string | null = null): Persisted {
   if (typeof window === "undefined") {
     return {
       cart: [],
@@ -358,13 +378,19 @@ function read(): Persisted {
   }
 
   try {
-    const current = window.localStorage.getItem(KEY);
+    const current = window.localStorage.getItem(
+      userId ? userStorageKey(userId) : KEY,
+    );
 
     if (current) {
       return parsePersisted(current);
     }
 
-    const legacy = window.localStorage.getItem(LEGACY_KEY);
+    // Migrate the existing anonymous browser cart into the first signed-in
+    // account once. Future account state is always stored under the user ID.
+    const legacy = window.localStorage.getItem(
+      userId ? KEY : LEGACY_KEY,
+    );
 
     if (legacy) {
       return parsePersisted(legacy);
@@ -397,17 +423,66 @@ export function CommerceProvider({
 }: {
   children: ReactNode;
 }) {
+  const { user, loading: authLoading } = useSession();
+  const userId = user?.id ?? null;
   const [state, setState] = useState<Persisted>(EMPTY);
   const [hydrated, setHydrated] = useState(false);
+  const [remoteReady, setRemoteReady] = useState(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* ------------------------------------------------------------------------ */
   /* HYDRATION                                                                */
   /* ------------------------------------------------------------------------ */
 
   useEffect(() => {
-    setState(read());
+    if (authLoading) return;
+
+    let cancelled = false;
+    const localState = read(userId);
+
+    setState(localState);
     setHydrated(true);
-  }, []);
+    setRemoteReady(false);
+
+    if (!userId) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void (async () => {
+      const { data, error } = await supabase
+        .from("store_customer_carts")
+        .select("cart")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        console.warn("Unable to load the account cart; using local cart", error);
+        setRemoteReady(true);
+        return;
+      }
+
+      const remoteCart = normaliseCartLines(data?.cart);
+      const mergedCart = mergeRemoteCartWithLocal(remoteCart, localState.cart);
+
+      setState((previous) => ({
+        ...previous,
+        cart: mergedCart,
+        selectedCartLineKeys: normaliseSelectedCartLineKeys(
+          mergedCart,
+          previous.selectedCartLineKeys,
+        ),
+      }));
+      setRemoteReady(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, userId]);
 
   /* ------------------------------------------------------------------------ */
   /* PERSISTENCE                                                              */
@@ -419,7 +494,10 @@ export function CommerceProvider({
     }
 
     try {
-      window.localStorage.setItem(KEY, JSON.stringify(state));
+      window.localStorage.setItem(
+        userId ? userStorageKey(userId) : KEY,
+        JSON.stringify(state),
+      );
       window.localStorage.removeItem(LEGACY_KEY);
     } catch {
       /**
@@ -427,7 +505,40 @@ export function CommerceProvider({
        * Commerce state continues in memory for the current session.
        */
     }
-  }, [state, hydrated]);
+  }, [state, hydrated, userId]);
+
+  /* ------------------------------------------------------------------------ */
+  /* ACCOUNT CART SYNC                                                        */
+  /* ------------------------------------------------------------------------ */
+
+  useEffect(() => {
+    if (!remoteReady || !userId) return;
+
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+    }
+
+    saveTimer.current = setTimeout(() => {
+      void supabase
+        .from("store_customer_carts")
+        .upsert({
+          user_id: userId,
+          cart: state.cart,
+          updated_at: new Date().toISOString(),
+        })
+        .then(({ error }) => {
+          if (error) {
+            console.warn("Unable to save the account cart", error);
+          }
+        });
+    }, 250);
+
+    return () => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+      }
+    };
+  }, [remoteReady, state.cart, userId]);
 
   /* ------------------------------------------------------------------------ */
   /* CART                                                                     */
