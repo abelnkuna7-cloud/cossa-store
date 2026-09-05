@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { PageHeader } from "@/components/common/PageHeader";
@@ -16,6 +16,11 @@ import type { Product } from "@/types/catalog";
 const TITLE = "Catalogue inspector | Cossa Store";
 
 export const Route = createFileRoute("/dev/catalogue")({
+  beforeLoad: () => {
+    // This inspector is a development tool, not a production surface. Keep
+    // the route absent in production rather than relying on a client guard.
+    if (import.meta.env.PROD) throw notFound();
+  },
   head: () => ({
     meta: [
       { title: TITLE },
