@@ -341,6 +341,13 @@ async function guardCustomerRequest(request: Request): Promise<Response | null> 
   }
 
   const { supabaseAdmin } = await import("./integrations/supabase/client.server");
+  const { data: liveAuthSession, error: liveAuthSessionError } = await (supabaseAdmin as any).rpc(
+    "is_live_store_auth_session",
+    { p_user_id: userId, p_session_id: sessionId },
+  );
+  if (liveAuthSessionError || liveAuthSession !== true) {
+    return redirectWithClearedSession(redirect);
+  }
   const now = Date.now();
   const issued = new Date(issuedAt * 1000);
   const absoluteExpiry = new Date((issuedAt + CUSTOMER_ABSOLUTE_TIMEOUT_SECONDS) * 1000);
@@ -435,6 +442,13 @@ async function guardAdminRequest(request: Request): Promise<Response | null> {
   }
 
   const { supabaseAdmin } = await import("./integrations/supabase/client.server");
+  const { data: liveAuthSession, error: liveAuthSessionError } = await (supabaseAdmin as any).rpc(
+    "is_live_store_auth_session",
+    { p_user_id: userId, p_session_id: sessionId },
+  );
+  if (liveAuthSessionError || liveAuthSession !== true) {
+    return Response.redirect(redirect, 302);
+  }
   const { data: authUser, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
   if (
     authUserError ||
