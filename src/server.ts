@@ -350,6 +350,18 @@ async function guardAdminRequest(request: Request): Promise<Response | null> {
     });
   }
 
+  const { data: mfaRequired, error: mfaError } = await (supabaseAdmin as any).rpc(
+    "store_admin_mfa_required",
+    { p_user_id: userId },
+  );
+  if (mfaError) return new Response("Admin access unavailable", { status: 503 });
+  const aal = typeof tokenClaims.aal === "string" ? tokenClaims.aal : null;
+  if (mfaRequired === true && aal !== "aal2") {
+    const response = Response.redirect(new URL(`/auth?redirect=${encodeURIComponent(pathname)}&mfa=required`, request.url), 302);
+    response.headers.append("set-cookie", "cossa_store_session=; Path=/; Max-Age=0; SameSite=Lax; Secure");
+    return response;
+  }
+
   const now = Math.floor(Date.now() / 1000);
   const issued = new Date(issuedAt * 1000);
   const absoluteExpiry = new Date((issuedAt + ADMIN_ABSOLUTE_TIMEOUT_SECONDS) * 1000);
