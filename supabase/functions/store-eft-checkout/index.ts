@@ -12,6 +12,13 @@ import {
   type DeliveryConfirmationClassification,
   type StoredDeliveryConfirmation,
 } from "./_shared/delivery-confirmation.ts";
+import {
+  LIVE_WEBHOOK_URL,
+  parseYocoWebhookSubscriptions,
+  persistOrCompensateWebhookSecret,
+  reconcileVaultAndYoco,
+  validateCreatedWebhookResponse,
+} from "./yoco-webhook-reconciliation.ts";
 
 const ALLOWED_ORIGINS = new Set([
   "https://store.cossanexusholdings.co.za",
@@ -377,6 +384,15 @@ async function requireCossaStoreAdmin(admin: any, userId: string) {
     (!(membership.data ?? []).length && !(role.data ?? []).length)
   ) {
     throw new Error("An authorised Cossa Store administrator is required to confirm delivery.");
+  }
+}
+
+async function requireCossaStoreAdminAal2(admin: any, authClient: any, token: string, userId: string) {
+  await requireCossaStoreAdmin(admin, userId);
+  const { data: claims, error: claimsError } = await authClient.auth.getClaims(token);
+  const aal = typeof claims?.claims?.aal === "string" ? claims.claims.aal : null;
+  if (claimsError || aal !== "aal2") {
+    throw new Error("A verified administrator authenticator is required for Yoco commissioning.");
   }
 }
 
@@ -760,6 +776,8 @@ Deno.serve(async (request) => {
                       ? "yoco_create"
                       : body.action === "yoco_live_create"
                         ? "yoco_live_create"
+                      : body.action === "yoco_live_register_webhook"
+                        ? "yoco_live_register_webhook"
                       : body.action === "yoco_status"
                         ? "yoco_status"
                         : body.action === "yoco_return"
@@ -776,6 +794,11 @@ Deno.serve(async (request) => {
       await requireCossaStoreAdmin(admin, userData.user.id);
     }
 
+    if (action === "yoco_live_register_webhook") {
+      stage = "yoco_live_webhook_commissioning_gate";
+      await requireCossaStoreAdminAal2(admin, authClient, token, userData.user.id);
+    }
+
     // Live Yoco is an explicit, server-only commissioning path. It remains
     // unavailable unless both the database control and server secret exist.
     if (action === "yoco_live_create") {
@@ -786,9 +809,77 @@ Deno.serve(async (request) => {
         .select("yoco_live_state")
         .eq("id", true)
         .maybeSingle();
-      if (controlError || control?.yoco_live_state === "disabled" || !liveSecret) {
+      if (controlError || !control || control.yoco_live_state === "disabled" || !liveSecret) {
         throw new Error("Yoco live payments are not currently available.");
       }
+      if (control.yoco_live_state === "commissioning") {
+        await requireCossaStoreAdminAal2(admin, authClient, token, userData.user.id);
+      }
+    }
+
+    if (action === "yoco_live_register_webhook") {
+      stage = "yoco_live_webhook_registration";
+      const liveSecret = Deno.env.get("YOCO_LIVE_SECRET_KEY");
+      if (!liveSecret) throw new Error("Yoco live payments are not configured.");
+      const { data: storedSecret, error: storedSecretError } = await admin.rpc(
+        "get_yoco_live_webhook_secret",
+      );
+      if (storedSecretError) throw new Error("Live webhook configuration could not be checked.");
+      const webhookUrl = LIVE_WEBHOOK_URL;
+      const existingResponse = await fetch("https://payments.yoco.com/api/webhooks", {
+        headers: { Authorization: `Bearer ${liveSecret}` },
+      });
+      if (!existingResponse.ok) throw new Error("Yoco webhooks could not be reconciled safely.");
+      const existing = parseYocoWebhookSubscriptions(await existingResponse.json());
+      const reconciliation = reconcileVaultAndYoco(Boolean(storedSecret), existing, webhookUrl);
+      if (reconciliation === "configured") return json(request, { alreadyConfigured: true, registered: true });
+      if (reconciliation !== "ready") throw new Error("Yoco and Vault webhook state requires reconciliation.");
+
+      const registerResponse = await fetch("https://payments.yoco.com/api/webhooks", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${liveSecret}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "cossa-store-yoco-live", url: webhookUrl }),
+      });
+      const registerBody = (await registerResponse.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!registerResponse.ok) {
+        throw new Error("Yoco live webhook registration failed safely.");
+      }
+      let created: { id: string; secret: string };
+      try {
+        created = validateCreatedWebhookResponse(registerBody, webhookUrl);
+      } catch {
+        const createdId = typeof registerBody.id === "string" ? registerBody.id.trim() : "";
+        if (!createdId) {
+          throw new Error("RECONCILIATION_REQUIRED: invalid Yoco webhook response had no usable ID.");
+        }
+        try {
+          const deleteResponse = await fetch(`https://payments.yoco.com/api/webhooks/${encodeURIComponent(createdId)}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${liveSecret}` },
+          });
+          if (!deleteResponse.ok) throw new Error("delete failed");
+        } catch {
+          throw new Error("RECONCILIATION_REQUIRED: invalid Yoco webhook response could not be compensated.");
+        }
+        throw new Error("Yoco live webhook registration response was invalid and was not retained.");
+      }
+      const outcome = await persistOrCompensateWebhookSecret({
+        webhookId: created.id,
+        storeSecret: async () => {
+          const { error } = await admin.rpc("store_yoco_live_webhook_secret", { p_secret: created.secret });
+          return { error };
+        },
+        deleteWebhook: async (webhookId) => {
+          const response = await fetch(`https://payments.yoco.com/api/webhooks/${encodeURIComponent(webhookId)}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${liveSecret}` },
+          });
+          return response.ok;
+        },
+      });
+      if (outcome === "rolled_back") throw new Error("Yoco webhook registration was rolled back because Vault storage failed.");
+      if (outcome === "reconciliation_required") throw new Error("RECONCILIATION_REQUIRED: Yoco webhook exists but Vault storage failed.");
+      return json(request, { registered: true, webhookUrl });
     }
 
     if (action === "yoco_status" || action === "yoco_return") {
