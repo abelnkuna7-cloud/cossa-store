@@ -112,18 +112,30 @@ Deno.serve(async (request) => {
     payload.metadata && typeof payload.metadata === "object"
       ? (payload.metadata as Record<string, unknown>)
       : {};
-  const checkoutId = text(metadata.checkoutId, 240);
+  const cossaAttemptId = text(metadata.cossaYocoTestAttemptId ?? payload.externalId, 64);
+  const providerCheckoutId = text(metadata.checkoutId ?? payload.checkoutId, 240);
 
   // One endpoint is used for Yoco test and live events. This integration is
   // intentionally test-only, so live events are acknowledged but ignored.
-  if (!checkoutId || text(payload.mode, 20) !== "test") return json({ ignored: true });
+  if ((!cossaAttemptId && !providerCheckoutId) || text(payload.mode, 20) !== "test") {
+    return json({ ignored: true });
+  }
 
   const { data: attempt, error: attemptError } = await admin
     .from("store_yoco_test_payment_attempts")
-    .select("id")
-    .eq("yoco_checkout_id", checkoutId)
+    .select("id,yoco_checkout_id")
+    .eq(cossaAttemptId ? "id" : "yoco_checkout_id", cossaAttemptId || providerCheckoutId)
     .maybeSingle();
   if (attemptError || !attempt) return json({ ignored: true });
+
+  // The Cossa attempt ID is the canonical identity. If Yoco also returns a
+  // provider checkout ID, it must agree with the checkout recorded for that
+  // attempt; conflicting identifiers fail closed.
+  if (providerCheckoutId && attempt.yoco_checkout_id !== providerCheckoutId) {
+    return json({ error: "Webhook checkout identity mismatch." }, 400);
+  }
+  const checkoutId = text(attempt.yoco_checkout_id, 240);
+  if (!checkoutId) return json({ error: "Webhook checkout is not recorded." }, 400);
 
   const { error } = await admin.rpc("record_store_yoco_test_payment_event", {
     p_event_id: text(event.id, 240),
