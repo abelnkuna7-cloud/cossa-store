@@ -1,10 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
-  hasCossaLiveWebhookDuplicate,
-  parseYocoWebhookSubscriptions,
-} from "./yoco-webhook-reconciliation.ts";
-import {
   DELIVERY_QUOTE_REQUIRED,
   resolveConfiguredDeliveryGroup,
   type ConfiguredDeliveryRate,
@@ -16,6 +12,13 @@ import {
   type DeliveryConfirmationClassification,
   type StoredDeliveryConfirmation,
 } from "./_shared/delivery-confirmation.ts";
+import {
+  LIVE_WEBHOOK_URL,
+  parseYocoWebhookSubscriptions,
+  persistOrCompensateWebhookSecret,
+  reconcileVaultAndYoco,
+  validateCreatedWebhookResponse,
+} from "./yoco-webhook-reconciliation.ts";
 
 const ALLOWED_ORIGINS = new Set([
   "https://store.cossanexusholdings.co.za",
@@ -822,16 +825,15 @@ Deno.serve(async (request) => {
         "get_yoco_live_webhook_secret",
       );
       if (storedSecretError) throw new Error("Live webhook configuration could not be checked.");
-      if (storedSecret) return json(request, { alreadyConfigured: true, registered: true });
-
-      const webhookUrl = "https://nptyyzyokzgnwnyteeyi.supabase.co/functions/v1/yoco-live-webhook";
+      const webhookUrl = LIVE_WEBHOOK_URL;
       const existingResponse = await fetch("https://payments.yoco.com/api/webhooks", {
         headers: { Authorization: `Bearer ${liveSecret}` },
       });
       if (!existingResponse.ok) throw new Error("Yoco webhooks could not be reconciled safely.");
       const existing = parseYocoWebhookSubscriptions(await existingResponse.json());
-      const duplicate = hasCossaLiveWebhookDuplicate(existing, webhookUrl);
-      if (duplicate) throw new Error("A Cossa Store live webhook already exists but its signing secret is not stored.");
+      const reconciliation = reconcileVaultAndYoco(Boolean(storedSecret), existing, webhookUrl);
+      if (reconciliation === "configured") return json(request, { alreadyConfigured: true, registered: true });
+      if (reconciliation !== "ready") throw new Error("Yoco and Vault webhook state requires reconciliation.");
 
       const registerResponse = await fetch("https://payments.yoco.com/api/webhooks", {
         method: "POST",
@@ -839,14 +841,43 @@ Deno.serve(async (request) => {
         body: JSON.stringify({ name: "cossa-store-yoco-live", url: webhookUrl }),
       });
       const registerBody = (await registerResponse.json().catch(() => ({}))) as Record<string, unknown>;
-      const webhookSecret = text(registerBody.secret, 1000);
-      if (!registerResponse.ok || !webhookSecret.startsWith("whsec_")) {
+      if (!registerResponse.ok) {
         throw new Error("Yoco live webhook registration failed safely.");
       }
-      const { error: storeError } = await admin.rpc("store_yoco_live_webhook_secret", {
-        p_secret: webhookSecret,
+      let created: { id: string; secret: string };
+      try {
+        created = validateCreatedWebhookResponse(registerBody, webhookUrl);
+      } catch {
+        const createdId = typeof registerBody.id === "string" ? registerBody.id.trim() : "";
+        if (createdId) {
+          try {
+            const deleteResponse = await fetch(`https://payments.yoco.com/api/webhooks/${encodeURIComponent(createdId)}`, {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${liveSecret}` },
+            });
+            if (!deleteResponse.ok) throw new Error("delete failed");
+          } catch {
+            throw new Error("RECONCILIATION_REQUIRED: invalid Yoco webhook response could not be compensated.");
+          }
+        }
+        throw new Error("Yoco live webhook registration response was invalid and was not retained.");
+      }
+      const outcome = await persistOrCompensateWebhookSecret({
+        webhookId: created.id,
+        storeSecret: async () => {
+          const { error } = await admin.rpc("store_yoco_live_webhook_secret", { p_secret: created.secret });
+          return { error };
+        },
+        deleteWebhook: async (webhookId) => {
+          const response = await fetch(`https://payments.yoco.com/api/webhooks/${encodeURIComponent(webhookId)}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${liveSecret}` },
+          });
+          return response.ok;
+        },
       });
-      if (storeError) throw new Error("The live webhook was registered but its secret could not be secured.");
+      if (outcome === "rolled_back") throw new Error("Yoco webhook registration was rolled back because Vault storage failed.");
+      if (outcome === "reconciliation_required") throw new Error("RECONCILIATION_REQUIRED: Yoco webhook exists but Vault storage failed.");
       return json(request, { registered: true, webhookUrl });
     }
 

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { hasCossaLiveWebhookDuplicate, parseYocoWebhookSubscriptions } from "../supabase/functions/store-eft-checkout/yoco-webhook-reconciliation.ts";
+import { hasCossaLiveWebhookDuplicate, parseYocoWebhookSubscriptions, persistOrCompensateWebhookSecret, reconcileVaultAndYoco, validateCreatedWebhookResponse } from "../supabase/functions/store-eft-checkout/yoco-webhook-reconciliation.ts";
 
 const migration = readFileSync("supabase/migrations/20260906190000_add_yoco_live_payment_model.sql", "utf8");
 const checkout = readFileSync("supabase/functions/store-eft-checkout/index.ts", "utf8");
@@ -29,6 +29,58 @@ test("official subscriptions response detects duplicate name and URL", () => {
   assert.equal(hasCossaLiveWebhookDuplicate(parseYocoWebhookSubscriptions({ subscriptions: [{ name: "other", url }] }), url), true);
 });
 
+test("Vault and Yoco reconciliation covers every safe state", () => {
+  const url = "https://nptyyzyokzgnwnyteeyi.supabase.co/functions/v1/yoco-live-webhook";
+  assert.equal(reconcileVaultAndYoco(false, []), "ready");
+  assert.equal(reconcileVaultAndYoco(false, [{ name: "cossa-store-yoco-live", url }]), "reconciliation_required");
+  assert.equal(reconcileVaultAndYoco(true, [{ name: "cossa-store-yoco-live", url }]), "configured");
+  assert.equal(reconcileVaultAndYoco(true, []), "reconciliation_required");
+  assert.equal(reconcileVaultAndYoco(false, [{ name: "cossa-store-yoco-live", url }, { name: "other", url }]), "reconciliation_required");
+});
+
+test("created webhook response validates id, secret, name, URL and live mode", () => {
+  const url = "https://nptyyzyokzgnwnyteeyi.supabase.co/functions/v1/yoco-live-webhook";
+  const result = validateCreatedWebhookResponse({ id: "wh_123", secret: "whsec_fixture", name: "cossa-store-yoco-live", url, mode: "live" }, url);
+  assert.equal(result.id, "wh_123");
+  assert.throws(() => validateCreatedWebhookResponse({ id: "wh_123", secret: "whsec_fixture", name: "wrong", url }, url));
+  assert.throws(() => validateCreatedWebhookResponse({ id: "wh_123", secret: "whsec_fixture", name: "cossa-store-yoco-live", url, mode: "test" }, url));
+  assert.throws(() => validateCreatedWebhookResponse({ id: "", secret: "whsec_fixture", name: "cossa-store-yoco-live", url }, url));
+  assert.match(checkout, /createdId/);
+  assert.match(checkout, /method: "DELETE"/);
+});
+
+test("Vault failure compensates with DELETE and distinguishes hard reconciliation", async () => {
+  let stores = 0;
+  let deletes = 0;
+  const rolledBack = await persistOrCompensateWebhookSecret({
+    webhookId: "wh_123",
+    storeSecret: async () => { stores++; return { error: { code: "23505" } }; },
+    deleteWebhook: async () => { deletes++; return true; },
+  });
+  assert.equal(rolledBack, "rolled_back");
+  assert.equal(stores, 1);
+  assert.equal(deletes, 1);
+  const hardStop = await persistOrCompensateWebhookSecret({
+    webhookId: "wh_456",
+    storeSecret: async () => ({ error: { status: 503 } }),
+    deleteWebhook: async () => false,
+  });
+  assert.equal(hardStop, "reconciliation_required");
+});
+
+test("retryable Vault failure retries once, then compensates", async () => {
+  let stores = 0;
+  let deletes = 0;
+  const outcome = await persistOrCompensateWebhookSecret({
+    webhookId: "wh_retry",
+    storeSecret: async () => { stores++; return { error: stores === 1 ? { status: 503 } : { status: 503 } }; },
+    deleteWebhook: async () => { deletes++; return true; },
+  });
+  assert.equal(outcome, "rolled_back");
+  assert.equal(stores, 2);
+  assert.equal(deletes, 1);
+});
+
 test("empty subscriptions permits registration, malformed responses fail closed", () => {
   assert.deepEqual(parseYocoWebhookSubscriptions({ subscriptions: [] }), []);
   assert.throws(() => parseYocoWebhookSubscriptions({}), /Unexpected Yoco webhook list response/);
@@ -40,10 +92,10 @@ test("live webhook registration reconciles before creating and prevents duplicat
   const registration = checkout.slice(checkout.indexOf('action === "yoco_live_register_webhook"'));
   assert.match(registration, /alreadyConfigured/);
   assert.match(registration, /payments\.yoco\.com\/api\/webhooks/);
-  assert.match(checkout, /hasCossaLiveWebhookDuplicate/);
+  assert.match(checkout, /reconcileVaultAndYoco/);
   assert.match(registration, /method: "POST"/);
   assert.match(registration, /parseYocoWebhookSubscriptions/);
-  assert.match(checkout, /nptyyzyokzgnwnyteeyi\.supabase\.co\/functions\/v1\/yoco-live-webhook/);
+  assert.match(checkout, /LIVE_WEBHOOK_URL/);
 });
 
 test("commissioning requires AAL2 unconditionally", () => {
