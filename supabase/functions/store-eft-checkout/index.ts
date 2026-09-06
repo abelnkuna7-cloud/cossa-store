@@ -849,16 +849,17 @@ Deno.serve(async (request) => {
         created = validateCreatedWebhookResponse(registerBody, webhookUrl);
       } catch {
         const createdId = typeof registerBody.id === "string" ? registerBody.id.trim() : "";
-        if (createdId) {
-          try {
-            const deleteResponse = await fetch(`https://payments.yoco.com/api/webhooks/${encodeURIComponent(createdId)}`, {
-              method: "DELETE",
-              headers: { Authorization: `Bearer ${liveSecret}` },
-            });
-            if (!deleteResponse.ok) throw new Error("delete failed");
-          } catch {
-            throw new Error("RECONCILIATION_REQUIRED: invalid Yoco webhook response could not be compensated.");
-          }
+        if (!createdId) {
+          throw new Error("RECONCILIATION_REQUIRED: invalid Yoco webhook response had no usable ID.");
+        }
+        try {
+          const deleteResponse = await fetch(`https://payments.yoco.com/api/webhooks/${encodeURIComponent(createdId)}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${liveSecret}` },
+          });
+          if (!deleteResponse.ok) throw new Error("delete failed");
+        } catch {
+          throw new Error("RECONCILIATION_REQUIRED: invalid Yoco webhook response could not be compensated.");
         }
         throw new Error("Yoco live webhook registration response was invalid and was not retained.");
       }

@@ -32,10 +32,13 @@ test("official subscriptions response detects duplicate name and URL", () => {
 test("Vault and Yoco reconciliation covers every safe state", () => {
   const url = "https://nptyyzyokzgnwnyteeyi.supabase.co/functions/v1/yoco-live-webhook";
   assert.equal(reconcileVaultAndYoco(false, []), "ready");
-  assert.equal(reconcileVaultAndYoco(false, [{ name: "cossa-store-yoco-live", url }]), "reconciliation_required");
-  assert.equal(reconcileVaultAndYoco(true, [{ name: "cossa-store-yoco-live", url }]), "configured");
+  assert.equal(reconcileVaultAndYoco(false, [{ name: "cossa-store-yoco-live", url, mode: "live" }]), "reconciliation_required");
+  assert.equal(reconcileVaultAndYoco(true, [{ name: "cossa-store-yoco-live", url, mode: "live" }]), "configured");
   assert.equal(reconcileVaultAndYoco(true, []), "reconciliation_required");
-  assert.equal(reconcileVaultAndYoco(false, [{ name: "cossa-store-yoco-live", url }, { name: "other", url }]), "reconciliation_required");
+  assert.equal(reconcileVaultAndYoco(false, [{ name: "cossa-store-yoco-live", url, mode: "live" }, { name: "other", url }]), "reconciliation_required");
+  assert.equal(reconcileVaultAndYoco(true, [{ name: "cossa-store-yoco-live", url: "https://wrong", mode: "live" }]), "reconciliation_required");
+  assert.equal(reconcileVaultAndYoco(true, [{ name: "other", url, mode: "live" }]), "reconciliation_required");
+  assert.equal(reconcileVaultAndYoco(true, [{ name: "cossa-store-yoco-live", url, mode: "test" }]), "reconciliation_required");
 });
 
 test("created webhook response validates id, secret, name, URL and live mode", () => {
@@ -44,9 +47,16 @@ test("created webhook response validates id, secret, name, URL and live mode", (
   assert.equal(result.id, "wh_123");
   assert.throws(() => validateCreatedWebhookResponse({ id: "wh_123", secret: "whsec_fixture", name: "wrong", url }, url));
   assert.throws(() => validateCreatedWebhookResponse({ id: "wh_123", secret: "whsec_fixture", name: "cossa-store-yoco-live", url, mode: "test" }, url));
+  assert.throws(() => validateCreatedWebhookResponse({ id: "wh_123", secret: "whsec_fixture", name: "cossa-store-yoco-live", url }, url));
   assert.throws(() => validateCreatedWebhookResponse({ id: "", secret: "whsec_fixture", name: "cossa-store-yoco-live", url }, url));
   assert.match(checkout, /createdId/);
   assert.match(checkout, /method: "DELETE"/);
+});
+
+test("malformed successful registration without ID is reconciliation-required, not safely discarded", () => {
+  assert.throws(() => validateCreatedWebhookResponse({ secret: "whsec_fixture" }), /invalid/);
+  assert.match(checkout, /RECONCILIATION_REQUIRED: invalid Yoco webhook response had no usable ID/);
+  assert.match(checkout, /Yoco live webhook registration response was invalid and was not retained/);
 });
 
 test("Vault failure compensates with DELETE and distinguishes hard reconciliation", async () => {

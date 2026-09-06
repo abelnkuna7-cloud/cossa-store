@@ -22,16 +22,24 @@ export function matchingCossaLiveWebhooks(
   return subscriptions.filter((row) => row.name === LIVE_WEBHOOK_NAME || row.url === webhookUrl);
 }
 
+export function isExactCossaLiveWebhook(
+  row: YocoWebhookSubscription,
+  webhookUrl = LIVE_WEBHOOK_URL,
+): boolean {
+  return row.name === LIVE_WEBHOOK_NAME && row.url === webhookUrl && row.mode === "live";
+}
+
 export function reconcileVaultAndYoco(
   vaultSecretPresent: boolean,
   subscriptions: YocoWebhookSubscription[],
   webhookUrl = LIVE_WEBHOOK_URL,
 ): "ready" | "configured" | "reconciliation_required" {
-  const matching = matchingCossaLiveWebhooks(subscriptions, webhookUrl);
-  if (matching.length > 1) return "reconciliation_required";
-  if (vaultSecretPresent && matching.length === 1) return "configured";
-  if (vaultSecretPresent !== (matching.length === 1)) return "reconciliation_required";
-  return "ready";
+  const collisions = matchingCossaLiveWebhooks(subscriptions, webhookUrl);
+  const exact = collisions.filter((row) => isExactCossaLiveWebhook(row, webhookUrl));
+  if (collisions.length > 1) return "reconciliation_required";
+  if (vaultSecretPresent && collisions.length === 1 && exact.length === 1) return "configured";
+  if (!vaultSecretPresent && collisions.length === 0) return "ready";
+  return "reconciliation_required";
 }
 
 export function validateCreatedWebhookResponse(
@@ -44,7 +52,7 @@ export function validateCreatedWebhookResponse(
   const row = body as Record<string, unknown>;
   const id = typeof row.id === "string" ? row.id.trim() : "";
   const secret = typeof row.secret === "string" ? row.secret.trim() : "";
-  if (!id || !secret.startsWith("whsec_") || row.name !== LIVE_WEBHOOK_NAME || row.url !== webhookUrl || (row.mode !== undefined && row.mode !== "live")) {
+  if (!id || !secret.startsWith("whsec_") || row.name !== LIVE_WEBHOOK_NAME || row.url !== webhookUrl || row.mode !== "live") {
     throw new Error("Yoco webhook registration response was invalid.");
   }
   return { id, secret };
