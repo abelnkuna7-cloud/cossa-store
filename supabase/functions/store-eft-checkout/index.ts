@@ -380,6 +380,19 @@ async function requireCossaStoreAdmin(admin: any, userId: string) {
   }
 }
 
+async function requireCossaStoreAdminAal2(admin: any, authClient: any, token: string, userId: string) {
+  await requireCossaStoreAdmin(admin, userId);
+  const { data: mfaRequired, error: mfaError } = await admin.rpc("store_admin_mfa_required", {
+    p_user_id: userId,
+  });
+  if (mfaError) throw new Error("Administrator MFA status could not be verified.");
+  const { data: claims, error: claimsError } = await authClient.auth.getClaims(token);
+  const aal = typeof claims?.claims?.aal === "string" ? claims.claims.aal : null;
+  if (claimsError || (mfaRequired === true && aal !== "aal2")) {
+    throw new Error("A verified administrator authenticator is required for Yoco commissioning.");
+  }
+}
+
 async function deliveryConfirmationTargets(admin: any, lines: ConfiguredPhysicalLine[]) {
   const productIds = [...new Set(lines.map((line) => line.productId))];
   const { data, error } = await admin
@@ -760,6 +773,8 @@ Deno.serve(async (request) => {
                       ? "yoco_create"
                       : body.action === "yoco_live_create"
                         ? "yoco_live_create"
+                      : body.action === "yoco_live_register_webhook"
+                        ? "yoco_live_register_webhook"
                       : body.action === "yoco_status"
                         ? "yoco_status"
                         : body.action === "yoco_return"
@@ -776,6 +791,11 @@ Deno.serve(async (request) => {
       await requireCossaStoreAdmin(admin, userData.user.id);
     }
 
+    if (action === "yoco_live_register_webhook") {
+      stage = "yoco_live_webhook_commissioning_gate";
+      await requireCossaStoreAdminAal2(admin, authClient, token, userData.user.id);
+    }
+
     // Live Yoco is an explicit, server-only commissioning path. It remains
     // unavailable unless both the database control and server secret exist.
     if (action === "yoco_live_create") {
@@ -786,9 +806,53 @@ Deno.serve(async (request) => {
         .select("yoco_live_state")
         .eq("id", true)
         .maybeSingle();
-      if (controlError || control?.yoco_live_state === "disabled" || !liveSecret) {
+      if (controlError || !control || control.yoco_live_state === "disabled" || !liveSecret) {
         throw new Error("Yoco live payments are not currently available.");
       }
+      if (control.yoco_live_state === "commissioning") {
+        await requireCossaStoreAdminAal2(admin, authClient, token, userData.user.id);
+      }
+    }
+
+    if (action === "yoco_live_register_webhook") {
+      stage = "yoco_live_webhook_registration";
+      const liveSecret = Deno.env.get("YOCO_LIVE_SECRET_KEY");
+      if (!liveSecret) throw new Error("Yoco live payments are not configured.");
+      const { data: storedSecret, error: storedSecretError } = await admin.rpc(
+        "get_yoco_live_webhook_secret",
+      );
+      if (storedSecretError) throw new Error("Live webhook configuration could not be checked.");
+      if (storedSecret) return json(request, { alreadyConfigured: true, registered: true });
+
+      const webhookUrl = `${supabaseUrl}/functions/v1/yoco-live-webhook`;
+      const existingResponse = await fetch("https://payments.yoco.com/api/webhooks", {
+        headers: { Authorization: `Bearer ${liveSecret}` },
+      });
+      const existingBody = (await existingResponse.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!existingResponse.ok) throw new Error("Yoco webhooks could not be reconciled safely.");
+      const existing = Array.isArray(existingBody) ? existingBody : Array.isArray(existingBody.data) ? existingBody.data : [];
+      const duplicate = existing.some((item) => {
+        if (!item || typeof item !== "object") return false;
+        const row = item as Record<string, unknown>;
+        return text(row.name, 120) === "cossa-store-yoco-live" || text(row.url, 500) === webhookUrl;
+      });
+      if (duplicate) throw new Error("A Cossa Store live webhook already exists but its signing secret is not stored.");
+
+      const registerResponse = await fetch("https://payments.yoco.com/api/webhooks", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${liveSecret}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "cossa-store-yoco-live", url: webhookUrl }),
+      });
+      const registerBody = (await registerResponse.json().catch(() => ({}))) as Record<string, unknown>;
+      const webhookSecret = text(registerBody.secret, 1000);
+      if (!registerResponse.ok || !webhookSecret.startsWith("whsec_")) {
+        throw new Error("Yoco live webhook registration failed safely.");
+      }
+      const { error: storeError } = await admin.rpc("store_yoco_live_webhook_secret", {
+        p_secret: webhookSecret,
+      });
+      if (storeError) throw new Error("The live webhook was registered but its secret could not be secured.");
+      return json(request, { registered: true, webhookUrl });
     }
 
     if (action === "yoco_status" || action === "yoco_return") {

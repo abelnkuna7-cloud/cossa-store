@@ -6,6 +6,30 @@ const migration = readFileSync("supabase/migrations/20260906190000_add_yoco_live
 const checkout = readFileSync("supabase/functions/store-eft-checkout/index.ts", "utf8");
 const webhook = readFileSync("supabase/functions/yoco-live-webhook/index.ts", "utf8");
 
+test("commissioning is admin/AAL2-only while active remains separately gated", () => {
+  assert.match(checkout, /action === "yoco_live_register_webhook"/);
+  assert.match(checkout, /requireCossaStoreAdminAal2\(admin, authClient, token, userData\.user\.id\)/);
+  assert.match(checkout, /control\.yoco_live_state === "commissioning"/);
+  assert.match(checkout, /\["commissioning", "active"\]\.includes/);
+});
+
+test("live commissioning never accepts a browser-supplied secret and stores Vault secret only", () => {
+  assert.match(checkout, /Deno\.env\.get\("YOCO_LIVE_SECRET_KEY"\)/);
+  assert.match(checkout, /get_yoco_live_webhook_secret/);
+  assert.match(checkout, /store_yoco_live_webhook_secret/);
+  assert.doesNotMatch(checkout, /body\.liveSecret|body\.yocoLiveSecret|body\.webhookSecret/);
+  assert.doesNotMatch(checkout, /return json\(request, \{[^}]*webhookSecret/);
+});
+
+test("live webhook registration reconciles before creating and prevents duplicates", () => {
+  const registration = checkout.slice(checkout.indexOf('action === "yoco_live_register_webhook"'));
+  assert.match(registration, /alreadyConfigured/);
+  assert.match(registration, /payments\.yoco\.com\/api\/webhooks/);
+  assert.match(registration, /row\.name.*cossa-store-yoco-live/);
+  assert.match(registration, /row\.url.*webhookUrl/);
+  assert.match(registration, /method: "POST"/);
+});
+
 test("live payment control defaults to disabled", () => {
   assert.match(migration, /values\s*\(\s*true,\s*'disabled'\)/);
   assert.match(checkout, /Yoco live payments are not currently available/);
