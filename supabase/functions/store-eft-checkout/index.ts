@@ -1,6 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
+  hasCossaLiveWebhookDuplicate,
+  parseYocoWebhookSubscriptions,
+} from "./yoco-webhook-reconciliation.ts";
+import {
   DELIVERY_QUOTE_REQUIRED,
   resolveConfiguredDeliveryGroup,
   type ConfiguredDeliveryRate,
@@ -382,13 +386,9 @@ async function requireCossaStoreAdmin(admin: any, userId: string) {
 
 async function requireCossaStoreAdminAal2(admin: any, authClient: any, token: string, userId: string) {
   await requireCossaStoreAdmin(admin, userId);
-  const { data: mfaRequired, error: mfaError } = await admin.rpc("store_admin_mfa_required", {
-    p_user_id: userId,
-  });
-  if (mfaError) throw new Error("Administrator MFA status could not be verified.");
   const { data: claims, error: claimsError } = await authClient.auth.getClaims(token);
   const aal = typeof claims?.claims?.aal === "string" ? claims.claims.aal : null;
-  if (claimsError || (mfaRequired === true && aal !== "aal2")) {
+  if (claimsError || aal !== "aal2") {
     throw new Error("A verified administrator authenticator is required for Yoco commissioning.");
   }
 }
@@ -824,18 +824,13 @@ Deno.serve(async (request) => {
       if (storedSecretError) throw new Error("Live webhook configuration could not be checked.");
       if (storedSecret) return json(request, { alreadyConfigured: true, registered: true });
 
-      const webhookUrl = `${supabaseUrl}/functions/v1/yoco-live-webhook`;
+      const webhookUrl = "https://nptyyzyokzgnwnyteeyi.supabase.co/functions/v1/yoco-live-webhook";
       const existingResponse = await fetch("https://payments.yoco.com/api/webhooks", {
         headers: { Authorization: `Bearer ${liveSecret}` },
       });
-      const existingBody = (await existingResponse.json().catch(() => ({}))) as Record<string, unknown>;
       if (!existingResponse.ok) throw new Error("Yoco webhooks could not be reconciled safely.");
-      const existing = Array.isArray(existingBody) ? existingBody : Array.isArray(existingBody.data) ? existingBody.data : [];
-      const duplicate = existing.some((item) => {
-        if (!item || typeof item !== "object") return false;
-        const row = item as Record<string, unknown>;
-        return text(row.name, 120) === "cossa-store-yoco-live" || text(row.url, 500) === webhookUrl;
-      });
+      const existing = parseYocoWebhookSubscriptions(await existingResponse.json());
+      const duplicate = hasCossaLiveWebhookDuplicate(existing, webhookUrl);
       if (duplicate) throw new Error("A Cossa Store live webhook already exists but its signing secret is not stored.");
 
       const registerResponse = await fetch("https://payments.yoco.com/api/webhooks", {

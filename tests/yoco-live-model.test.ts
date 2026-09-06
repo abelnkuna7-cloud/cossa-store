@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { hasCossaLiveWebhookDuplicate, parseYocoWebhookSubscriptions } from "../supabase/functions/store-eft-checkout/yoco-webhook-reconciliation.ts";
 
 const migration = readFileSync("supabase/migrations/20260906190000_add_yoco_live_payment_model.sql", "utf8");
 const checkout = readFileSync("supabase/functions/store-eft-checkout/index.ts", "utf8");
@@ -21,13 +22,34 @@ test("live commissioning never accepts a browser-supplied secret and stores Vaul
   assert.doesNotMatch(checkout, /return json\(request, \{[^}]*webhookSecret/);
 });
 
+test("official subscriptions response detects duplicate name and URL", () => {
+  const url = "https://nptyyzyokzgnwnyteeyi.supabase.co/functions/v1/yoco-live-webhook";
+  const subscriptions = parseYocoWebhookSubscriptions({ subscriptions: [{ name: "cossa-store-yoco-live", url: "https://other" }] });
+  assert.equal(hasCossaLiveWebhookDuplicate(subscriptions, url), true);
+  assert.equal(hasCossaLiveWebhookDuplicate(parseYocoWebhookSubscriptions({ subscriptions: [{ name: "other", url }] }), url), true);
+});
+
+test("empty subscriptions permits registration, malformed responses fail closed", () => {
+  assert.deepEqual(parseYocoWebhookSubscriptions({ subscriptions: [] }), []);
+  assert.throws(() => parseYocoWebhookSubscriptions({}), /Unexpected Yoco webhook list response/);
+  assert.throws(() => parseYocoWebhookSubscriptions({ subscriptions: null }), /Unexpected Yoco webhook list response/);
+  assert.throws(() => parseYocoWebhookSubscriptions({ subscriptions: [{ name: "broken" }, null] }), /Unexpected Yoco webhook list response/);
+});
+
 test("live webhook registration reconciles before creating and prevents duplicates", () => {
   const registration = checkout.slice(checkout.indexOf('action === "yoco_live_register_webhook"'));
   assert.match(registration, /alreadyConfigured/);
   assert.match(registration, /payments\.yoco\.com\/api\/webhooks/);
-  assert.match(registration, /row\.name.*cossa-store-yoco-live/);
-  assert.match(registration, /row\.url.*webhookUrl/);
+  assert.match(checkout, /hasCossaLiveWebhookDuplicate/);
   assert.match(registration, /method: "POST"/);
+  assert.match(registration, /parseYocoWebhookSubscriptions/);
+  assert.match(checkout, /nptyyzyokzgnwnyteeyi\.supabase\.co\/functions\/v1\/yoco-live-webhook/);
+});
+
+test("commissioning requires AAL2 unconditionally", () => {
+  const helper = checkout.slice(checkout.indexOf("async function requireCossaStoreAdminAal2"), checkout.indexOf("async function deliveryConfirmationTargets"));
+  assert.match(helper, /aal !== "aal2"/);
+  assert.doesNotMatch(helper, /mfaRequired === true/);
 });
 
 test("live payment control defaults to disabled", () => {
