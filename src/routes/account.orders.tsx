@@ -211,6 +211,17 @@ function OrdersPage() {
     queryKey: ["customer-store-orders", user?.id],
     enabled: Boolean(user?.id),
     queryFn: async (): Promise<CustomerOrder[]> => {
+      // Ensure the server-side customer session registry is touched before
+      // the Data API request. The orders tables have a restrictive
+      // is_active_store_session() policy; awaiting this guard avoids a race
+      // where the SPA has a valid Auth session but RLS still sees a stale
+      // last_seen_at value.
+      await fetch("/account", {
+        credentials: "include",
+        cache: "no-store",
+        headers: { "x-cossa-session-heartbeat": "1" },
+      });
+
       // Keep the base order projection independent from optional related
       // tables. A relationship/RLS failure must not hide an order that was
       // already created and is awaiting payment.
