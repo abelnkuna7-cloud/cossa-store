@@ -71,6 +71,7 @@ type CustomerOrder = {
   store_order_items: OrderItem[] | null;
   store_digital_entitlements: DigitalEntitlement[] | null;
   fulfilments: CustomerFulfilment[];
+  relatedDataError?: string | null;
 };
 
 export const Route = createFileRoute("/account/orders")({
@@ -97,7 +98,7 @@ function statusLabel(status: string) {
     case "completed":
       return "Completed";
     case "pending":
-      return "Awaiting EFT approval";
+      return "Awaiting payment";
     case "cancelled":
       return "Cancelled";
     default:
@@ -210,10 +211,13 @@ function OrdersPage() {
     queryKey: ["customer-store-orders", user?.id],
     enabled: Boolean(user?.id),
     queryFn: async (): Promise<CustomerOrder[]> => {
+      // Keep the base order projection independent from optional related
+      // tables. A relationship/RLS failure must not hide an order that was
+      // already created and is awaiting payment.
       const { data, error } = await db
         .from("store_orders")
         .select(
-          "id,order_number,status,subtotal,shipping_total,shipping_method,metadata,total,payment_provider,payment_reference,paid_at,created_at,store_order_items(id,product_id,product_name,sku,product_type,quantity,unit_price,line_total),store_digital_entitlements(id,order_item_id,product_id,download_limit,downloads_used,expires_at,revoked_at)",
+          "id,order_number,status,subtotal,shipping_total,shipping_method,metadata,total,payment_provider,payment_reference,paid_at,created_at",
         )
         .eq("customer_user_id", user!.id)
         .order("created_at", { ascending: false });
@@ -228,20 +232,47 @@ function OrdersPage() {
 
       if (!orderIds.length) return [];
 
+      const [itemsResult, fulfilmentsResult] = await Promise.all([
+        db
+          .from("store_order_items")
+          .select("id,order_id,product_id,product_name,sku,product_type,quantity,unit_price,line_total")
+          .in("order_id", orderIds),
+        db
+          .from("store_customer_fulfilments")
+          .select("id,store_order_id,status,tracking_number,updated_at")
+          .in("store_order_id", orderIds)
+          .order("updated_at", { ascending: false }),
+      ]);
+
+      const itemIds = ((itemsResult.data ?? []) as (OrderItem & { order_id: string })[]).map((item) => item.id);
+      const entitlementsResult = itemIds.length
+        ? await db
+            .from("store_digital_entitlements")
+            .select("id,order_item_id,product_id,download_limit,downloads_used,expires_at,revoked_at")
+            .in("order_item_id", itemIds)
+        : { data: [], error: null };
+
+      const relatedErrors = [itemsResult.error, entitlementsResult.error, fulfilmentsResult.error]
+        .filter(Boolean)
+        .map((relatedError) => relatedError.message)
+        .filter(Boolean);
+      const itemsByOrder = new Map<string, OrderItem[]>();
+      for (const item of (itemsResult.data ?? []) as (OrderItem & { order_id: string })[]) {
+        const current = itemsByOrder.get(item.order_id) ?? [];
+        current.push(item);
+        itemsByOrder.set(item.order_id, current);
+      }
+      const entitlementsByItem = new Map<string, DigitalEntitlement[]>();
+      for (const entitlement of (entitlementsResult.data ?? []) as DigitalEntitlement[]) {
+        const current = entitlementsByItem.get(entitlement.order_item_id) ?? [];
+        current.push(entitlement);
+        entitlementsByItem.set(entitlement.order_item_id, current);
+      }
+
       // This customer projection excludes supplier records, costs and payloads.
       // The database limits its rows to orders owned by the signed-in customer.
-      const { data: fulfilmentRows, error: fulfilmentError } = await db
-        .from("store_customer_fulfilments")
-        .select(
-          "id,store_order_id,status,tracking_number,updated_at",
-        )
-        .in("store_order_id", orderIds)
-        .order("updated_at", { ascending: false });
-
-      if (fulfilmentError) throw fulfilmentError;
-
       const fulfilmentsByOrder = new Map<string, CustomerFulfilment[]>();
-      for (const fulfilment of (fulfilmentRows ?? []) as CustomerFulfilment[]) {
+      for (const fulfilment of (fulfilmentsResult.data ?? []) as CustomerFulfilment[]) {
         const current = fulfilmentsByOrder.get(fulfilment.store_order_id) ?? [];
         current.push(fulfilment);
         fulfilmentsByOrder.set(fulfilment.store_order_id, current);
@@ -249,7 +280,12 @@ function OrdersPage() {
 
       return orderRows.map((order) => ({
         ...order,
+        store_order_items: (itemsByOrder.get(order.id) ?? []).map(({ order_id: _orderId, ...item }) => item),
+        store_digital_entitlements: (itemsByOrder.get(order.id) ?? []).flatMap(
+          (item) => entitlementsByItem.get(item.id) ?? [],
+        ),
         fulfilments: fulfilmentsByOrder.get(order.id) ?? [],
+        relatedDataError: relatedErrors.length ? relatedErrors.join("; ") : null,
       }));
     },
   });
@@ -479,6 +515,13 @@ function OrdersPage() {
                 ) : null}
               </div>
             </div>
+
+            {order.relatedDataError ? (
+              <div className="border-b border-border bg-muted/20 px-5 py-3 text-xs text-muted-foreground">
+                Some delivery or download details are temporarily unavailable;
+                your order and payment status remain visible.
+              </div>
+            ) : null}
 
             {payment ? (
               <div className="border-b border-border bg-muted/20 p-5">

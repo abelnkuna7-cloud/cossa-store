@@ -38,7 +38,8 @@ import {
 } from "@/services/yoco-payments";
 
 const TITLE = "Checkout | Cossa Store";
-const DESCRIPTION = "Create a secure Cossa Store EFT payment request or Yoco test card checkout.";
+const DESCRIPTION =
+  "Choose from the payment options currently available for your order. If a payment option is temporarily unavailable, you can use another available method or contact Cossa Store for assistance.";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
@@ -445,10 +446,10 @@ function CheckoutPage() {
       <PageHeader eyebrow="Checkout" title="Secure checkout" description={DESCRIPTION} />
 
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-10 sm:px-6 lg:px-8">
-        <NoticeBlock tone="pending" title="EFT and Yoco test checkout">
-          EFT remains available. Yoco card checkout is in test mode: a signed Yoco webhook, never a
-          browser redirect, is required before a test payment is considered verified. Test payments
-          cannot release fulfilment, digital goods or stock.
+        <NoticeBlock tone="pending" title="Secure checkout">
+          Choose from the payment options currently available for your order. If a payment option
+          is temporarily unavailable, you can use another available method or contact Cossa Store
+          for assistance.
         </NoticeBlock>
 
         {yocoReturnMessage ? (
@@ -1062,7 +1063,7 @@ function CheckoutPage() {
               </section>
 
               <fieldset className="mt-5 space-y-3 rounded-md border border-border bg-background/40 p-4">
-                <legend className="px-1 text-sm font-semibold">Payment method</legend>
+                <legend className="px-1 text-sm font-semibold">Pay securely with Cossa Store</legend>
                 <label className="flex cursor-pointer items-start gap-3 text-sm">
                   <input
                     type="radio"
@@ -1119,10 +1120,10 @@ function CheckoutPage() {
                   {starting
                     ? paymentMethod === "yoco"
                       ? "Opening Yoco test checkout…"
-                      : "Creating EFT request…"
+                      : "Creating bank transfer request…"
                     : paymentMethod === "yoco"
                       ? "Continue to Yoco test checkout"
-                      : "Create EFT payment request"}
+                      : "Continue with bank transfer"}
                 </Button>
                 <Button asChild variant="outline" size="lg">
                   <Link to="/cart">Back to cart</Link>

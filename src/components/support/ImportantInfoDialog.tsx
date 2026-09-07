@@ -15,7 +15,7 @@ const STATUS = [
   "Supplier network is being established.",
   "Product catalogue is being prepared.",
   "Quotations and product sourcing requests are available.",
-  "Payment and delivery integrations are not connected yet and will only be described as active once they are live.",
+  "Choose from the payment options currently available for your order. If a payment option is temporarily unavailable, you can use another available method or contact Cossa Store for assistance.",
 ];
 
 const SUPPORT_CATEGORIES = [

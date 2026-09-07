@@ -882,15 +882,10 @@ function CartPage() {
                 </Link>
               </Button>
 
-              <NoticeBlock
-                tone="pending"
-                title="Secure EFT checkout is available"
-              >
-                Card and instant-payment integrations are still being completed.
-                Continue to checkout to create a secure EFT payment request with
-                the exact amount and a unique reference, then upload your proof
-                of payment for review. Digital access is released only after the
-                payment is approved.
+              <NoticeBlock tone="pending" title="Secure checkout">
+                Choose from the payment options currently available for your order. If a payment
+                option is temporarily unavailable, you can use another available method or contact
+                Cossa Store for assistance.
               </NoticeBlock>
             </aside>
           </div>
