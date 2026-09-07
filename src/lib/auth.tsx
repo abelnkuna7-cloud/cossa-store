@@ -76,9 +76,23 @@ export function useRoles(userId: string | undefined) {
 function syncServerSessionCookie(accessToken: string | null) {
   if (typeof document === "undefined") return;
   const base = "Path=/; Max-Age=3600; SameSite=Lax; Secure";
-  document.cookie = accessToken
-    ? `cossa_store_session=${encodeURIComponent(accessToken)}; ${base}`
-    : `cossa_store_session=; ${base}; Max-Age=0`;
+  if (!accessToken) {
+    document.cookie = `cossa_store_session=; ${base}; Max-Age=0`;
+    return;
+  }
+
+  document.cookie = `cossa_store_session=${encodeURIComponent(accessToken)}; ${base}`;
+
+  // The private-data RLS policy requires a recently-seen Store session row.
+  // Auth state changes happen in the SPA, so explicitly touch an existing
+  // private route through the server guard to register/refresh that row before
+  // customer Data API queries run. The access token remains in the cookie and
+  // is never logged or sent as a query parameter.
+  void fetch("/account", {
+    credentials: "include",
+    cache: "no-store",
+    headers: { "x-cossa-session-heartbeat": "1" },
+  }).catch(() => undefined);
 }
 
 const COSSA_STORE_ORGANISATION_ID = "00000000-0000-4000-8000-000000000001";
