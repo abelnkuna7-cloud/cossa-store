@@ -349,6 +349,7 @@ async function guardCustomerRequest(request: Request): Promise<Response | null> 
     return redirectWithClearedSession(redirect);
   }
   const now = Date.now();
+  const isSessionHeartbeat = request.headers.get("x-cossa-session-heartbeat") === "1";
   const issued = new Date(issuedAt * 1000);
   const absoluteExpiry = new Date((issuedAt + CUSTOMER_ABSOLUTE_TIMEOUT_SECONDS) * 1000);
   const { data: activeSession, error: sessionReadError } = await (supabaseAdmin as any)
@@ -364,7 +365,7 @@ async function guardCustomerRequest(request: Request): Promise<Response | null> 
     : absoluteExpiry.getTime();
   const timedOut =
     Boolean(activeSession?.revoked_at) ||
-    (lastSeen > 0 && now - lastSeen > CUSTOMER_IDLE_TIMEOUT_SECONDS * 1000) ||
+    (!isSessionHeartbeat && lastSeen > 0 && now - lastSeen > CUSTOMER_IDLE_TIMEOUT_SECONDS * 1000) ||
     now >= absoluteExpiresAt;
   const incomingIssuedAt = issued.getTime();
   const existingIssuedAt = activeSession?.issued_at ? Date.parse(activeSession.issued_at) : 0;
