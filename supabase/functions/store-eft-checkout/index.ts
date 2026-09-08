@@ -825,14 +825,32 @@ Deno.serve(async (request) => {
       if (returnState !== "success" && attemptData.status !== "succeeded") {
         update.status = returnState;
       }
-      const { data: updatedAttempt, error: updateError } = await admin
+      let returnUpdate = admin
         .from("store_yoco_test_payment_attempts")
         .update(update)
-        .eq("id", attemptId)
+        .eq("id", attemptId);
+      // The signed webhook may succeed after the read above. Never overwrite
+      // that authoritative success with a browser cancellation/failure.
+      if (update.status) returnUpdate = returnUpdate.neq("status", "succeeded");
+      const { data: updatedAttempt, error: updateError } = await returnUpdate
         .select("*")
-        .single();
-      if (updateError || !updatedAttempt)
+        .maybeSingle();
+      if (updateError)
         throw new Error("The Yoco return state could not be recorded.");
+      if (!updatedAttempt) {
+        const { data: verifiedAttempt, error: verifiedError } = await admin
+          .from("store_yoco_test_payment_attempts")
+          .select("*")
+          .eq("id", attemptId)
+          .eq("payer_user_id", userData.user.id)
+          .eq("status", "succeeded")
+          .single();
+        if (verifiedError || !verifiedAttempt)
+          throw new Error("The Yoco return state could not be recorded.");
+        return json(request, {
+          attempt: yocoAttemptPublic(verifiedAttempt as Record<string, unknown>),
+        });
+      }
       return json(request, {
         attempt: yocoAttemptPublic(updatedAttempt as Record<string, unknown>),
       });

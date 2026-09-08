@@ -17,6 +17,7 @@ import { NoticeBlock } from "@/components/common/StateBlocks";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/auth";
 import { formatZar } from "@/lib/format";
+import { orderPaymentMethod, unpaidDownloadMessage } from "@/lib/order-payment-copy";
 import {
   getMyEftProofUrl,
   listMyEftPayments,
@@ -423,7 +424,7 @@ function OrdersPage() {
   if (!user) {
     return (
       <NoticeBlock tone="pending" title="Sign in to view your orders">
-        Your EFT orders and approved digital downloads are tied to the account
+        Your orders and approved digital downloads are tied to the account
         used at checkout. {" "}
         <Link
           to="/auth"
@@ -517,6 +518,9 @@ function OrdersPage() {
               <div className="sm:text-right">
                 <p className="font-semibold text-primary">
                   {formatZar(Number(order.total))}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {orderPaymentMethod(order.payment_provider)}
                 </p>
                 {order.payment_reference ? (
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -730,7 +734,7 @@ function OrdersPage() {
 
                         {isDigital && !approved ? (
                           <p className="mt-3 text-sm text-muted-foreground">
-                            Download locked until EFT payment is approved.
+                            {unpaidDownloadMessage(order.payment_provider)}
                           </p>
                         ) : null}
 
