@@ -9,7 +9,7 @@ import { NoticeBlock } from "@/components/common/StateBlocks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useRoles, useSession } from "@/lib/auth";
+import { useCossaStoreAdminAccess, useSession } from "@/lib/auth";
 import { useCommerce } from "@/lib/commerce-store";
 import {
   checkoutQuoteFingerprint,
@@ -61,8 +61,8 @@ function newRequestId(): string {
 
 function CheckoutPage() {
   const { session, loading: authLoading } = useSession();
-  const roles = useRoles(session?.user.id);
-  const canTestYoco = (roles.data ?? []).includes("admin");
+  const storeAdmin = useCossaStoreAdminAccess();
+  const canTestYoco = storeAdmin.isAdmin;
   const { selectedCartLines, hydrated, removePaidCartLines } = useCommerce();
   const [acceptedPolicies, setAcceptedPolicies] = useState(false);
   const [customerName, setCustomerName] = useState("");
