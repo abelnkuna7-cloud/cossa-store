@@ -61,7 +61,6 @@ type CustomerOrder = {
   status: string;
   subtotal: number | string;
   shipping_total: number | string;
-  shipping_method: string | null;
   metadata: Record<string, unknown> | null;
   total: number | string;
   payment_provider: string | null;
@@ -228,7 +227,7 @@ function OrdersPage() {
       const { data, error } = await db
         .from("store_orders")
         .select(
-          "id,order_number,status,subtotal,shipping_total,shipping_method,metadata,total,payment_provider,payment_reference,paid_at,created_at",
+          "id,order_number,status,subtotal,shipping_total,metadata,total,payment_provider,payment_reference,paid_at,created_at",
         )
         .eq("customer_user_id", user!.id)
         .order("created_at", { ascending: false });
