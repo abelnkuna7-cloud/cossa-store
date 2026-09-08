@@ -13,13 +13,15 @@ export const MERCHANDISING = {
 } as const;
 
 /**
- * Merchandising tags. Staff set these on a product in the catalogue manager.
- * Nothing here fabricates demand — a product only appears in "Trending now"
- * when a staff member has deliberately marked it.
+ * Merchandising tags written by the Store intake/catalogue workflow.
+ * Customer-facing claims still need matching evidence rules in merchandising.ts.
  */
 export const MERCH_TAGS = {
+  newArrival: "new_arrival",
   trending: "trending",
-  /** Set only after an administrator verifies a genuine demand signal. */
+  bestSeller: "best_seller",
+  sale: "sale",
+  /** Legacy evidence-backed demand tag retained for compatibility. */
   popular: "popular",
   businessDeal: "business-deal",
 } as const;

@@ -16,6 +16,7 @@ export interface ProductBadge {
 }
 
 export function isNewArrival(product: Product, now = Date.now()): boolean {
+  if (product.tags.includes(MERCH_TAGS.newArrival)) return true;
   if (!product.published_at) return false;
   const published = new Date(product.published_at).getTime();
   if (!Number.isFinite(published)) return false;
@@ -24,18 +25,23 @@ export function isNewArrival(product: Product, now = Date.now()): boolean {
 }
 
 /**
- * A legacy merchandising tag may still exist on records, but the public Store
- * does not label a product as trending unless a verified demand-data pipeline
- * is introduced. This prevents a staff tag from becoming an unsupported market
- * demand claim.
+ * Trending is a deliberate staff merchandising signal. It is never inferred
+ * from supplier wording or fabricated from general market claims.
  */
 export function isTrending(product: Product): boolean {
   return product.tags.includes(MERCH_TAGS.trending);
 }
 
-/** A popular label is shown only after staff set the evidence-backed tag. */
+/** Best-seller/popular labels require a deliberate evidence-backed staff tag. */
 export function isPopular(product: Product): boolean {
-  return product.tags.includes(MERCH_TAGS.popular);
+  return (
+    product.tags.includes(MERCH_TAGS.bestSeller) ||
+    product.tags.includes(MERCH_TAGS.popular)
+  );
+}
+
+export function isBestSeller(product: Product): boolean {
+  return product.tags.includes(MERCH_TAGS.bestSeller);
 }
 
 export function isAffiliate(product: Product): boolean {
@@ -99,11 +105,13 @@ export function productBadges(product: Product): ProductBadge[] {
   badges.push(availabilityLabel(product));
   if (isProjectKit(product)) badges.push({ label: "Project kit", tone: "gold" });
   if (isNewArrival(product)) badges.push({ label: "New arrival", tone: "gold" });
+  if (isTrending(product)) badges.push({ label: "Trending", tone: "gold" });
   if (genuineComparePrice(product)) badges.push({ label: "Sale", tone: "gold" });
   if (isCossaStock(product) && product.stock_status === "low_stock") {
     badges.push({ label: "Limited stock", tone: "warning" });
   }
-  if (isPopular(product)) badges.push({ label: "Popular", tone: "positive" });
+  if (isBestSeller(product)) badges.push({ label: "Best seller", tone: "positive" });
+  else if (isPopular(product)) badges.push({ label: "Popular", tone: "positive" });
   if (product.requires_quote) badges.push({ label: "Quote only", tone: "neutral" });
   return badges;
 }
@@ -123,7 +131,7 @@ export interface MerchandisingSection {
   products: Product[];
   filter?: {
     fulfilment?: FulfilmentType;
-    flag?: "new" | "affiliate" | "made_to_order" | "popular";
+    flag?: "new" | "affiliate" | "made_to_order" | "popular" | "trending" | "best_seller" | "sale";
   };
 }
 
@@ -144,9 +152,35 @@ export function buildSections(products: Product[], now = Date.now()): Merchandis
     {
       id: "new-arrivals",
       title: "New arrivals",
-      description: "Recently published products from the live Cossa Store catalogue.",
+      description: "Recently published products and products deliberately marked as new arrivals.",
       products: cap(byNewest.filter((p) => isNewArrival(p, now))),
       filter: { flag: "new" },
+    },
+    {
+      id: "trending",
+      title: "Trending",
+      description: "Products deliberately selected by Cossa Store for current merchandising focus.",
+      products: cap(products.filter(isTrending)),
+      filter: { flag: "trending" },
+    },
+    {
+      id: "best-sellers",
+      title: "Best sellers",
+      description: "Products marked after Cossa Store verifies sales or demand evidence.",
+      products: cap(products.filter(isBestSeller)),
+      filter: { flag: "best_seller" },
+    },
+    {
+      id: "sale",
+      title: "On sale",
+      description: "Products with a genuine higher compare-at price and an active sale merchandising flag.",
+      products: cap(
+        products.filter(
+          (product) =>
+            product.tags.includes(MERCH_TAGS.sale) && Boolean(genuineComparePrice(product)),
+        ),
+      ),
+      filter: { flag: "sale" },
     },
     {
       id: "cossa-stock",
@@ -193,7 +227,7 @@ export function buildSections(products: Product[], now = Date.now()): Merchandis
       id: "popular",
       title: "Popular",
       description: "Products marked from verified Cossa Store demand signals.",
-      products: cap(products.filter(isPopular)),
+      products: cap(products.filter((product) => isPopular(product) && !isBestSeller(product))),
       filter: { flag: "popular" },
     },
     {
