@@ -28,6 +28,9 @@ type PublicStoreProductRow = {
   short_description: string | null;
   description: string | null;
   category: string | null;
+  additional_categories: string[] | null;
+  merchandising_tags: string[] | null;
+  fulfilment_model: string | null;
   brand: string | null;
   affiliate_url: string | null;
   currency: "ZAR";
@@ -40,6 +43,11 @@ type PublicStoreProductRow = {
   image_urls: string[];
   seo_title: string | null;
   seo_description: string | null;
+  customer_features: unknown;
+  customer_specifications: unknown;
+  customer_delivery_notice: string | null;
+  customer_returns_notice: string | null;
+  customer_warranty_notice: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -56,7 +64,7 @@ type StoreVariantRow = {
 };
 
 const PUBLIC_PRODUCT_SELECT =
-  "id,name,slug,sku,product_type,status,short_description,description,category,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at,customer_features,customer_specifications,customer_delivery_notice,customer_returns_notice,customer_warranty_notice";
+  "id,name,slug,sku,product_type,status,short_description,description,category,additional_categories,merchandising_tags,fulfilment_model,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at,customer_features,customer_specifications,customer_delivery_notice,customer_returns_notice,customer_warranty_notice";
 
 const PUBLIC_VARIANT_SELECT =
   "id,product_id,sku,title,price_zar,is_default,is_available,sort_order";
@@ -78,18 +86,35 @@ function asNumber(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function strings(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean);
+}
+
 function fulfilmentFor(row: PublicStoreProductRow): FulfilmentType {
-  switch (row.product_type) {
+  switch (row.fulfilment_model) {
     case "digital": return "digital";
     case "affiliate": return "affiliate";
-    case "pod": return "print_on_demand";
-    case "dropshipping": return "international_dropshipping";
-    default: return "cossa_stock";
+    case "print_on_demand": return "print_on_demand";
+    case "local_supplier": return "local_supplier";
+    case "local_dropshipping": return "local_dropshipping";
+    case "international_dropshipping": return "international_dropshipping";
+    case "cossa_stock": return "cossa_stock";
+    default:
+      switch (row.product_type) {
+        case "digital": return "digital";
+        case "affiliate": return "affiliate";
+        case "pod": return "print_on_demand";
+        case "dropshipping": return "international_dropshipping";
+        default: return "cossa_stock";
+      }
   }
 }
 
 function stockStatusFor(row: PublicStoreProductRow) {
-  switch (row.fulfilment_model) {
+  switch (fulfilmentFor(row)) {
     case "digital":
     case "affiliate":
     case "print_on_demand":
@@ -109,7 +134,7 @@ function stockStatusFor(row: PublicStoreProductRow) {
 }
 
 function availabilityFor(row: PublicStoreProductRow) {
-  switch (row.fulfilment_model) {
+  switch (fulfilmentFor(row)) {
     case "digital": return "digital_available" as const;
     case "affiliate": return "partner_offer" as const;
     case "print_on_demand": return "made_to_order" as const;
@@ -126,7 +151,7 @@ function availabilityFor(row: PublicStoreProductRow) {
 }
 
 function estimatedDeliveryFor(row: PublicStoreProductRow) {
-  switch (row.fulfilment_model) {
+  switch (fulfilmentFor(row)) {
     case "digital": return "Digital access after successful payment confirmation.";
     case "affiliate": return "Delivery and fulfilment are handled by the partner retailer.";
     case "print_on_demand": return "Made to order. Production and delivery timing is confirmed during checkout.";
@@ -152,6 +177,16 @@ function storefrontCategory(row: PublicStoreProductRow) {
   return category ? { slug: category.slug, name: category.name } : { slug: raw, name: raw };
 }
 
+function normalisedDepartmentSlug(value: string): string {
+  const trimmed = value.trim();
+  return storeDepartmentSlugFor(trimmed) ?? normaliseStoreDepartmentKey(trimmed);
+}
+
+function additionalDepartmentSlugs(row: PublicStoreProductRow): string[] {
+  return Array.from(
+    new Set(strings(row.additional_categories).map(normalisedDepartmentSlug).filter(Boolean)),
+  );
+}
 
 function inferSize(title: string): string | null {
   const match = title.match(/(?:^|\s|\/|-)(5XL|4XL|3XL|2XL|XXXL|XXL|XL|L|M|S|XS|XXS)(?:$|\s|\/|-)/i);
@@ -204,6 +239,13 @@ function mapRow(row: PublicStoreProductRow, variantRows: StoreVariantRow[] = [])
     ? customerAffiliateOffer(row.affiliate_url)
     : null;
 
+  const merchandisingTags = Array.from(
+    new Set([
+      ...strings(row.merchandising_tags),
+      ...(row.featured ? ["featured"] : []),
+    ]),
+  );
+
   return {
     id: row.id,
     sku: row.sku ?? row.id,
@@ -229,19 +271,17 @@ function mapRow(row: PublicStoreProductRow, variantRows: StoreVariantRow[] = [])
     stock_available: stockAvailable,
     stock_quantity: fulfilment === "cossa_stock" && row.track_inventory ? row.stock_quantity : null,
     category: category.slug,
+    additional_categories: additionalDepartmentSlugs(row),
     subcategory: "",
     display_category: category.name,
-    // Affiliate source identities are operational data, not product brands.
-    // Keep an independently recorded brand on Cossa-sold product records,
-    // but never use an affiliate partner as customer-facing brand copy.
     brand: fulfilment === "affiliate" ? null : row.brand,
     collection: null,
     images,
     variants,
-    features: [],
-    specifications: [],
+    features: strings(row.customer_features),
+    specifications: strings(row.customer_specifications),
     attributes: [],
-    tags: row.featured ? ["featured"] : [],
+    tags: merchandisingTags,
     affiliate,
     supplier_name: null,
     requires_quote: sellingPrice <= 0,
@@ -256,8 +296,9 @@ function mapRow(row: PublicStoreProductRow, variantRows: StoreVariantRow[] = [])
     project_slugs: [],
     related_product_ids: [],
     frequently_together_ids: [],
-    warranty: null,
-    return_policy: fulfilment === "digital" ? "Digital products are subject to the Cossa Store digital-products and returns terms." : null,
+    warranty: row.customer_warranty_notice,
+    return_policy: row.customer_returns_notice ??
+      (fulfilment === "digital" ? "Digital products are subject to the Cossa Store digital-products and returns terms." : null),
     seo_title: row.seo_title,
     seo_description: row.seo_description,
     is_featured: row.featured,
@@ -269,6 +310,11 @@ function mapRow(row: PublicStoreProductRow, variantRows: StoreVariantRow[] = [])
     created_at: row.created_at,
     updated_at: row.updated_at,
   } as unknown as Product;
+}
+
+function productDepartmentSlugs(product: Product): string[] {
+  const additional = (product as Product & { additional_categories?: string[] }).additional_categories ?? [];
+  return Array.from(new Set([product.category, ...additional].filter(Boolean)));
 }
 
 async function loadVariants(productIds: string[]): Promise<StoreVariantRow[]> {
@@ -311,8 +357,11 @@ export async function listFeaturedProducts(limit = 8): Promise<Product[]> {
 
 export async function listProducts(query: ProductQuery = {}): Promise<Product[]> {
   let products = await listStorefrontProducts();
-  if (query.category) products = products.filter((product) => product.category === query.category);
+  if (query.category) {
+    products = products.filter((product) => productDepartmentSlugs(product).includes(query.category!));
+  }
   if (query.subcategory) products = products.filter((product) => product.subcategory === query.subcategory);
+  if (query.collection) products = products.filter((product) => product.tags.includes(query.collection!));
   if (query.search?.trim()) {
     products = products.filter((product) => matchesStoreSearch(product, query.search!));
   }
@@ -355,6 +404,13 @@ export async function fetchProductsByIds(ids: string[]): Promise<Product[]> {
 }
 
 export async function listRelatedProducts(product: Product, limit = 4): Promise<Product[]> {
+  const departments = new Set(productDepartmentSlugs(product));
   const products = await listStorefrontProducts();
-  return products.filter((candidate) => candidate.id !== product.id && candidate.category === product.category).slice(0, limit);
+  return products
+    .filter(
+      (candidate) =>
+        candidate.id !== product.id &&
+        productDepartmentSlugs(candidate).some((department) => departments.has(department)),
+    )
+    .slice(0, limit);
 }
