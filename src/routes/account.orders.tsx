@@ -207,6 +207,20 @@ function OrdersPage() {
   const [submittingProofId, setSubmittingProofId] = useState<string | null>(null);
   const [openingProofId, setOpeningProofId] = useState<string | null>(null);
 
+  const previewDiagnostics = typeof window !== "undefined" && window.location.hostname.endsWith(".vercel.app");
+  const logOrderQueryDiagnostic = (queryName: string, error: any, userId?: string) => {
+    if (!previewDiagnostics) return;
+    console.error("[orders-diagnostic]", {
+      query: queryName,
+      code: error?.code ?? null,
+      message: error?.message ?? null,
+      details: error?.details ?? null,
+      hint: error?.hint ?? null,
+      status: error?.status ?? error?.statusCode ?? null,
+      user: userId ? `${userId.slice(0, 4)}…${userId.slice(-4)}` : null,
+    });
+  };
+
   const orders = useQuery({
     queryKey: ["customer-store-orders", user?.id],
     enabled: Boolean(user?.id),
@@ -233,7 +247,13 @@ function OrdersPage() {
         .eq("customer_user_id", user!.id)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        logOrderQueryDiagnostic("store_orders", error, user!.id);
+        throw error;
+      }
+      if (previewDiagnostics) {
+        console.info("[orders-diagnostic]", { query: "store_orders", succeeded: true, rowCount: data?.length ?? 0 });
+      }
 
       const orderRows = (data ?? []) as Omit<
         CustomerOrder,
@@ -263,6 +283,9 @@ function OrdersPage() {
             .in("order_item_id", itemIds)
         : { data: [], error: null };
 
+      if (itemsResult.error) logOrderQueryDiagnostic("store_order_items", itemsResult.error, user!.id);
+      if (entitlementsResult.error) logOrderQueryDiagnostic("store_digital_entitlements", entitlementsResult.error, user!.id);
+      if (fulfilmentsResult.error) logOrderQueryDiagnostic("store_customer_fulfilments", fulfilmentsResult.error, user!.id);
       const relatedErrors = [itemsResult.error, entitlementsResult.error, fulfilmentsResult.error]
         .filter(Boolean)
         .map((relatedError) => relatedError.message)
