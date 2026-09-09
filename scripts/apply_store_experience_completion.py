@@ -4,9 +4,9 @@ from pathlib import Path
 def replace_once(path: str, old: str, new: str) -> None:
     file = Path(path)
     text = file.read_text(encoding="utf-8")
-    if new in text:
-        return
     if old not in text:
+        if new in text:
+            return
         raise SystemExit(f"Expected text not found in {path}: {old[:100]!r}")
     file.write_text(text.replace(old, new, 1), encoding="utf-8")
 
@@ -25,8 +25,8 @@ replace_once(
 
 replace_once(
     "src/components/layout/SiteHeader.tsx",
-    '<div className="space-y-1">',
-    '<div className="flex flex-wrap gap-2">',
+    '              <div className="space-y-1">\n                {group.slugs.map(',
+    '              <div className="flex flex-wrap gap-2">\n                {group.slugs.map(',
 )
 
 replace_once(
