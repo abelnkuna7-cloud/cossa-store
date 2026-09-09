@@ -370,15 +370,7 @@ async function guardCustomerRequest(request: Request): Promise<Response | null> 
     now >= absoluteExpiresAt;
   const incomingIssuedAt = issued.getTime();
   const existingIssuedAt = activeSession?.issued_at ? Date.parse(activeSession.issued_at) : 0;
-  if (
-    shouldRejectAdminSessionRotation({
-      hasActiveSession: Boolean(activeSession),
-      sameSession: activeSession?.session_id === sessionId,
-      timedOut,
-      incomingIssuedAt,
-      existingIssuedAt,
-    })
-  ) {
+  if (timedOut || (activeSession && activeSession.session_id !== sessionId && incomingIssuedAt <= existingIssuedAt)) {
     return redirectWithClearedSession(redirect);
   }
 
@@ -518,7 +510,15 @@ async function guardAdminRequest(request: Request): Promise<Response | null> {
     now * 1000 >= absoluteExpiresAt;
   const incomingIssuedAt = issued.getTime();
   const existingIssuedAt = activeSession?.issued_at ? Date.parse(activeSession.issued_at) : 0;
-  if (timedOut || (activeSession && activeSession.session_id !== sessionId && incomingIssuedAt <= existingIssuedAt)) {
+  if (
+    shouldRejectAdminSessionRotation({
+      hasActiveSession: Boolean(activeSession),
+      sameSession: activeSession?.session_id === sessionId,
+      timedOut,
+      incomingIssuedAt,
+      existingIssuedAt,
+    })
+  ) {
     return redirectWithClearedSession(redirect);
   }
 
