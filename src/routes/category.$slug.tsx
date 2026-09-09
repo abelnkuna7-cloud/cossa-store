@@ -9,6 +9,7 @@ import {
   LoadingBlock,
 } from "@/components/common/StateBlocks";
 import { ProductGrid } from "@/components/shop/ProductCard";
+import { ServiceCrossSell } from "@/components/support/ServiceCrossSell";
 import { Button } from "@/components/ui/button";
 
 import { getCategory } from "@/data/categories";
@@ -273,6 +274,10 @@ function CategoryPage() {
         {isConstructionCategory ? (
           <ConstructionBadge className="mb-6" />
         ) : null}
+
+        <div className="mb-8">
+          <ServiceCrossSell categorySlug={category.slug} />
+        </div>
 
         {/* SUBCATEGORY NAVIGATION */}
         {category.subcategories.length > 0 ? (
