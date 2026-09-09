@@ -34,6 +34,22 @@ test("live webhook has separate Vault secret and signature gate", () => {
   assert.match(webhook, /Invalid webhook signature/);
   assert.match(webhook, /MAX_WEBHOOK_AGE_MS/);
 });
+test("live webhook registration is admin-only, idempotent and keeps secrets server-side", () => {
+  const registration = checkout.slice(
+    checkout.indexOf('if (action === "yoco_live_register_webhook")'),
+    checkout.indexOf("// The Yoco integration is deliberately"),
+  );
+  assert.match(registration, /requireCossaStoreAdmin/);
+  assert.match(registration, /YOCO_LIVE_SECRET_KEY/);
+  assert.match(registration, /get_yoco_live_webhook_secret/);
+  assert.match(registration, /created:\s*false/);
+  assert.match(registration, /store_yoco_live_webhook_secret/);
+  assert.doesNotMatch(
+    registration,
+    /return json\(request,\s*\{[^}]*\b(?:secret|webhookSecret)\s*:/,
+  );
+  assert.doesNotMatch(registration, /yoco_live_state/);
+});
 test("live webhook rejects non-live payloads", () => {
   assert.match(webhook, /mode !== "live"/);
   assert.match(migration, /environment='live'/);

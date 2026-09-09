@@ -758,6 +758,8 @@ Deno.serve(async (request) => {
                     ? "reject_delivery_quote"
                     : body.action === "yoco_create"
                       ? "yoco_create"
+                      : body.action === "yoco_live_register_webhook"
+                        ? "yoco_live_register_webhook"
                       : body.action === "yoco_live_create"
                         ? "yoco_live_create"
                       : body.action === "yoco_status"
@@ -768,6 +770,65 @@ Deno.serve(async (request) => {
                             ? "create"
                             : null;
     if (!action) throw new Error("Unsupported checkout action.");
+
+    if (action === "yoco_live_register_webhook") {
+      stage = "yoco_live_webhook_registration";
+      await requireCossaStoreAdmin(admin, userData.user.id);
+
+      const liveSecret = Deno.env.get("YOCO_LIVE_SECRET_KEY");
+      if (!liveSecret) throw new Error("Yoco live payments are not configured.");
+
+      const { data: storedWebhookSecret, error: storedWebhookSecretError } = await admin.rpc(
+        "get_yoco_live_webhook_secret",
+      );
+      if (storedWebhookSecretError) {
+        throw new Error("The live webhook configuration could not be checked safely.");
+      }
+      if (storedWebhookSecret) {
+        return json(request, {
+          configured: true,
+          created: false,
+          url: `${supabaseUrl}/functions/v1/yoco-live-webhook`,
+        });
+      }
+
+      const webhookResponse = await fetch("https://payments.yoco.com/api/webhooks", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${liveSecret}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "cossa-store-yoco-live",
+          url: `${supabaseUrl}/functions/v1/yoco-live-webhook`,
+        }),
+      });
+      const webhookBody = (await webhookResponse.json().catch(() => ({}))) as Record<
+        string,
+        unknown
+      >;
+      const webhookSecret = text(webhookBody.secret, 1000);
+      if (!webhookResponse.ok || !webhookSecret.startsWith("whsec_")) {
+        throw new Error("Yoco could not register the live payment webhook.");
+      }
+
+      const { error: saveWebhookSecretError } = await admin.rpc(
+        "store_yoco_live_webhook_secret",
+        { p_secret: webhookSecret },
+      );
+      if (saveWebhookSecretError) {
+        throw new Error(
+          "Yoco registered the live webhook, but its signing secret could not be secured.",
+        );
+      }
+
+      return json(request, {
+        configured: true,
+        created: true,
+        webhookId: text(webhookBody.id, 240) || null,
+        url: `${supabaseUrl}/functions/v1/yoco-live-webhook`,
+      });
+    }
 
     // The Yoco integration is deliberately a merchant-only test path. This
     // prevents public customers from creating test orders on the live store
