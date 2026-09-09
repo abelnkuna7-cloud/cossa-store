@@ -1,13 +1,10 @@
 /**
- * Cossa AI chatbot service boundary.
+ * Cossa AI customer-assistance boundary.
  *
- * THE AI BRAIN IS NOT CONNECTED. `sendMessage` returns a clearly labelled
- * assisted-support reply and never fabricates products, prices, stock or
- * delivery information.
- *
- * Conversations and messages ARE persisted to the Cossa backend so the team
- * can follow up. No API keys are referenced here — model calls will live
- * server-side.
+ * The Store intelligence layer is connected to the customer-safe live catalogue
+ * and deterministic Cossa service/project guidance. It never exposes supplier
+ * cost or private operational data. A future server-side reasoning model can
+ * extend this boundary without changing the customer chat contract.
  */
 import {
   ensureConversation,
@@ -17,8 +14,10 @@ import {
 } from "@/services/chatbot";
 import { submitHumanSupportRequest } from "@/services/support";
 import type { SubmissionResult } from "@/services/service-result";
+import { listProducts } from "@/services/store-products.service";
+import { buildAdvisorPlan, formatAdvisorReply } from "@/lib/store-advisor";
 
-export const COSSA_AI_CONNECTED = false;
+export const COSSA_AI_CONNECTED = true;
 
 export type ChatRole = "assistant" | "user" | "system";
 
@@ -37,10 +36,10 @@ export interface Conversation {
 }
 
 export const ASSISTED_SUPPORT_REPLY =
-  "Cossa AI's full intelligence is being connected. I can currently help you choose a support option or send your request to the Cossa team.";
+  "I can help with products, project quantities and Cossa services. If I cannot verify something from the live Store information, I will direct you to sourcing, a quotation or a Cossa team member instead of guessing.";
 
 export const OPENING_MESSAGE =
-  "Hi, I'm Cossa AI, the shopping and business assistant for Cossa Store. I can help you find products, prepare a sourcing request, request a quotation or connect you with a Cossa service.";
+  "Hi, I'm Cossa AI. Tell me what you want to buy, fix, build, clean or improve. I can search Cossa Store, help estimate project quantities and connect you with Cossa Nexus Construction, Cossa Facility Services or Cossa Tech when you need more than a product.";
 
 function id(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
@@ -50,11 +49,6 @@ export function buildMessage(role: ChatRole, text: string): ChatMessage {
   return { id: id("msg"), role, text, created_at: new Date().toISOString() };
 }
 
-/**
- * Starts (or resumes) the session conversation in the backend. The chat UI
- * stays usable even when the backend is unreachable — `id` is then null and
- * messages are simply not persisted.
- */
 export async function createConversation(): Promise<Conversation> {
   let handle: ConversationHandle | null = null;
   try {
@@ -70,7 +64,6 @@ export async function createConversation(): Promise<Conversation> {
   };
 }
 
-/** Persists a message. Silently ignored when no conversation is available. */
 export async function saveMessage(
   conversationId: string | null,
   message: ChatMessage,
@@ -79,7 +72,6 @@ export async function saveMessage(
   await saveChatMessage(conversationId, message.role, message.text);
 }
 
-/** Records the quick-action a visitor tapped, when one was used. */
 export async function saveIntent(
   conversationId: string | null,
   intent: string,
@@ -95,16 +87,29 @@ export interface AssistantReply {
 
 export async function sendMessage(
   conversationId: string | null,
-  _text: string,
+  text: string,
 ): Promise<AssistantReply> {
-  if (!COSSA_AI_CONNECTED) {
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    const message = buildMessage("assistant", ASSISTED_SUPPORT_REPLY);
-    await saveMessage(conversationId, message);
-    return { message, mode: "assisted_support" };
+  const plan = buildAdvisorPlan(text);
+  let products: Awaited<ReturnType<typeof listProducts>> = [];
+  if (plan.searchTerm) {
+    try {
+      products = await listProducts({ search: plan.searchTerm });
+    } catch {
+      products = [];
+    }
   }
-  // Future: call a server function that proxies Cossa AI.
-  throw new Error("Cossa AI transport not implemented");
+  const replyText = formatAdvisorReply(
+    plan,
+    products.slice(0, 3).map((product) => ({
+      name: product.name,
+      slug: product.slug,
+      selling_price: product.selling_price,
+      estimated_delivery: product.estimated_delivery,
+    })),
+  );
+  const message = buildMessage("assistant", replyText || ASSISTED_SUPPORT_REPLY);
+  await saveMessage(conversationId, message);
+  return { message, mode: "ai" };
 }
 
 export function requestHumanSupport(
@@ -118,12 +123,25 @@ export function requestHumanSupport(
   });
 }
 
-/** Catalogue search hook for the future AI tool-calling layer. */
-export async function productSearch(_term: string): Promise<{ connected: false }> {
-  return { connected: false };
+export async function productSearch(term: string) {
+  const products = await listProducts({ search: term });
+  return products.slice(0, 8).map((product) => ({
+    id: product.id,
+    name: product.name,
+    slug: product.slug,
+    price: product.selling_price,
+    availability: product.availability_status,
+    delivery: product.estimated_delivery,
+  }));
 }
 
-/** Service recommendation hook for the future AI tool-calling layer. */
-export async function serviceRecommendation(_context: string): Promise<{ connected: false }> {
-  return { connected: false };
+export async function serviceRecommendation(context: string) {
+  const plan = buildAdvisorPlan(context);
+  return {
+    service: plan.service,
+    serviceName: plan.serviceName,
+    guidance: plan.guidance,
+    calculation: plan.calculation,
+    safetyNote: plan.safetyNote,
+  };
 }
