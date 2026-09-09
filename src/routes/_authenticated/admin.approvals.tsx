@@ -26,7 +26,6 @@ import {
   type EftReviewPayment,
 } from "@/services/eft-payments";
 import { formatZar } from "@/lib/format";
-import { registerStoreYocoLiveWebhook } from "@/services/yoco-payments";
 
 export const Route = createFileRoute("/_authenticated/admin/approvals")({
   head: () => ({
@@ -66,7 +65,6 @@ function AdminOnly() {
       <PaymentReviewQueue />
       {access.isAdmin ? (
         <>
-          <YocoLiveWebhookRegistration />
           <DeliveryQuoteQueue />
           <section className="rounded-lg border border-border bg-card p-5">
             <h2 className="text-lg font-semibold">Store catalogue</h2>
@@ -80,43 +78,6 @@ function AdminOnly() {
         </>
       ) : null}
     </div>
-  );
-}
-
-function YocoLiveWebhookRegistration() {
-  const registration = useMutation({
-    mutationFn: registerStoreYocoLiveWebhook,
-    onSuccess: (result) =>
-      toast.success("Yoco live webhook registered securely", {
-        description: result.created
-          ? "The signing secret was stored securely. Live payments remain disabled."
-          : "The signing secret was already configured. Live payments remain disabled.",
-      }),
-    onError: (error) =>
-      toast.error("Yoco live webhook registration failed", {
-        description: error instanceof Error ? error.message : undefined,
-      }),
-  });
-
-  return (
-    <section className="rounded-lg border border-border bg-card p-5">
-      <h2 className="text-lg font-semibold">Temporary Yoco commissioning control</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Registers the approved live webhook and stores its signing secret server-side. This does
-        not enable live payments.
-      </p>
-      <Button
-        className="mt-4"
-        disabled={registration.isPending || registration.isSuccess}
-        onClick={() => registration.mutate()}
-      >
-        {registration.isPending
-          ? "Registering securely…"
-          : registration.isSuccess
-            ? "Webhook registered"
-            : "Register Yoco live webhook"}
-      </Button>
-    </section>
   );
 }
 

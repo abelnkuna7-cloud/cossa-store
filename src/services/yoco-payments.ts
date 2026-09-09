@@ -68,12 +68,3 @@ export function recordStoreYocoTestReturn(
     returnState,
   });
 }
-
-export function registerStoreYocoLiveWebhook() {
-  return invoke<{
-    configured: boolean;
-    created: boolean;
-    webhookId: string | null;
-    url: string;
-  }>({ action: "yoco_live_register_webhook" });
-}
