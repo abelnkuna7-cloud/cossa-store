@@ -32,13 +32,15 @@ import {
   type StoreDeliveryQuoteRequest,
 } from "@/services/eft-payments";
 import {
+  getStoreYocoLiveOptions,
   getStoreYocoTestAttempt,
   recordStoreYocoTestReturn,
+  startStoreYocoLiveCheckout,
   startStoreYocoTestCheckout,
 } from "@/services/yoco-payments";
 
 const TITLE = "Checkout | Cossa Store";
-const DESCRIPTION = "Create a secure Cossa Store EFT payment request or Yoco test card checkout.";
+const DESCRIPTION = "Pay securely online with Yoco or choose EFT bank transfer.";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
@@ -62,6 +64,15 @@ function CheckoutPage() {
   const { session, loading: authLoading } = useSession();
   const roles = useRoles(session?.user.id);
   const canTestYoco = (roles.data ?? []).includes("admin");
+  const yocoLiveOptions = useQuery({
+    queryKey: ["checkout", "yoco-live-options", session?.user.id],
+    queryFn: getStoreYocoLiveOptions,
+    enabled: Boolean(session?.user),
+    staleTime: 30_000,
+  });
+  const yocoLiveState = yocoLiveOptions.data?.yocoLiveState ?? "disabled";
+  const canUseLiveYoco =
+    yocoLiveState === "active" || (yocoLiveState === "commissioning" && canTestYoco);
   const { selectedCartLines, hydrated, removePaidCartLines } = useCommerce();
   const [acceptedPolicies, setAcceptedPolicies] = useState(false);
   const [customerName, setCustomerName] = useState("");
@@ -79,7 +90,7 @@ function CheckoutPage() {
   const [quotedFor, setQuotedFor] = useState<string | null>(null);
   const [quoteProblem, setQuoteProblem] = useState<string | null>(null);
   const [payment, setPayment] = useState<EftPaymentDetail | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"eft" | "yoco">("eft");
+  const [paymentMethod, setPaymentMethod] = useState<"eft" | "yoco" | "yoco_live">("eft");
   const [yocoReturnMessage, setYocoReturnMessage] = useState<string | null>(null);
   const [proof, setProof] = useState<File | null>(null);
   const [payerNote, setPayerNote] = useState("");
@@ -107,10 +118,33 @@ function CheckoutPage() {
   }, [canTestYoco, paymentMethod]);
 
   useEffect(() => {
+    if (canUseLiveYoco) setPaymentMethod("yoco_live");
+  }, [canUseLiveYoco]);
+
+  useEffect(() => {
+    if (!canUseLiveYoco && paymentMethod === "yoco_live") setPaymentMethod("eft");
+  }, [canUseLiveYoco, paymentMethod]);
+
+  useEffect(() => {
     if (!session?.user || typeof window === "undefined") return;
     const search = new URLSearchParams(window.location.search);
     const attemptId = search.get("yocoAttemptId");
+    const liveAttemptId = search.get("yocoLiveAttemptId");
     const returnState = search.get("yoco");
+    if (
+      liveAttemptId &&
+      (returnState === "success" || returnState === "cancelled" || returnState === "failed")
+    ) {
+      setYocoReturnMessage(
+        returnState === "success"
+          ? "Your payment response was received. We are securely verifying it with Yoco. Check My orders for the authoritative payment status."
+          : returnState === "cancelled"
+            ? "The Yoco checkout was cancelled. You can safely retry or choose EFT."
+            : "The Yoco payment was not completed. You can safely retry or choose EFT.",
+      );
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
     if (
       !attemptId ||
       (returnState !== "success" && returnState !== "cancelled" && returnState !== "failed")
@@ -394,6 +428,11 @@ function CheckoutPage() {
         window.location.assign(result.redirectUrl);
         return;
       }
+      if (paymentMethod === "yoco_live") {
+        const result = await startStoreYocoLiveCheckout(checkoutInput);
+        window.location.assign(result.redirectUrl);
+        return;
+      }
       const result = await startStoreEftPayment({
         ...checkoutInput,
       });
@@ -405,7 +444,7 @@ function CheckoutPage() {
       });
     } catch (error) {
       toast.error(
-        paymentMethod === "yoco"
+        paymentMethod === "yoco" || paymentMethod === "yoco_live"
           ? "Yoco checkout could not be created"
           : "Your EFT order could not be created",
         {
@@ -445,10 +484,9 @@ function CheckoutPage() {
       <PageHeader eyebrow="Checkout" title="Secure checkout" description={DESCRIPTION} />
 
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-10 sm:px-6 lg:px-8">
-        <NoticeBlock tone="pending" title="EFT and Yoco test checkout">
-          EFT remains available. Yoco card checkout is in test mode: a signed Yoco webhook, never a
-          browser redirect, is required before a test payment is considered verified. Test payments
-          cannot release fulfilment, digital goods or stock.
+        <NoticeBlock tone="pending" title="Secure checkout">
+          Choose from the payment options currently available for your order. Your order is only
+          confirmed as paid after the payment has been securely verified.
         </NoticeBlock>
 
         {yocoReturnMessage ? (
@@ -1063,6 +1101,23 @@ function CheckoutPage() {
 
               <fieldset className="mt-5 space-y-3 rounded-md border border-border bg-background/40 p-4">
                 <legend className="px-1 text-sm font-semibold">Payment method</legend>
+                {canUseLiveYoco ? (
+                  <label className="flex cursor-pointer items-start gap-3 text-sm">
+                    <input
+                      type="radio"
+                      name="payment-method"
+                      checked={paymentMethod === "yoco_live"}
+                      onChange={() => setPaymentMethod("yoco_live")}
+                      className="mt-1 accent-current"
+                    />
+                    <span>
+                      <span className="font-medium">Yoco — Pay online</span>
+                      <span className="mt-1 block text-muted-foreground">
+                        Pay securely by card on Yoco. Cossa Store never receives your card details.
+                      </span>
+                    </span>
+                  </label>
+                ) : null}
                 <label className="flex cursor-pointer items-start gap-3 text-sm">
                   <input
                     type="radio"
@@ -1117,12 +1172,14 @@ function CheckoutPage() {
                 >
                   {starting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
                   {starting
-                    ? paymentMethod === "yoco"
-                      ? "Opening Yoco test checkout…"
+                    ? paymentMethod === "yoco" || paymentMethod === "yoco_live"
+                      ? "Opening secure Yoco checkout…"
                       : "Creating EFT request…"
-                    : paymentMethod === "yoco"
-                      ? "Continue to Yoco test checkout"
-                      : "Create EFT payment request"}
+                    : paymentMethod === "yoco_live"
+                      ? "Pay securely with Yoco"
+                      : paymentMethod === "yoco"
+                        ? "Continue to Yoco test checkout"
+                        : "Create EFT payment request"}
                 </Button>
                 <Button asChild variant="outline" size="lg">
                   <Link to="/cart">Back to cart</Link>

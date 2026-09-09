@@ -760,14 +760,30 @@ Deno.serve(async (request) => {
                       ? "yoco_create"
                       : body.action === "yoco_live_create"
                         ? "yoco_live_create"
-                      : body.action === "yoco_status"
-                        ? "yoco_status"
-                        : body.action === "yoco_return"
-                          ? "yoco_return"
-                          : body.action === "create" || !body.action
-                            ? "create"
-                            : null;
+                        : body.action === "yoco_live_options"
+                          ? "yoco_live_options"
+                          : body.action === "yoco_status"
+                            ? "yoco_status"
+                            : body.action === "yoco_return"
+                              ? "yoco_return"
+                              : body.action === "create" || !body.action
+                                ? "create"
+                                : null;
     if (!action) throw new Error("Unsupported checkout action.");
+
+    if (action === "yoco_live_options") {
+      stage = "yoco_live_options";
+      const { data: control, error: controlError } = await admin
+        .from("store_payment_provider_controls")
+        .select("yoco_live_state")
+        .eq("id", true)
+        .maybeSingle();
+      if (controlError) throw new Error("Payment options could not be checked safely.");
+      const state = String(control?.yoco_live_state ?? "disabled");
+      return json(request, {
+        yocoLiveState: state === "active" || state === "commissioning" ? state : "disabled",
+      });
+    }
 
     // The Yoco integration is deliberately a merchant-only test path. This
     // prevents public customers from creating test orders on the live store
@@ -788,6 +804,9 @@ Deno.serve(async (request) => {
         .maybeSingle();
       if (controlError || control?.yoco_live_state === "disabled" || !liveSecret) {
         throw new Error("Yoco live payments are not currently available.");
+      }
+      if (control.yoco_live_state === "commissioning") {
+        await requireCossaStoreAdmin(admin, userData.user.id);
       }
     }
 
@@ -1368,30 +1387,66 @@ Deno.serve(async (request) => {
           p_delivery_fingerprint: JSON.stringify(shippingQuoteMetadata),
         },
       );
-      if (attemptError || !attemptData) throw new Error(attemptError?.message || "Live payment attempt could not be created.");
-      const attempt = (Array.isArray(attemptData) ? attemptData[0] : attemptData) as Record<string, unknown>;
-      const prior = attempt.metadata && typeof attempt.metadata === "object" ? attempt.metadata as Record<string, unknown> : {};
+      if (attemptError || !attemptData)
+        throw new Error(attemptError?.message || "Live payment attempt could not be created.");
+      const attempt = (Array.isArray(attemptData) ? attemptData[0] : attemptData) as Record<
+        string,
+        unknown
+      >;
+      const prior =
+        attempt.metadata && typeof attempt.metadata === "object"
+          ? (attempt.metadata as Record<string, unknown>)
+          : {};
       const priorRedirect = text(prior.redirectUrl, 2000);
-      if (attempt.provider_checkout_id && priorRedirect) return json(request, { attempt: yocoLiveAttemptPublic(attempt), redirectUrl: priorRedirect });
+      if (attempt.provider_checkout_id && priorRedirect)
+        return json(request, {
+          attempt: yocoLiveAttemptPublic(attempt),
+          redirectUrl: priorRedirect,
+        });
       const returnOrigin = request.headers.get("origin");
-      if (!returnOrigin || !isAllowedOrigin(returnOrigin)) throw new Error("The Yoco return origin is not allowed.");
+      if (!returnOrigin || !isAllowedOrigin(returnOrigin))
+        throw new Error("The Yoco return origin is not allowed.");
       const returnBase = `${returnOrigin}/checkout?yocoLiveAttemptId=${encodeURIComponent(String(attempt.id))}`;
       const yocoResponse = await fetch("https://payments.yoco.com/api/checkouts", {
         method: "POST",
-        headers: { Authorization: `Bearer ${liveSecret}`, "Content-Type": "application/json", "Idempotency-Key": String(attempt.id) },
+        headers: {
+          Authorization: `Bearer ${liveSecret}`,
+          "Content-Type": "application/json",
+          "Idempotency-Key": String(attempt.id),
+        },
         body: JSON.stringify({
-          amount: Number(attempt.amount_cents), currency: "ZAR", clientReferenceId: String(attempt.store_order_id), externalId: String(attempt.id),
+          amount: Number(attempt.amount_cents),
+          currency: "ZAR",
+          clientReferenceId: String(attempt.store_order_id),
+          externalId: String(attempt.id),
           metadata: { cossaPaymentAttemptId: attempt.id, mode: "live" },
-          successUrl: `${returnBase}&yoco=success`, cancelUrl: `${returnBase}&yoco=cancelled`, failureUrl: `${returnBase}&yoco=failed`,
+          successUrl: `${returnBase}&yoco=success`,
+          cancelUrl: `${returnBase}&yoco=cancelled`,
+          failureUrl: `${returnBase}&yoco=failed`,
         }),
       });
       const yocoBody = (await yocoResponse.json().catch(() => ({}))) as Record<string, unknown>;
       const redirectUrl = text(yocoBody.redirectUrl, 2000);
       const checkoutId = text(yocoBody.id, 240);
-      if (!yocoResponse.ok || !redirectUrl || !checkoutId) throw new Error("Yoco could not create the live checkout.");
-      const { data: updated, error: updateError } = await admin.from("store_payment_attempts").update({ provider_checkout_id: checkoutId, status: "created", metadata: { ...prior, redirectUrl }, updated_at: new Date().toISOString() }).eq("id", attempt.id).select("*").single();
-      if (updateError || !updated) throw new Error("Live checkout was created but could not be recorded safely.");
-      return json(request, { attempt: yocoLiveAttemptPublic(updated as Record<string, unknown>), redirectUrl });
+      if (!yocoResponse.ok || !redirectUrl || !checkoutId)
+        throw new Error("Yoco could not create the live checkout.");
+      const { data: updated, error: updateError } = await admin
+        .from("store_payment_attempts")
+        .update({
+          provider_checkout_id: checkoutId,
+          status: "created",
+          metadata: { ...prior, redirectUrl },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", attempt.id)
+        .select("*")
+        .single();
+      if (updateError || !updated)
+        throw new Error("Live checkout was created but could not be recorded safely.");
+      return json(request, {
+        attempt: yocoLiveAttemptPublic(updated as Record<string, unknown>),
+        redirectUrl,
+      });
     }
 
     if (action === "yoco_create") {
