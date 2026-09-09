@@ -11,6 +11,7 @@ import { projectQuery } from "@/lib/queries";
 import { ServiceCrossSell } from "@/components/support/ServiceCrossSell";
 import { SITE_URL } from "@/config/seo";
 import { ProjectPlanner } from "@/components/project/ProjectPlanner";
+import { SmartProjectEstimator } from "@/components/project/SmartProjectEstimator";
 import { savedProjects, useMarkRecentlyViewed } from "@/lib/saved-projects";
 import type { SavedProject } from "@/types/catalog";
 
@@ -109,6 +110,9 @@ function ProjectPage() {
         }
       />
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mb-10">
+          <SmartProjectEstimator projectName={project.name} />
+        </div>
         {project.calculator ? (
           <div className="mb-10">
             <ProjectPlanner
@@ -123,7 +127,7 @@ function ProjectPage() {
         {products.length === 0 ? (
           <EmptyBlock
             title="No products listed for this project yet"
-            description="The kit structure above is ready. Request a quote and our team will price every item for you."
+            description="The project planning tools above are ready. Request a quote and our team will price the products or service requirement for you."
             action={
               <Button asChild>
                 <Link to="/request-a-quote">Request a project quote</Link>
