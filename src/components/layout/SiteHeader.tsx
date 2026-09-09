@@ -1018,7 +1018,7 @@ function DepartmentMegaMenu({
 
       {/* GROUPED DEPARTMENTS */}
 
-      <div className="grid grid-cols-4 gap-0 divide-x divide-border">
+      <div className="divide-y divide-border">
         {CATEGORY_MENU_GROUPS.map(
           (group) => (
             <div
@@ -1033,7 +1033,7 @@ function DepartmentMegaMenu({
                 }
               </p>
 
-              <div className="space-y-1">
+              <div className="flex flex-wrap gap-2">
                 {group.slugs.map(
                   (slug) => {
                     const category =
@@ -1064,7 +1064,7 @@ function DepartmentMegaMenu({
                         onClick={
                           onClose
                         }
-                        className="group flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm text-foreground/80 transition-colors hover:bg-secondary hover:text-foreground"
+                        className="group inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-foreground/80 transition-colors hover:border-primary hover:bg-secondary hover:text-foreground"
                       >
                         <span>
                           {
