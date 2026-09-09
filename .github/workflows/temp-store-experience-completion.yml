@@ -1,0 +1,41 @@
+name: Temporary Store Experience Completion
+
+on:
+  push:
+    branches:
+      - upgrade/store-experience-completion
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply guarded Store UX patch
+        run: python3 scripts/apply_store_experience_completion.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test -- --run
+      - name: Build production bundle
+        run: npm run build
+      - name: Commit generated patch when needed
+        run: |
+          if git diff --quiet; then
+            echo "No generated changes to commit."
+            exit 0
+          fi
+          git config user.name "cossa-store-upgrade-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/routes/index.tsx src/components/layout/SiteHeader.tsx
+          git commit -m "feat(store): complete customer experience upgrade"
+          git push
