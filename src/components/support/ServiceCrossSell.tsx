@@ -12,21 +12,51 @@ const SERVICE_BY_CATEGORY: Record<
 > = {
   "construction-diy": {
     heading: "Need installation, renovation or construction support?",
-    body: "Cossa Construction & DIY can carry out the work for the products you buy.",
+    body: "Cossa Nexus Construction can help with renovations, repairs, maintenance, painting, tiling and related project work.",
     message:
-      "Hello Cossa Store, I need products together with a Cossa service (construction or installation).",
+      "Hello Cossa Store, I need products together with Cossa Nexus Construction support.",
+  },
+  "tools-industrial": {
+    heading: "Need help with the project, not only the tools?",
+    body: "Cossa Nexus Construction can support suitable installation, repair, maintenance and renovation work.",
+    message:
+      "Hello Cossa Store, I need products together with Cossa Nexus Construction support.",
+  },
+  "cleaning-household": {
+    heading: "Need professional cleaning or facility support?",
+    body: "Cossa Facility Services can provide residential, commercial and recurring cleaning, hygiene and facility-support services.",
+    message:
+      "Hello Cossa Store, I need products together with Cossa Facility Services cleaning or facility support.",
   },
   "cleaning-facility-supplies": {
     heading: "Need professional cleaning or facility support?",
-    body: "Cossa Facility Services handles contract cleaning, hygiene and facility maintenance.",
+    body: "Cossa Facility Services can provide residential, commercial and recurring cleaning, hygiene and facility-support services.",
     message:
-      "Hello Cossa Store, I need products together with a Cossa service (cleaning or facility support).",
+      "Hello Cossa Store, I need products together with Cossa Facility Services cleaning or facility support.",
+  },
+  "technology-electronics": {
+    heading: "Need setup, installation or technical support?",
+    body: "Cossa Tech can support suitable connected technology, smart-home, security and workplace technology requirements.",
+    message:
+      "Hello Cossa Store, I need products together with Cossa Tech setup or technical support.",
+  },
+  "security-smart-home": {
+    heading: "Need smart-home or security setup support?",
+    body: "Cossa Tech can help with suitable smart-home, connected-device and security technology setup requirements.",
+    message:
+      "Hello Cossa Store, I need products together with Cossa Tech smart-home or security support.",
+  },
+  "office-business": {
+    heading: "Need workplace technology or business setup support?",
+    body: "Cossa Tech can support suitable workplace technology, digital setup and business technology requirements.",
+    message:
+      "Hello Cossa Store, I need products together with Cossa Tech workplace technology support.",
   },
   "technology-smart-solutions": {
     heading: "Need installation, setup or technical support?",
-    body: "Cossa Tech installs and configures smart-home, security and workplace technology.",
+    body: "Cossa Tech can support suitable smart-home, security and workplace technology requirements.",
     message:
-      "Hello Cossa Store, I need products together with a Cossa service (technology installation or support).",
+      "Hello Cossa Store, I need products together with Cossa Tech setup or technical support.",
   },
 };
 
