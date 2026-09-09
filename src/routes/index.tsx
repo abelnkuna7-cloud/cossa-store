@@ -178,7 +178,7 @@ function Home() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
             [Landmark, "South African business", `Cossa Store is operated by ${SITE.parent}, a registered South African company.`],
-            [ShieldCheck, "Payment truth", "Payment methods are presented as available only when the relevant merchant verification and production integration are complete."],
+            [ShieldCheck, "Secure payments", "Pay securely at checkout using the payment options currently available for your order. Available methods may vary as we continue expanding our payment options."],
             [Truck, "Delivery information", "Delivery expectations are communicated according to product type, destination and fulfilment route."],
             [Undo2, "Type-specific returns", "Returns and refunds are handled according to product type, the published policy and applicable South African consumer law."],
           ].map(([Icon, title, body]) => {
