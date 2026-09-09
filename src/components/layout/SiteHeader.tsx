@@ -1033,7 +1033,7 @@ function DepartmentMegaMenu({
                 }
               </p>
 
-              <div className="space-y-1">
+              <div className="flex flex-wrap gap-2">
                 {group.slugs.map(
                   (slug) => {
                     const category =
