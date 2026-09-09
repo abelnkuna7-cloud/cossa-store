@@ -28,12 +28,12 @@ import { CallButton, WhatsAppButton } from "@/components/support/ContactActions"
 
 const QUICK_ACTIONS = [
   "Find a product",
-  "Source a product",
-  "Request a quote",
-  "Business buying",
-  "Construction help",
+  "My paint is peeling",
+  "My tiles are coming loose",
+  "Calculate tiles for my area",
   "Cleaning service",
   "Technology support",
+  "Business buying",
   "Speak to a person",
 ];
 
@@ -106,12 +106,12 @@ export function CossaAiChat() {
             </span>
             Cossa AI
           </DialogTitle>
-          <DialogDescription>Shopping and business assistant</DialogDescription>
+          <DialogDescription>Products · projects · quantities · Cossa services</DialogDescription>
           {!COSSA_AI_CONNECTED ? (
             <p className="mt-2 inline-flex items-start gap-2 rounded-md border border-border bg-secondary px-3 py-2 text-xs text-muted-foreground">
               <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
-              Assisted-support mode. The Cossa AI brain is not connected yet, so no product,
-              pricing, stock or delivery answers are generated.
+              Assisted-support mode. Live Store intelligence is temporarily unavailable, so product,
+              pricing, stock or delivery answers will not be guessed.
             </p>
           ) : null}
         </DialogHeader>
@@ -129,7 +129,7 @@ export function CossaAiChat() {
                 className={
                   message.role === "user"
                     ? "ml-auto max-w-[85%] rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"
-                    : "max-w-[90%] text-sm text-foreground"
+                    : "max-w-[90%] whitespace-pre-line text-sm text-foreground"
                 }
               >
                 {message.text}
@@ -137,7 +137,7 @@ export function CossaAiChat() {
             ))}
             {status === "typing" ? (
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> Cossa AI is typing…
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> Cossa AI is checking…
               </p>
             ) : null}
             {status === "error" ? (
@@ -178,7 +178,7 @@ export function CossaAiChat() {
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your question…"
+              placeholder="Tell me what you want to fix, buy, build or clean…"
               aria-label="Message Cossa AI"
             />
             <Button
