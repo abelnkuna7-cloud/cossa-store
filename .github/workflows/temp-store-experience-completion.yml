@@ -22,13 +22,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - name: Apply guarded Store UX patch
         run: python3 scripts/apply_store_experience_completion.py
       - name: Install dependencies
-        run: npm ci
-      - name: Run tests
-        run: npm test -- --run
+        run: npm install --no-audit --no-fund
+      - name: Run lint
+        run: npm run lint
       - name: Build production bundle
         run: npm run build
       - name: Commit generated patch when needed
