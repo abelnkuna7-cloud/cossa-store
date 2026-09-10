@@ -8,12 +8,15 @@ import {
 import {
   fetchProductBySlug,
   fetchProductsByIds,
-  listFeaturedProducts,
   listProducts,
-  listRelatedProducts,
   listStorefrontProducts,
   type ProductQuery,
 } from "@/services/store-products.service";
+import {
+  listFeaturedProductsEgressSafe,
+  listProductsEgressSafe,
+  listRelatedProductsEgressSafe,
+} from "@/services/store-products-egress.service";
 
 import type { Product } from "@/types/catalog";
 
@@ -46,7 +49,7 @@ export const featuredProductsQuery = (
     ],
 
     queryFn: () =>
-      listFeaturedProducts(
+      listFeaturedProductsEgressSafe(
         limit,
       ),
     ...storefrontCachePolicy,
@@ -75,7 +78,7 @@ export const productsQuery = (
     ],
 
     queryFn: () =>
-      listProducts(
+      listProductsEgressSafe(
         query,
       ),
     ...storefrontCachePolicy,
@@ -109,7 +112,7 @@ export const relatedProductsQuery = (
     ],
 
     queryFn: () =>
-      listRelatedProducts(
+      listRelatedProductsEgressSafe(
         product,
       ),
     ...storefrontCachePolicy,
