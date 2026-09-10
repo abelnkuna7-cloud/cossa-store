@@ -1,18 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { CatalogueShell, useCatalogueAccess } from "@/components/admin/CatalogueShell";
-import { EmptyBlock } from "@/components/common/StateBlocks";
+import { EmptyBlock, LoadingBlock } from "@/components/common/StateBlocks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/admin/delivery-certification")({
   component: DeliveryCertificationPage,
 });
+
+const ASTRUM_SUPPLIER_ID = "3b625ee7-25d4-4604-afd5-2a0909ac04b6";
 
 type Address = {
   address1: string;
@@ -22,6 +23,16 @@ type Address = {
   region: string;
   zip: string;
   country: "ZA";
+};
+
+type AstrumIntake = {
+  id: string;
+  name: string;
+  supplier_product_ref: string;
+  supplier_available_stock: number | string | null;
+  selling_price_override: number | string | null;
+  approval_status: string;
+  publication_store_product_id: string | null;
 };
 
 type Result = {
@@ -84,6 +95,24 @@ function DeliveryCertificationPage() {
   const [running, setRunning] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, Result>>({});
 
+  const stockQuery = useQuery({
+    queryKey: ["astrum-delivery-certification-stock"],
+    enabled: access.isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("store_inventory_intakes")
+        .select("id,name,supplier_product_ref,supplier_available_stock,selling_price_override,approval_status,publication_store_product_id")
+        .eq("supplier_id", ASTRUM_SUPPLIER_ID)
+        .eq("approval_status", "approved")
+        .is("publication_store_product_id", null)
+        .gt("supplier_available_stock", 0)
+        .order("name", { ascending: true })
+        .limit(100);
+      if (error) throw error;
+      return (data ?? []) as AstrumIntake[];
+    },
+  });
+
   const runCase = async (testCase: (typeof CASES)[number]) => {
     setRunning(testCase.label);
     setResults((current) => ({ ...current, [testCase.label]: {} }));
@@ -115,14 +144,51 @@ function DeliveryCertificationPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
+              <CardTitle>Approved Astrum stock</CardTitle>
+              <CardDescription>Select one of the approved, unpublished Astrum products with live supplier stock. Nothing on this page publishes a product.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {stockQuery.isPending ? (
+                <LoadingBlock label="Loading approved Astrum stock…" />
+              ) : stockQuery.error ? (
+                <p className="text-sm text-destructive">Could not load Astrum stock: {stockQuery.error instanceof Error ? stockQuery.error.message : "Unknown error"}</p>
+              ) : (stockQuery.data ?? []).length === 0 ? (
+                <EmptyBlock title="No approved unpublished Astrum stock visible" description="The admin session may not have read access to the intake records, or no matching stock currently passes the filter." />
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {(stockQuery.data ?? []).map((item) => {
+                    const selected = supplierProductRef === item.supplier_product_ref;
+                    return (
+                      <button
+                        type="button"
+                        key={item.id}
+                        onClick={() => {
+                          setSupplierProductRef(item.supplier_product_ref);
+                          setResults({});
+                        }}
+                        className={`rounded-lg border p-4 text-left transition ${selected ? "border-primary ring-1 ring-primary" : "hover:border-foreground/30"}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <strong className="text-sm leading-5">{item.name}</strong>
+                          {selected ? <Badge>Selected</Badge> : null}
+                        </div>
+                        <p className="mt-2 text-xs text-muted-foreground">Ref: {item.supplier_product_ref}</p>
+                        <p className="mt-1 text-xs">Supplier stock: <strong>{Number(item.supplier_available_stock ?? 0)}</strong></p>
+                        {item.selling_price_override != null ? <p className="mt-1 text-xs">Cossa price: <strong>R{Number(item.selling_price_override).toFixed(2)}</strong></p> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Astrum routing test</CardTitle>
-              <CardDescription>Use a small approved unpublished Astrum SKU for route/rate certification.</CardDescription>
+              <CardDescription>Selected supplier product reference: <strong>{supplierProductRef}</strong></CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="max-w-md space-y-2">
-                <Label htmlFor="supplier-ref">Astrum supplier product reference</Label>
-                <Input id="supplier-ref" value={supplierProductRef} onChange={(event) => setSupplierProductRef(event.target.value)} />
-              </div>
               <Button onClick={runAll} disabled={Boolean(running) || supplierProductRef.trim().length < 2}>
                 {running ? `Testing ${running}…` : "Run all three routing tests"}
               </Button>
