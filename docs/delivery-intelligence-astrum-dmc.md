@@ -9,9 +9,10 @@ Production goal: every physical order must resolve supplier identity, stock, del
 - Local: <= 30 km from Midrand, Durban or Cape Town branch.
 - Main-centre and Rest-of-SA bands use the verified Astrum delivery-rate configuration already stored in production.
 - Astrum delivery rates remain server-owned. The browser never supplies a trusted delivery price, supplier ID, profile ID or rate ID.
-- >15 kg / volumetric exception remains a manual-quote path until a verified supplier rule can calculate it safely.
+- >15 kg / volumetric exception remains a manual-quote path when verified order weight is above the supplier threshold.
 - `OPENROUTESERVICE_API_KEY` is stored as a Supabase Edge Function secret and is read only through `Deno.env`; it must never be returned to the browser, committed to GitHub or written to order metadata.
 - Routing/geocoding uses the current HeiGIT endpoints under `api.heigit.org`.
+- `store-eft-checkout` is now integrated with the Astrum resolver and production Edge Function version 23 has been deployed for checkout certification.
 
 ## DMC
 
@@ -35,4 +36,4 @@ No new physical SKU is sale-ready until all of these pass:
 9. final Store order total including delivery;
 10. EFT payment request equals that exact final order total.
 
-Astrum Batch 1 stays unpublished until the existing `store-eft-checkout` function is integrated with the delivery-intelligence resolver and the certification cases pass.
+Astrum Batch 1 remains unpublished until live checkout certification passes for Local, Main Centre, Rest-of-SA and heavy/exception scenarios. DMC remediation remains a separate controlled follow-up so the existing published DMC catalogue is not disrupted blindly.
