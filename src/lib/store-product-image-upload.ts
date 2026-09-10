@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
+const ORGANISATION_ID = "00000000-0000-4000-8000-000000000001";
 const IMAGE_BUCKET = "store-product-images";
 const MAX_SOURCE_BYTES = 12 * 1024 * 1024;
 const TARGET_BYTES = 500 * 1024;
@@ -93,7 +94,7 @@ export async function uploadStoreProductImage(file: File, productFolder: string)
   const optimised = await optimiseImage(file);
   const folder = safeSegment(productFolder);
   const objectName = `${sourceHash}.${optimised.extension}`;
-  const objectFolder = `${folder}`;
+  const objectFolder = `${ORGANISATION_ID}/${folder}`;
   const path = `${objectFolder}/${objectName}`;
 
   const { data: existing, error: listError } = await supabase.storage
