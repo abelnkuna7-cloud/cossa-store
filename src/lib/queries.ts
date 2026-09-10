@@ -9,7 +9,6 @@ import {
   fetchProductBySlug,
   fetchProductsByIds,
   listProducts,
-  listStorefrontProducts,
   type ProductQuery,
 } from "@/services/store-products.service";
 import {
@@ -17,6 +16,7 @@ import {
   listProductsEgressSafe,
   listRelatedProductsEgressSafe,
 } from "@/services/store-products-egress.service";
+import { listHomepageProductsEgressSafe } from "@/services/homepage-products-egress.service";
 
 import type { Product } from "@/types/catalog";
 
@@ -63,7 +63,7 @@ export const storefrontProductsQuery = () =>
     ],
 
     queryFn: () =>
-      listStorefrontProducts(),
+      listHomepageProductsEgressSafe(),
     ...storefrontCachePolicy,
   });
 
