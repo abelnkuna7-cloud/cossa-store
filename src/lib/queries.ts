@@ -8,14 +8,31 @@ import {
 import {
   fetchProductBySlug,
   fetchProductsByIds,
-  listFeaturedProducts,
   listProducts,
-  listRelatedProducts,
   listStorefrontProducts,
   type ProductQuery,
 } from "@/services/store-products.service";
+import {
+  listFeaturedProductsEgressSafe,
+  listProductsEgressSafe,
+  listRelatedProductsEgressSafe,
+} from "@/services/store-products-egress.service";
 
 import type { Product } from "@/types/catalog";
+
+/* -------------------------------------------------------------------------- */
+/* SUPABASE EGRESS GUARDRAILS                                                 */
+/* -------------------------------------------------------------------------- */
+
+const STOREFRONT_STALE_TIME = 5 * 60 * 1000;
+const STOREFRONT_GC_TIME = 30 * 60 * 1000;
+
+const storefrontCachePolicy = {
+  staleTime: STOREFRONT_STALE_TIME,
+  gcTime: STOREFRONT_GC_TIME,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+} as const;
 
 /* -------------------------------------------------------------------------- */
 /* PRODUCTS                                                                   */
@@ -32,9 +49,10 @@ export const featuredProductsQuery = (
     ],
 
     queryFn: () =>
-      listFeaturedProducts(
+      listFeaturedProductsEgressSafe(
         limit,
       ),
+    ...storefrontCachePolicy,
   });
 
 export const storefrontProductsQuery = () =>
@@ -46,6 +64,7 @@ export const storefrontProductsQuery = () =>
 
     queryFn: () =>
       listStorefrontProducts(),
+    ...storefrontCachePolicy,
   });
 
 export const productsQuery = (
@@ -59,9 +78,10 @@ export const productsQuery = (
     ],
 
     queryFn: () =>
-      listProducts(
+      listProductsEgressSafe(
         query,
       ),
+    ...storefrontCachePolicy,
   });
 
 export const productQuery = (
@@ -78,6 +98,7 @@ export const productQuery = (
       fetchProductBySlug(
         slug,
       ),
+    ...storefrontCachePolicy,
   });
 
 export const relatedProductsQuery = (
@@ -91,9 +112,10 @@ export const relatedProductsQuery = (
     ],
 
     queryFn: () =>
-      listRelatedProducts(
+      listRelatedProductsEgressSafe(
         product,
       ),
+    ...storefrontCachePolicy,
   });
 
 /**
@@ -128,6 +150,7 @@ export const productsByIdsQuery = (
       fetchProductsByIds(
         stableIds,
       ),
+    ...storefrontCachePolicy,
   });
 };
 
@@ -152,6 +175,7 @@ export const publicCollectionsQuery = () =>
     ],
 
     queryFn: async () => [],
+    ...storefrontCachePolicy,
   });
 
 /* -------------------------------------------------------------------------- */
@@ -171,6 +195,7 @@ export const categoryQuery = (
       fetchCategory(
         slug,
       ),
+    ...storefrontCachePolicy,
   });
 
 /* -------------------------------------------------------------------------- */
@@ -209,4 +234,5 @@ export const projectQuery = (
         products,
       };
     },
+    ...storefrontCachePolicy,
   });
