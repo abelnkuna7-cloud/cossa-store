@@ -22,9 +22,9 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { CATEGORIES } from "@/data/categories";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadStoreProductImage } from "@/lib/store-product-image-upload";
 
 const ORGANISATION_ID = "00000000-0000-4000-8000-000000000001";
-const IMAGE_BUCKET = "store-product-images";
 const DIGITAL_BUCKET = "store-digital-products";
 const db = supabase as any;
 
@@ -331,26 +331,37 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
       if (!authData.user) throw new Error("Please sign in again before uploading images.");
 
       const uploaded: string[] = [];
+      let reusedCount = 0;
+      let originalBytes = 0;
+      let storedBytes = 0;
+      const folder = form.slug || slugify(form.name) || "new-product";
+
       for (const file of Array.from(files)) {
-        if (!file.type.startsWith("image/")) throw new Error(`${file.name} is not an image.`);
-        if (file.size > 8 * 1024 * 1024) throw new Error(`${file.name} is larger than 8 MB.`);
-        const folder = form.slug || slugify(form.name) || "new-product";
-        const path = `${ORGANISATION_ID}/${folder}/${Date.now()}-${safeFileName(file.name)}`;
-        const { error } = await supabase.storage.from(IMAGE_BUCKET).upload(path, file, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: file.type,
-        });
-        if (error) throw error;
-        const { data } = supabase.storage.from(IMAGE_BUCKET).getPublicUrl(path);
-        uploaded.push(data.publicUrl);
+        const result = await uploadStoreProductImage(file, folder);
+        uploaded.push(result.publicUrl);
+        if (result.reused) reusedCount += 1;
+        originalBytes += result.originalBytes;
+        storedBytes += result.storedBytes;
       }
 
-      setForm((current) => ({
-        ...current,
-        image_urls: [...current.image_urls.split(/\n|,/).map((v) => v.trim()).filter(Boolean), ...uploaded].join("\n"),
-      }));
-      toast.success(`${uploaded.length} product image${uploaded.length === 1 ? "" : "s"} uploaded.`);
+      setForm((current) => {
+        const existing = current.image_urls.split(/\n|,/).map((v) => v.trim()).filter(Boolean);
+        return {
+          ...current,
+          image_urls: Array.from(new Set([...existing, ...uploaded])).join("\n"),
+        };
+      });
+
+      const savedBytes = Math.max(0, originalBytes - storedBytes);
+      const savedMb = savedBytes / (1024 * 1024);
+      const details = [
+        reusedCount ? `${reusedCount} duplicate${reusedCount === 1 ? "" : "s"} reused` : null,
+        savedBytes > 0 ? `${savedMb.toFixed(savedMb >= 1 ? 1 : 2)} MB avoided by optimisation` : null,
+      ].filter(Boolean).join(" · ");
+
+      toast.success(
+        `${uploaded.length} product image${uploaded.length === 1 ? "" : "s"} ready${details ? ` · ${details}` : ""}.`,
+      );
     } catch (error: any) {
       toast.error(error?.message ?? "Product images could not be uploaded.");
     } finally {
@@ -666,14 +677,14 @@ export function ProductEditor({ productId }: { productId?: string; mode?: "creat
 
       <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
         <h2 className="text-lg font-semibold">{isSupplier || isAffiliate ? "5" : "4"}. Product images</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Upload real product images directly from your phone or computer. The first image becomes the main storefront image.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Upload real product images directly from your phone or computer. The first image becomes the main storefront image. Cossa Store now optimises large images and reuses identical uploads automatically.</p>
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
             {uploadingImages ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-            {uploadingImages ? "Uploadingâ€¦" : "Upload images"}
-            <input className="sr-only" type="file" accept="image/*" multiple disabled={uploadingImages} onChange={(event) => void uploadImages(event.target.files)} />
+            {uploadingImages ? "Optimising & uploadingâ€¦" : "Upload images"}
+            <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={uploadingImages} onChange={(event) => void uploadImages(event.target.files)} />
           </label>
-          <span className="text-xs text-muted-foreground">JPG, PNG, WebP and other browser image formats Â· max 8 MB each</span>
+          <span className="text-xs text-muted-foreground">JPG, PNG or WebP · source max 12 MB · large images resized to 1600 px and targeted near 500 KB · duplicates reused</span>
         </div>
 
         {imageUrls.length ? (
@@ -805,4 +816,3 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
     </label>
   );
 }
-
