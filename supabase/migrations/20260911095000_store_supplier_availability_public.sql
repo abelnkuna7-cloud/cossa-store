@@ -23,7 +23,7 @@ select distinct on (i.publication_store_product_id)
 from public.store_inventory_intakes i
 where i.publication_store_product_id is not null
   and i.approval_status = 'published'
-order by i.publication_store_product_id, i.last_stock_checked_at desc nulls last, i.updated_at desc nulls last;
+order by i.publication_store_product_id, i.last_stock_checked_at desc nulls last, i.created_at desc;
 
 revoke all on public.store_supplier_availability_public from public;
 grant select on public.store_supplier_availability_public to anon, authenticated;
