@@ -55,8 +55,6 @@ function detectAstrumAvailability(html: string): "available" | "unavailable" | "
   ];
   if (availableSignals.some((signal) => signal.test(html))) return "available";
 
-  // Avoid guessing from generic words such as “stock”, cart buttons, or prices.
-  // Unknown evidence must never be converted into a false availability decision.
   if (!source.includes("product")) return "unknown";
   return "unknown";
 }
@@ -69,7 +67,7 @@ async function fetchPage(url: string) {
   const response = await fetch(parsed.toString(), {
     redirect: "follow",
     headers: {
-      "User-Agent": "Mozilla/5.0 CossaStore-StockMonitor/2.0",
+      "User-Agent": "Mozilla/5.0 CossaStore-StockMonitor/2.1",
       Accept: "text/html,application/xhtml+xml",
     },
   });
@@ -114,21 +112,40 @@ Deno.serve(async (request) => {
         const html = await fetchPage(sourceUrl);
         const observed = detectAstrumAvailability(html);
 
-        if (dryRun || observed === "unknown") {
+        if (dryRun) {
           results.push({
             ref: row.supplier_product_ref,
             productId: row.publication_store_product_id,
             observed,
             current: row.stock_status,
             changed: false,
-            reason: observed === "unknown" ? "Supplier page did not provide a strong stock signal; existing state preserved." : undefined,
           });
-          if (!dryRun) {
-            await admin
-              .from("store_inventory_intakes")
-              .update({ last_stock_checked_at: checkedAt })
-              .eq("id", row.id);
-          }
+          continue;
+        }
+
+        if (observed === "unknown") {
+          const { error: unknownError } = await admin
+            .from("store_inventory_intakes")
+            .update({
+              stock_status: "unknown",
+              last_stock_checked_at: checkedAt,
+              stock_confirmed: false,
+              operational_notes:
+                `Astrum Stock Monitor: official supplier page did not provide a strong stock signal at ${checkedAt}. ` +
+                `The previous numeric quantity was preserved for audit, but checkout must revalidate before accepting payment.`,
+            })
+            .eq("id", row.id)
+            .eq("publication_store_product_id", row.publication_store_product_id);
+          if (unknownError) throw unknownError;
+
+          results.push({
+            ref: row.supplier_product_ref,
+            productId: row.publication_store_product_id,
+            observed,
+            previous: row.stock_status,
+            changed: row.stock_status !== "unknown",
+            reason: "Supplier page did not provide a strong stock signal; checkout is fail-closed until a fresh positive signal is available.",
+          });
           continue;
         }
 
@@ -143,9 +160,6 @@ Deno.serve(async (request) => {
             `No numerical quantity was invented from webpage availability.`,
         };
 
-        // If Astrum explicitly says out of stock, zeroing the supplier quantity is safe and
-        // prevents stale CSV quantity from being mistaken for current sellable stock.
-        // When stock returns, the numerical quantity is not invented; only availability is restored.
         if (observed === "unavailable") patch.supplier_available_stock = 0;
 
         const { error: updateError } = await admin
@@ -163,12 +177,25 @@ Deno.serve(async (request) => {
           changed: row.stock_status !== nextStatus,
         });
       } catch (itemError) {
+        const { error: failClosedError } = await admin
+          .from("store_inventory_intakes")
+          .update({
+            stock_status: "unknown",
+            last_stock_checked_at: checkedAt,
+            stock_confirmed: false,
+            operational_notes:
+              `Astrum Stock Monitor: stock verification failed at ${checkedAt}. Checkout remains fail-closed until supplier availability is verified.`,
+          })
+          .eq("id", row.id)
+          .eq("publication_store_product_id", row.publication_store_product_id);
+
         results.push({
           ref: row.supplier_product_ref,
           productId: row.publication_store_product_id,
           observed: "unknown",
-          changed: false,
+          changed: row.stock_status !== "unknown",
           error: itemError instanceof Error ? itemError.message : "Stock check failed.",
+          stateUpdateError: failClosedError?.message ?? null,
         });
       }
     }
