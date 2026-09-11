@@ -75,30 +75,11 @@ export function getStoreYocoTestAttempt(attemptId: string) {
   return invoke<{ attempt: YocoTestPaymentAttempt }>({ action: "yoco_status", attemptId });
 }
 
-export async function getStoreYocoLiveAttempt(attemptId: string) {
-  const { data, error } = await supabase
-    .from("store_payment_attempts")
-    .select("id,status,provider_checkout_id,provider_payment_id,amount_cents,verified_at")
-    .eq("id", attemptId)
-    .maybeSingle();
-  if (error) {
-    throw new Error(await errorMessage(error, data, "The live Yoco payment status is unavailable."));
-  }
-  if (!data) throw new Error("The live Yoco payment attempt was not found.");
-  const attempt = data as Record<string, unknown>;
-  return {
-    attempt: {
-      id: String(attempt.id),
-      status: String(attempt.status) as YocoLivePaymentAttempt["status"],
-      providerCheckoutId:
-        typeof attempt.provider_checkout_id === "string" ? attempt.provider_checkout_id : null,
-      providerPaymentId:
-        typeof attempt.provider_payment_id === "string" ? attempt.provider_payment_id : null,
-      amountCents: Number(attempt.amount_cents),
-      currency: "ZAR" as const,
-      verifiedAt: typeof attempt.verified_at === "string" ? attempt.verified_at : null,
-    },
-  };
+export function getStoreYocoLiveAttempt(attemptId: string) {
+  return invoke<{ attempt: YocoLivePaymentAttempt }>({
+    action: "yoco_live_status",
+    attemptId,
+  });
 }
 
 export function recordStoreYocoTestReturn(
