@@ -22,7 +22,7 @@ export type CommercialDecision = {
 
 const GENERIC_IMAGE_MARKERS = [
   "logo", "favicon", "placeholder", "banner", "header", "footer", "icon", "avatar",
-  "payment", "woocommerce-placeholder", "astrum-logo", "cropped-", "site-logo",
+  "payment", "woocommerce-placeholder", "astrum-logo", "site-logo",
 ];
 
 export function compactText(value: string) {
@@ -41,7 +41,6 @@ export function modelToken(value: string) {
 
 export function classifyProduct(supplierCategory: string | null, title: string): ProductTaxonomy {
   const hay = `${supplierCategory ?? ""} ${title}`.toLowerCase();
-  const tags: string[] = [];
   const result = (department: string, subdepartments: string[], extraTags: string[] = []): ProductTaxonomy => ({
     department,
     subdepartments: [...new Set(subdepartments)],
@@ -49,7 +48,7 @@ export function classifyProduct(supplierCategory: string | null, title: string):
   });
 
   if (/ip\s*cam|camera|cctv|surveillance|security/.test(hay))
-    return result("security-smart-home", ["security-cameras", "smart-devices"], ["security camera", "smart security", "ip camera"]);
+    return result("security-smart-home", ["cctv-cameras", "security-systems"], ["security camera", "smart security", "ip camera"]);
   if (/keyboard/.test(hay))
     return result("technology-electronics", ["computer-accessories", "productivity-equipment"], ["keyboard", "wireless keyboard", "computer accessories"]);
   if (/mouse|trackball/.test(hay))
@@ -73,70 +72,87 @@ export function classifyProduct(supplierCategory: string | null, title: string):
   if (/ups|backup power/.test(hay))
     return result("technology-electronics", ["ups-backup-power", "power-charging"], ["backup power", "ups"]);
 
-  tags.push(slugToken(supplierCategory ?? "technology"));
-  return result("technology-electronics", ["computer-accessories"], tags);
+  return result("technology-electronics", ["computer-accessories"], [supplierCategory ?? "technology"]);
 }
 
 function normaliseImageUrl(value: string) {
   return value.replace(/&amp;/g, "&").trim();
 }
 
-function imageScore(url: string, model: string, supplierRef: string) {
+function canonicalImageKey(url: string) {
+  return url
+    .replace(/-\d+x\d+(?=\.[a-z]+(?:\?|$))/i, "")
+    .replace(/\?.*$/, "")
+    .toLowerCase();
+}
+
+function imageScore(url: string, model: string, supplierRef: string, isOgImage: boolean) {
   const lower = url.toLowerCase();
-  let score = 0;
+  let score = isOgImage ? 12 : 0;
   if (lower.includes("/wp-content/uploads/")) score += 4;
-  if (model && lower.includes(model.toLowerCase())) score += 6;
-  if (supplierRef && lower.includes(supplierRef.toLowerCase())) score += 6;
+  if (model && lower.includes(model.toLowerCase())) score += 7;
+  if (supplierRef && lower.includes(supplierRef.toLowerCase())) score += 8;
   if (/\.(?:webp|jpe?g|png)(?:\?|$)/i.test(lower)) score += 2;
-  if (/product|gallery|woocommerce/.test(lower)) score += 1;
-  if (GENERIC_IMAGE_MARKERS.some((marker) => lower.includes(marker))) score -= 20;
+  if (/product|gallery|woocommerce|detail|front|side|back|case/.test(lower)) score += 2;
+  if (GENERIC_IMAGE_MARKERS.some((marker) => lower.includes(marker))) score -= 30;
   return score;
 }
 
 export function extractOfficialProductGallery(html: string, title: string, supplierRef: string, ogImage = "") {
   const model = modelToken(title);
-  const candidates = new Set<string>();
-  if (ogImage) candidates.add(normaliseImageUrl(ogImage));
+  const candidates = new Map<string, { url: string; galleryContext: boolean; isOgImage: boolean }>();
+  const add = (raw: string, galleryContext: boolean, isOgImage = false) => {
+    const url = normaliseImageUrl(raw);
+    if (!/^https:\/\/astrum\.co\.za\/wp-content\/uploads\//i.test(url)) return;
+    const key = canonicalImageKey(url);
+    const current = candidates.get(key);
+    if (!current || (!current.galleryContext && galleryContext) || (!current.isOgImage && isOgImage)) {
+      candidates.set(key, { url, galleryContext, isOgImage });
+    }
+  };
 
-  const attributes = [
-    /(?:src|data-src|data-large_image|href)=["'](https:\/\/astrum\.co\.za\/wp-content\/uploads\/[^"']+)["']/gi,
-    /srcset=["']([^"']+)["']/gi,
-  ];
+  if (ogImage) add(ogImage, true, true);
 
-  for (const pattern of attributes) {
-    for (const match of html.matchAll(pattern)) {
-      if (!match[1]) continue;
-      if (pattern.source.startsWith("srcset")) {
-        for (const part of match[1].split(",")) {
-          const url = part.trim().split(/\s+/)[0];
-          if (/^https:\/\/astrum\.co\.za\/wp-content\/uploads\//i.test(url)) candidates.add(normaliseImageUrl(url));
-        }
-      } else {
-        candidates.add(normaliseImageUrl(match[1]));
+  const galleryBlocks: string[] = [];
+  for (const match of html.matchAll(/<(?:figure|div)[^>]+class=["'][^"']*woocommerce-product-gallery[^"']*["'][^>]*>([\s\S]*?)<\/(?:figure|div)>/gi)) {
+    galleryBlocks.push(match[0]);
+  }
+  for (const match of html.matchAll(/<div[^>]+class=["'][^"']*woocommerce-product-gallery__image[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi)) {
+    galleryBlocks.push(match[0]);
+  }
+
+  for (const block of galleryBlocks) {
+    for (const match of block.matchAll(/(?:src|data-src|data-large_image|href)=["'](https:\/\/astrum\.co\.za\/wp-content\/uploads\/[^"']+)["']/gi)) {
+      add(match[1], true);
+    }
+    for (const match of block.matchAll(/srcset=["']([^"']+)["']/gi)) {
+      for (const part of match[1].split(",")) {
+        const url = part.trim().split(/\s+/)[0];
+        add(url, true);
       }
     }
   }
 
-  const ranked = [...candidates]
-    .filter((url) => /^https:\/\/astrum\.co\.za\/wp-content\/uploads\//i.test(url))
-    .filter((url) => !GENERIC_IMAGE_MARKERS.some((marker) => url.toLowerCase().includes(marker)))
-    .map((url) => ({ url, score: imageScore(url, model, supplierRef) }))
-    .filter((item) => item.score >= 2)
-    .sort((a, b) => b.score - a.score || a.url.length - b.url.length);
-
-  const deduped: string[] = [];
-  const identity = new Set<string>();
-  for (const item of ranked) {
-    const key = item.url
-      .replace(/-\d+x\d+(?=\.[a-z]+(?:\?|$))/i, "")
-      .replace(/\?.*$/, "")
-      .toLowerCase();
-    if (identity.has(key)) continue;
-    identity.add(key);
-    deduped.push(item.url);
-    if (deduped.length >= 8) break;
+  // Fallback for Astrum pages whose theme omits the standard WooCommerce gallery wrapper.
+  // Only retain assets that contain the exact model/ref token; never sweep the whole page blindly.
+  if (candidates.size <= 1) {
+    for (const match of html.matchAll(/(?:src|data-src|data-large_image|href)=["'](https:\/\/astrum\.co\.za\/wp-content\/uploads\/[^"']+)["']/gi)) {
+      const url = match[1];
+      const lower = url.toLowerCase();
+      if ((model && lower.includes(model.toLowerCase())) || lower.includes(supplierRef.toLowerCase())) add(url, false);
+    }
   }
-  return deduped;
+
+  return [...candidates.values()]
+    .filter((item) => !GENERIC_IMAGE_MARKERS.some((marker) => item.url.toLowerCase().includes(marker)))
+    .map((item) => ({
+      ...item,
+      score: imageScore(item.url, model, supplierRef, item.isOgImage) + (item.galleryContext ? 5 : 0),
+    }))
+    .filter((item) => item.score >= 8)
+    .sort((a, b) => b.score - a.score || a.url.length - b.url.length)
+    .slice(0, 8)
+    .map((item) => item.url);
 }
 
 export function evaluateCommercialPosition(sellingPrice: number, evidence: MarketEvidence[]): CommercialDecision {
