@@ -5,6 +5,7 @@ import { Copy, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { CatalogueShell } from "@/components/admin/CatalogueShell";
+import { AstrumSmartIntakePanel } from "@/components/admin/AstrumSmartIntakePanel";
 import { CjProductSyncPanel } from "@/components/admin/CjProductSyncPanel";
 import { PrintifySyncPanel } from "@/components/admin/PrintifySyncPanel";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/common/StateBlocks";
@@ -165,6 +166,7 @@ function CatalogueTable() {
 
   return (
     <div className="space-y-5">
+      <AstrumSmartIntakePanel />
       <PrintifySyncPanel onSynced={invalidateCatalogue} />
       <CjProductSyncPanel onSynced={invalidateCatalogue} />
 
