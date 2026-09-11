@@ -39,6 +39,7 @@ import { Route as DevCatalogueRouteImport } from './routes/dev.catalogue'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as ProjectSlugRouteImport } from './routes/project.$slug'
 import { Route as AuthenticatedAdminApprovalsRouteImport } from './routes/_authenticated/admin.approvals'
+import { Route as AuthenticatedAdminDeliveryCertificationRouteImport } from './routes/_authenticated/admin.delivery-certification'
 import { Route as AuthenticatedAdminEmailOperationsRouteImport } from './routes/_authenticated/admin.email-operations'
 import { Route as AuthenticatedAdminFulfilmentOperationsRouteImport } from './routes/_authenticated/admin.fulfilment-operations'
 import { Route as AuthenticatedAdminSecurityRouteImport } from './routes/_authenticated/admin.security'
@@ -195,6 +196,12 @@ const AuthenticatedAdminApprovalsRoute =
   AuthenticatedAdminApprovalsRouteImport.update({
     id: '/admin/approvals',
     path: '/admin/approvals',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminDeliveryCertificationRoute =
+  AuthenticatedAdminDeliveryCertificationRouteImport.update({
+    id: '/admin/delivery-certification',
+    path: '/admin/delivery-certification',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminEmailOperationsRoute =
@@ -766,6 +773,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminApprovalsRoute: typeof AuthenticatedAdminApprovalsRoute
+  AuthenticatedAdminDeliveryCertificationRoute: typeof AuthenticatedAdminDeliveryCertificationRoute
   AuthenticatedAdminEmailOperationsRoute: typeof AuthenticatedAdminEmailOperationsRoute
   AuthenticatedAdminFulfilmentOperationsRoute: typeof AuthenticatedAdminFulfilmentOperationsRoute
   AuthenticatedAdminSecurityRoute: typeof AuthenticatedAdminSecurityRoute
@@ -777,6 +785,8 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminApprovalsRoute: AuthenticatedAdminApprovalsRoute,
+  AuthenticatedAdminDeliveryCertificationRoute:
+    AuthenticatedAdminDeliveryCertificationRoute,
   AuthenticatedAdminEmailOperationsRoute:
     AuthenticatedAdminEmailOperationsRoute,
   AuthenticatedAdminFulfilmentOperationsRoute:

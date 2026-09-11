@@ -61,6 +61,9 @@ export function CatalogueShell({
             <Link to="/admin/approvals">Approvals</Link>
           </Button>
           <Button asChild size="sm" variant="outline">
+            <Link to="/admin/delivery-certification">Delivery certification</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
             <Link to="/admin/email-operations">Email operations</Link>
           </Button>
           <Button
