@@ -63,6 +63,14 @@ type StoreVariantRow = {
   sort_order: number;
 };
 
+type SupplierAvailabilityRow = {
+  product_id: string;
+  supplier_stock_state: "in_stock" | "out_of_stock" | "stale" | "unknown" | string;
+  is_fresh: boolean;
+  supplier_available: boolean;
+  last_stock_checked_at: string | null;
+};
+
 const PUBLIC_PRODUCT_SELECT =
   "id,name,slug,sku,product_type,status,short_description,description,category,additional_categories,merchandising_tags,fulfilment_model,brand,affiliate_url,currency,price,compare_at_price,track_inventory,stock_quantity,unlimited_stock,featured,image_urls,seo_title,seo_description,created_at,updated_at,customer_features,customer_specifications,customer_delivery_notice,customer_returns_notice,customer_warranty_notice";
 
@@ -113,16 +121,26 @@ function fulfilmentFor(row: PublicStoreProductRow): FulfilmentType {
   }
 }
 
-function stockStatusFor(row: PublicStoreProductRow) {
-  switch (fulfilmentFor(row)) {
+function supplierManaged(fulfilment: FulfilmentType) {
+  return fulfilment === "local_supplier" ||
+    fulfilment === "local_dropshipping" ||
+    fulfilment === "international_dropshipping";
+}
+
+function stockStatusFor(
+  row: PublicStoreProductRow,
+  supplierAvailability: SupplierAvailabilityRow | null,
+) {
+  const fulfilment = fulfilmentFor(row);
+  if (supplierManaged(fulfilment)) {
+    if (supplierAvailability?.supplier_stock_state === "out_of_stock") return "out_of_stock" as const;
+    return "backorder" as const;
+  }
+  switch (fulfilment) {
     case "digital":
     case "affiliate":
     case "print_on_demand":
       return "made_to_order" as const;
-    case "local_supplier":
-    case "local_dropshipping":
-    case "international_dropshipping":
-      return "backorder" as const;
     case "cossa_stock":
     default:
       if (row.unlimited_stock) return "in_stock" as const;
@@ -133,8 +151,15 @@ function stockStatusFor(row: PublicStoreProductRow) {
   }
 }
 
-function availabilityFor(row: PublicStoreProductRow) {
-  switch (fulfilmentFor(row)) {
+function availabilityFor(
+  row: PublicStoreProductRow,
+  supplierAvailability: SupplierAvailabilityRow | null,
+) {
+  const fulfilment = fulfilmentFor(row);
+  if (supplierManaged(fulfilment) && supplierAvailability?.supplier_stock_state === "out_of_stock") {
+    return "out_of_stock" as const;
+  }
+  switch (fulfilment) {
     case "digital": return "digital_available" as const;
     case "affiliate": return "partner_offer" as const;
     case "print_on_demand": return "made_to_order" as const;
@@ -150,8 +175,20 @@ function availabilityFor(row: PublicStoreProductRow) {
   }
 }
 
-function estimatedDeliveryFor(row: PublicStoreProductRow) {
-  switch (fulfilmentFor(row)) {
+function estimatedDeliveryFor(
+  row: PublicStoreProductRow,
+  supplierAvailability: SupplierAvailabilityRow | null,
+) {
+  const fulfilment = fulfilmentFor(row);
+  if (supplierManaged(fulfilment)) {
+    if (supplierAvailability?.supplier_stock_state === "out_of_stock") {
+      return "Currently unavailable from the supplier. This page remains visible so you can check again later.";
+    }
+    if (supplierAvailability?.supplier_stock_state === "stale" || supplierAvailability?.supplier_stock_state === "unknown") {
+      return "Supplier availability must be rechecked before payment is accepted.";
+    }
+  }
+  switch (fulfilment) {
     case "digital": return "Digital access after successful payment confirmation.";
     case "affiliate": return "Delivery and fulfilment are handled by the partner retailer.";
     case "print_on_demand": return "Made to order. Production and delivery timing is confirmed during checkout.";
@@ -211,7 +248,11 @@ function mapVariant(row: StoreVariantRow): ProductVariantPublic {
   } as unknown as ProductVariantPublic;
 }
 
-function mapRow(row: PublicStoreProductRow, variantRows: StoreVariantRow[] = []): Product {
+function mapRow(
+  row: PublicStoreProductRow,
+  variantRows: StoreVariantRow[] = [],
+  supplierAvailability: SupplierAvailabilityRow | null = null,
+): Product {
   const variants = variantRows
     .filter((variant) => variant.product_id === row.id && variant.is_available)
     .sort((a, b) => a.sort_order - b.sort_order)
@@ -220,12 +261,12 @@ function mapRow(row: PublicStoreProductRow, variantRows: StoreVariantRow[] = [])
   const compareAt = row.compare_at_price == null ? null : asNumber(row.compare_at_price);
   const fulfilment = fulfilmentFor(row);
   const category = storefrontCategory(row);
-  const stockStatus = stockStatusFor(row);
-  const availability = availabilityFor(row);
-  const stockAvailable =
-    fulfilment === "digital" || fulfilment === "affiliate" || fulfilment === "print_on_demand" ||
-    fulfilment === "local_supplier" || fulfilment === "local_dropshipping" ||
-    fulfilment === "international_dropshipping" || row.unlimited_stock || !row.track_inventory || row.stock_quantity > 0;
+  const stockStatus = stockStatusFor(row, supplierAvailability);
+  const availability = availabilityFor(row, supplierAvailability);
+  const stockAvailable = supplierManaged(fulfilment)
+    ? supplierAvailability?.supplier_stock_state !== "out_of_stock"
+    : fulfilment === "digital" || fulfilment === "affiliate" || fulfilment === "print_on_demand" ||
+      row.unlimited_stock || !row.track_inventory || row.stock_quantity > 0;
 
   const images = (row.image_urls ?? []).map((url, index) => ({
     id: `${row.id}-image-${index + 1}`,
@@ -288,7 +329,7 @@ function mapRow(row: PublicStoreProductRow, variantRows: StoreVariantRow[] = [])
     service_included: false,
     service_description: null,
     digital_download: fulfilment === "digital",
-    estimated_delivery: estimatedDeliveryFor(row),
+    estimated_delivery: estimatedDeliveryFor(row, supplierAvailability),
     province_availability: fulfilment === "digital" ? [] : ALL_PROVINCES,
     lead_time: fulfilment === "print_on_demand" ? "production time varies by product" : null,
     customisation_options: [],
@@ -317,6 +358,36 @@ function productDepartmentSlugs(product: Product): string[] {
   return Array.from(new Set([product.category, ...additional].filter(Boolean)));
 }
 
+function astrumModelToken(name: string) {
+  return (name.match(/\b(?:MX|MZ|KT|IP|BS|NA|CL|DUOZ|BT|WATZ|ENP|KBX|WL|PB|SB|SW)[ -]?[A-Z0-9-]*\d+[A-Z0-9-]*\b/i)?.[0] ?? "")
+    .replace(/\s+/g, "")
+    .toUpperCase();
+}
+
+function canonicalProductKey(product: Product) {
+  const isAstrum = product.brand?.toLowerCase() === "astrum" || /\bastrum\b/i.test(product.name);
+  const model = astrumModelToken(product.name);
+  if (isAstrum && model) return `astrum:${model}`;
+  return `id:${product.id}`;
+}
+
+function dedupeCanonicalProducts(products: Product[]) {
+  const byKey = new Map<string, Product>();
+  for (const product of products) {
+    const key = canonicalProductKey(product);
+    const current = byKey.get(key);
+    if (!current) {
+      byKey.set(key, product);
+      continue;
+    }
+    const chooseIncoming =
+      product.selling_price > 0 &&
+      (current.selling_price <= 0 || product.selling_price < current.selling_price);
+    if (chooseIncoming) byKey.set(key, product);
+  }
+  return [...byKey.values()];
+}
+
 async function loadVariants(productIds: string[]): Promise<StoreVariantRow[]> {
   if (productIds.length === 0) return [];
   const { data, error } = await db
@@ -332,6 +403,22 @@ async function loadVariants(productIds: string[]): Promise<StoreVariantRow[]> {
   return (data ?? []) as StoreVariantRow[];
 }
 
+async function loadSupplierAvailability(productIds: string[]) {
+  const uniqueIds = Array.from(new Set(productIds.filter(Boolean)));
+  if (uniqueIds.length === 0) return new Map<string, SupplierAvailabilityRow>();
+  const { data, error } = await db
+    .from("store_supplier_availability_public")
+    .select("product_id,supplier_stock_state,is_fresh,supplier_available,last_stock_checked_at")
+    .in("product_id", uniqueIds);
+  if (error) {
+    console.error("[Cossa Store] Supplier availability projection could not be loaded", error);
+    return new Map<string, SupplierAvailabilityRow>();
+  }
+  return new Map(
+    ((data ?? []) as SupplierAvailabilityRow[]).map((row) => [row.product_id, row]),
+  );
+}
+
 async function loadRows(): Promise<PublicStoreProductRow[]> {
   const { data, error } = await db.from("store_customer_products").select(PUBLIC_PRODUCT_SELECT).order("updated_at", { ascending: false });
   if (error) {
@@ -342,8 +429,14 @@ async function loadRows(): Promise<PublicStoreProductRow[]> {
 }
 
 async function mapRowsWithVariants(rows: PublicStoreProductRow[]): Promise<Product[]> {
-  const variants = await loadVariants(rows.map((row) => row.id));
-  return rows.map((row) => mapRow(row, variants));
+  const ids = rows.map((row) => row.id);
+  const [variants, supplierAvailability] = await Promise.all([
+    loadVariants(ids),
+    loadSupplierAvailability(ids),
+  ]);
+  return dedupeCanonicalProducts(
+    rows.map((row) => mapRow(row, variants, supplierAvailability.get(row.id) ?? null)),
+  );
 }
 
 export async function listStorefrontProducts(): Promise<Product[]> {
@@ -384,8 +477,12 @@ export async function fetchProductBySlug(slug: string): Promise<Product | null> 
     throw error;
   }
   if (!data) return null;
-  const variants = await loadVariants([data.id]);
-  return mapRow(data as PublicStoreProductRow, variants);
+  const row = data as PublicStoreProductRow;
+  const [variants, supplierAvailability] = await Promise.all([
+    loadVariants([row.id]),
+    loadSupplierAvailability([row.id]),
+  ]);
+  return mapRow(row, variants, supplierAvailability.get(row.id) ?? null);
 }
 
 export async function fetchProductsByIds(ids: string[]): Promise<Product[]> {
@@ -397,8 +494,13 @@ export async function fetchProductsByIds(ids: string[]): Promise<Product[]> {
     throw error;
   }
   const rows = (data ?? []) as PublicStoreProductRow[];
-  const variants = await loadVariants(uniqueIds);
-  const mapped = rows.map((row) => mapRow(row, variants));
+  const [variants, supplierAvailability] = await Promise.all([
+    loadVariants(uniqueIds),
+    loadSupplierAvailability(uniqueIds),
+  ]);
+  const mapped = dedupeCanonicalProducts(
+    rows.map((row) => mapRow(row, variants, supplierAvailability.get(row.id) ?? null)),
+  );
   const byId = new Map(mapped.map((product) => [product.id, product]));
   return uniqueIds.map((id) => byId.get(id)).filter((product): product is Product => Boolean(product));
 }

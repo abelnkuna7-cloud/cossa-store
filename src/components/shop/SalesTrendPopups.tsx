@@ -3,6 +3,10 @@
  *
  * Every card is built from factual published catalogue data. No sales volume,
  * popularity, demand or trending activity is inferred or invented.
+ *
+ * New arrivals are intentionally excluded here because they already have a
+ * dedicated homepage section. Repeating them in a floating popup made the
+ * storefront appear to contain duplicate products and prices.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -20,10 +24,8 @@ const FIRST_DELAY = 12000;
 const VISIBLE_MS = 9000;
 const GAP_MS = 18000;
 
-function highlightLabel(product: Product): string {
-  if (product.is_featured) return "Featured by Cossa Store";
-  if (isNewArrival(product)) return "New arrival";
-  return "From the Cossa Store catalogue";
+function highlightLabel(_product: Product): string {
+  return "Featured by Cossa Store";
 }
 
 export function SalesTrendPopups() {
@@ -34,8 +36,9 @@ export function SalesTrendPopups() {
 
   const picks = useMemo(() => {
     const all = products.data ?? [];
-    const highlighted = all.filter((p) => p.is_featured || isNewArrival(p));
-    return (highlighted.length ? highlighted : all).slice(0, 6);
+    return all
+      .filter((product) => product.is_featured && !isNewArrival(product))
+      .slice(0, 6);
   }, [products.data]);
 
   useEffect(() => {
