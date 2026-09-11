@@ -58,6 +58,9 @@ export function CatalogueShell({
         <div className="flex flex-wrap items-center gap-2">
           {actions}
           <Button asChild size="sm" variant="outline">
+            <Link to="/admin/catalogue">Smart Intake</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
             <Link to="/admin/approvals">Approvals</Link>
           </Button>
           <Button asChild size="sm" variant="outline">
