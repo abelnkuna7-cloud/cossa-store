@@ -61,12 +61,43 @@ export function NoticeBlock({
   title: string;
   children?: ReactNode;
 }) {
+  let displayTitle = title;
+  let displayChildren = children;
+
+  if (title === "Secure EFT checkout is available") {
+    displayTitle = "Secure checkout available";
+    displayChildren = (
+      <>
+        Choose Yoco card payment or EFT at checkout. Cossa Store confirms your order total and
+        delivery securely before payment.
+      </>
+    );
+  } else if (title === "Sign in before creating an EFT order") {
+    displayTitle = "Sign in to continue checkout";
+    displayChildren = (
+      <>
+        Sign in or create an account so your order, payment and any digital downloads stay securely
+        linked to you.
+      </>
+    );
+  } else if (title === "EFT and Yoco test checkout") {
+    displayTitle = "Secure Yoco and EFT checkout";
+    displayChildren = (
+      <>
+        Pay securely by Yoco card checkout or EFT. Cossa Store confirms prices, delivery and order
+        totals before payment.
+      </>
+    );
+  } else if (title === "Yoco test checkout") {
+    displayTitle = "Yoco payment status";
+  }
+
   const toneClass =
     tone === "pending" ? "border-accent/50 bg-accent/10" : "border-border bg-secondary";
   return (
     <div className={`rounded-lg border px-4 py-4 text-sm ${toneClass}`}>
-      <p className="font-semibold">{title}</p>
-      {children ? <div className="mt-1 text-muted-foreground">{children}</div> : null}
+      <p className="font-semibold">{displayTitle}</p>
+      {displayChildren ? <div className="mt-1 text-muted-foreground">{displayChildren}</div> : null}
     </div>
   );
 }
