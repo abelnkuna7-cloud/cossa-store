@@ -84,7 +84,7 @@ export const COMPLIANCE_BADGES: ComplianceBadge[] = [
   },
 ];
 
-/** Payment gateways. `live` stays false until merchant keys are verified. */
+/** Payment gateways. Live values reflect the currently verified merchant configuration. */
 export interface PaymentGateway {
   id: "payfast" | "ozow" | "yoco";
   name: string;
@@ -118,9 +118,10 @@ export const PAYMENT_GATEWAYS: PaymentGateway[] = [
     id: "yoco",
     name: "Yoco",
     method: "Credit & debit cards",
-    description: "Secure Yoco-hosted card checkout. Test mode only while validation is in progress.",
-    requiredKeys: ["YOCO_TEST_PUBLIC_KEY", "YOCO_TEST_SECRET_KEY"],
-    live: false,
+    description:
+      "Secure Yoco-hosted live card checkout. Payment status is verified server-side by signed webhooks.",
+    requiredKeys: ["YOCO_LIVE_SECRET_KEY", "YOCO_LIVE_WEBHOOK_SECRET"],
+    live: true,
   },
 ];
 
