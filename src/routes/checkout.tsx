@@ -32,13 +32,15 @@ import {
   type StoreDeliveryQuoteRequest,
 } from "@/services/eft-payments";
 import {
+  getStoreYocoLiveAttempt,
   getStoreYocoTestAttempt,
   recordStoreYocoTestReturn,
+  startStoreYocoLiveCheckout,
   startStoreYocoTestCheckout,
 } from "@/services/yoco-payments";
 
 const TITLE = "Checkout | Cossa Store";
-const DESCRIPTION = "Create a secure Cossa Store EFT payment request or Yoco test card checkout.";
+const DESCRIPTION = "Create a secure Cossa Store EFT payment request or Yoco hosted card checkout.";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
@@ -61,7 +63,8 @@ function newRequestId(): string {
 function CheckoutPage() {
   const { session, loading: authLoading } = useSession();
   const roles = useRoles(session?.user.id);
-  const canTestYoco = (roles.data ?? []).includes("admin");
+  const canUseYocoTest = (roles.data ?? []).includes("admin");
+  const canUseYocoLive = Boolean(session?.user);
   const { selectedCartLines, hydrated, removePaidCartLines } = useCommerce();
   const [acceptedPolicies, setAcceptedPolicies] = useState(false);
   const [customerName, setCustomerName] = useState("");
@@ -79,7 +82,9 @@ function CheckoutPage() {
   const [quotedFor, setQuotedFor] = useState<string | null>(null);
   const [quoteProblem, setQuoteProblem] = useState<string | null>(null);
   const [payment, setPayment] = useState<EftPaymentDetail | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"eft" | "yoco">("eft");
+  const [paymentMethod, setPaymentMethod] = useState<
+    "eft" | "yoco_test" | "yoco_live"
+  >("eft");
   const [yocoReturnMessage, setYocoReturnMessage] = useState<string | null>(null);
   const [proof, setProof] = useState<File | null>(null);
   const [payerNote, setPayerNote] = useState("");
@@ -103,13 +108,20 @@ function CheckoutPage() {
   ]);
 
   useEffect(() => {
-    if (!canTestYoco && paymentMethod === "yoco") setPaymentMethod("eft");
-  }, [canTestYoco, paymentMethod]);
+    if (
+      (!canUseYocoTest && paymentMethod === "yoco_test") ||
+      (!canUseYocoLive && paymentMethod === "yoco_live")
+    ) {
+      setPaymentMethod("eft");
+    }
+  }, [canUseYocoLive, canUseYocoTest, paymentMethod]);
 
   useEffect(() => {
     if (!session?.user || typeof window === "undefined") return;
     const search = new URLSearchParams(window.location.search);
-    const attemptId = search.get("yocoAttemptId");
+    const liveAttemptId = search.get("yocoLiveAttemptId");
+    const testAttemptId = search.get("yocoAttemptId");
+    const attemptId = liveAttemptId ?? testAttemptId;
     const returnState = search.get("yoco");
     if (
       !attemptId ||
@@ -121,26 +133,49 @@ function CheckoutPage() {
     let mounted = true;
     void (async () => {
       try {
-        const returned = await recordStoreYocoTestReturn(attemptId, returnState);
-        const latest = await getStoreYocoTestAttempt(attemptId);
-        if (!mounted) return;
-        if (latest.attempt.status === "succeeded") {
-          setYocoReturnMessage(
-            "Your Yoco test payment was verified by its signed webhook. Test mode does not release fulfilment, digital goods or stock.",
-          );
-          toast.success("Yoco test payment verified");
-        } else if (returnState === "success") {
-          setYocoReturnMessage(
-            "Yoco returned you successfully. We are waiting for Yoco’s signed webhook before treating the test payment as verified.",
-          );
-        } else if (returned.attempt.status === "cancelled") {
-          setYocoReturnMessage(
-            "Yoco test checkout was cancelled. No payment was taken and your cart is unchanged.",
-          );
+        if (liveAttemptId) {
+          const latest = await getStoreYocoLiveAttempt(liveAttemptId);
+          if (!mounted) return;
+          if (latest.attempt.status === "succeeded") {
+            setYocoReturnMessage(
+              "Your Yoco payment was verified by its signed webhook. Cossa will release the digital product only through the verified order flow.",
+            );
+            toast.success("Yoco payment verified");
+          } else if (returnState === "cancelled") {
+            setYocoReturnMessage(
+              "The Yoco live checkout was cancelled. No order is treated as paid unless Yoco sends a verified payment event.",
+            );
+          } else if (returnState === "success") {
+            setYocoReturnMessage(
+              "Yoco returned you successfully. We are waiting for Yoco’s signed webhook before treating the payment as verified.",
+            );
+          } else {
+            setYocoReturnMessage(
+              "Yoco did not complete the live checkout. The order remains unpaid unless Yoco sends a verified payment event.",
+            );
+          }
         } else {
-          setYocoReturnMessage(
-            "Yoco did not complete the test checkout. No payment was taken and your cart is unchanged.",
-          );
+          const returned = await recordStoreYocoTestReturn(attemptId, returnState);
+          const latest = await getStoreYocoTestAttempt(attemptId);
+          if (!mounted) return;
+          if (latest.attempt.status === "succeeded") {
+            setYocoReturnMessage(
+              "Your Yoco test payment was verified by its signed webhook. Test mode does not release fulfilment, digital goods or stock.",
+            );
+            toast.success("Yoco test payment verified");
+          } else if (returnState === "success") {
+            setYocoReturnMessage(
+              "Yoco returned you successfully. We are waiting for Yoco’s signed webhook before treating the test payment as verified.",
+            );
+          } else if (returned.attempt.status === "cancelled") {
+            setYocoReturnMessage(
+              "Yoco test checkout was cancelled. No payment was taken and your cart is unchanged.",
+            );
+          } else {
+            setYocoReturnMessage(
+              "Yoco did not complete the test checkout. No payment was taken and your cart is unchanged.",
+            );
+          }
         }
       } catch (error) {
         if (mounted) {
@@ -291,7 +326,7 @@ function CheckoutPage() {
 
   async function confirmDeliveryEligibility() {
     setShowAddressErrors(true);
-    if (!canTestYoco || !canQuote || !requiresDelivery || deliveryEvidence.trim().length < 3) {
+    if (!canUseYocoTest || !canQuote || !requiresDelivery || deliveryEvidence.trim().length < 3) {
       if (deliveryEvidence.trim().length < 3) {
         toast.error("Record the carrier or supplier evidence before confirming delivery.");
       }
@@ -389,7 +424,12 @@ function CheckoutPage() {
         })),
         shippingAddress: requiresDelivery ? deliveryAddress : undefined,
       };
-      if (paymentMethod === "yoco") {
+      if (paymentMethod === "yoco_live") {
+        const result = await startStoreYocoLiveCheckout(checkoutInput);
+        window.location.assign(result.redirectUrl);
+        return;
+      }
+      if (paymentMethod === "yoco_test") {
         const result = await startStoreYocoTestCheckout(checkoutInput);
         window.location.assign(result.redirectUrl);
         return;
@@ -405,7 +445,7 @@ function CheckoutPage() {
       });
     } catch (error) {
       toast.error(
-        paymentMethod === "yoco"
+        paymentMethod === "yoco_live" || paymentMethod === "yoco_test"
           ? "Yoco checkout could not be created"
           : "Your EFT order could not be created",
         {
@@ -445,14 +485,14 @@ function CheckoutPage() {
       <PageHeader eyebrow="Checkout" title="Secure checkout" description={DESCRIPTION} />
 
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-10 sm:px-6 lg:px-8">
-        <NoticeBlock tone="pending" title="EFT and Yoco test checkout">
-          EFT remains available. Yoco card checkout is in test mode: a signed Yoco webhook, never a
-          browser redirect, is required before a test payment is considered verified. Test payments
-          cannot release fulfilment, digital goods or stock.
+        <NoticeBlock tone="pending" title="EFT and Yoco hosted checkout">
+          EFT remains available. Yoco hosts the card form, while Cossa verifies the final payment
+          server-side from a signed webhook. Live Yoco payments are not treated as paid from a
+          browser redirect.
         </NoticeBlock>
 
         {yocoReturnMessage ? (
-          <NoticeBlock tone="pending" title="Yoco test checkout">
+          <NoticeBlock tone="pending" title="Yoco checkout status">
             {yocoReturnMessage}
           </NoticeBlock>
         ) : null}
@@ -658,7 +698,7 @@ function CheckoutPage() {
                   <h2 className="font-display text-lg font-semibold">Order protection</h2>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                     Prices, selected product options, delivery and stock eligibility are confirmed
-                    on Cossa’s server before the EFT reference is issued. We never ask for a banking
+                    on Cossa’s server before a payment request or Yoco checkout is created. We never ask for a banking
                     password, card PIN or online-banking security code.
                   </p>
                 </div>
@@ -666,9 +706,8 @@ function CheckoutPage() {
             </section>
 
             {!authLoading && !session ? (
-              <NoticeBlock tone="pending" title="Sign in before creating an EFT order">
-                Your order, payment proof and any digital download must stay attached to your
-                account.{" "}
+              <NoticeBlock tone="pending" title="Sign in before creating a payment">
+                Your order and any digital download must stay attached to your account.{" "}
                 <Link to="/auth" className="font-medium text-primary underline underline-offset-2">
                   Sign in or create an account
                 </Link>{" "}
@@ -978,7 +1017,7 @@ function CheckoutPage() {
                     {quoteProblem}
                   </p>
                 ) : null}
-                {requiresDelivery && !activeQuote && !canTestYoco ? (
+                {requiresDelivery && !activeQuote && !canUseYocoTest ? (
                   <section className="mt-4 rounded-md border border-primary/35 bg-primary/5 p-4">
                     <h4 className="font-medium">Request a staff delivery quote</h4>
                     {submittedDeliveryQuote?.status === "requested" ? (
@@ -1021,7 +1060,7 @@ function CheckoutPage() {
                     ) : null}
                   </section>
                 ) : null}
-                {canTestYoco && requiresDelivery && !activeQuote ? (
+                {canUseYocoTest && requiresDelivery && !activeQuote ? (
                   <section className="mt-4 rounded-md border border-primary/35 bg-primary/5 p-4">
                     <h4 className="font-medium">Administrator delivery confirmation</h4>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
@@ -1078,13 +1117,31 @@ function CheckoutPage() {
                     </span>
                   </span>
                 </label>
-                {canTestYoco ? (
+                {canUseYocoLive ? (
                   <label className="flex cursor-pointer items-start gap-3 text-sm">
                     <input
                       type="radio"
                       name="payment-method"
-                      checked={paymentMethod === "yoco"}
-                      onChange={() => setPaymentMethod("yoco")}
+                      checked={paymentMethod === "yoco_live"}
+                      onChange={() => setPaymentMethod("yoco_live")}
+                      className="mt-1 accent-current"
+                    />
+                    <span>
+                      <span className="font-medium">Yoco card checkout — live</span>
+                      <span className="mt-1 block text-muted-foreground">
+                        Live card payment hosted by Yoco. Cossa Store never receives card details;
+                        only a verified Yoco webhook can mark the order paid.
+                      </span>
+                    </span>
+                  </label>
+                ) : null}
+                {canUseYocoTest ? (
+                  <label className="flex cursor-pointer items-start gap-3 text-sm">
+                    <input
+                      type="radio"
+                      name="payment-method"
+                      checked={paymentMethod === "yoco_test"}
+                      onChange={() => setPaymentMethod("yoco_test")}
                       className="mt-1 accent-current"
                     />
                     <span>
@@ -1117,12 +1174,16 @@ function CheckoutPage() {
                 >
                   {starting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
                   {starting
-                    ? paymentMethod === "yoco"
-                      ? "Opening Yoco test checkout…"
-                      : "Creating EFT request…"
-                    : paymentMethod === "yoco"
-                      ? "Continue to Yoco test checkout"
-                      : "Create EFT payment request"}
+                    ? paymentMethod === "yoco_live"
+                      ? "Opening live Yoco checkout…"
+                      : paymentMethod === "yoco_test"
+                        ? "Opening Yoco test checkout…"
+                        : "Creating EFT request…"
+                    : paymentMethod === "yoco_live"
+                      ? "Continue to live Yoco checkout"
+                      : paymentMethod === "yoco_test"
+                        ? "Continue to Yoco test checkout"
+                        : "Create EFT payment request"}
                 </Button>
                 <Button asChild variant="outline" size="lg">
                   <Link to="/cart">Back to cart</Link>
@@ -1135,7 +1196,7 @@ function CheckoutPage() {
               ) : null}
               {activeQuote && !acceptedPolicies ? (
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Accept the Store terms above before creating your EFT payment request.
+                  Accept the Store terms above before creating your payment.
                 </p>
               ) : null}
             </section>
