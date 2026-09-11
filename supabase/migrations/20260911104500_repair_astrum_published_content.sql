@@ -1,6 +1,5 @@
 begin;
 
--- Correct taxonomy/brand for historically published flagship headphones.
 update public.store_products
 set brand='Astrum', category='technology-electronics', additional_categories=array['audio','headphones'],
     seo_title='Astrum MX Pro Hybrid ANC Bluetooth Headphones Black | Cossa Store', updated_at=now()
@@ -11,7 +10,6 @@ set brand='Astrum', category='technology-electronics', additional_categories=arr
     seo_title='Astrum MZ Pro Hybrid ANC Bluetooth Headphones Black | Cossa Store', updated_at=now()
 where supplier_name='Astrum' and supplier_product_ref='A11562-B';
 
--- KT210: manufacturer page A51021-B.
 update public.store_products set
  short_description='Slim multi-mode wireless keyboard with touchpad, Bluetooth/Wi-Fi connections, pairing for up to three devices, RGB backlighting, silent keys and spill resistance.',
  description='The Astrum KT210 is a slim multi-mode wireless keyboard with an integrated touchpad. It can pair with up to three compatible devices and switch between them, with Bluetooth/Wi-Fi connectivity, silent keys, spill resistance and multi-colour backlighting. Astrum specifies up to 160 hours of working time and compatibility with Windows, macOS, ChromeOS, Linux and Android.',
@@ -22,7 +20,6 @@ update public.store_products set
  brand='Astrum', category='technology-electronics', additional_categories=array['computer-accessories','productivity-equipment'], updated_at=now()
 where supplier_name='Astrum' and supplier_product_ref='A51021-B';
 
--- IP110: manufacturer page A63011-Q.
 update public.store_products set
  short_description='Indoor 2K Quad HD Wi-Fi security camera with app control, two-way audio, infrared night vision, 355° pan, 90° tilt and TF card support up to 128GB.',
  description='The Astrum IP110 is an indoor smart security camera for home and office monitoring. It connects over 2.4GHz Wi-Fi and supports remote app control, 2K Quad HD video, infrared night vision, two-way audio, 355° pan and 90° tilt. Recordings can be stored in the cloud or on a TF card up to 128GB, and the app supports compatible iOS and Android devices.',
@@ -33,7 +30,6 @@ update public.store_products set
  brand='Astrum', category='security-smart-home', additional_categories=array['cctv-cameras','security-systems'], updated_at=now()
 where supplier_name='Astrum' and supplier_product_ref='A63011-Q';
 
--- BS120: manufacturer page A70012-B.
 update public.store_products set
  short_description='High-speed USB 1D/2D barcode scanner with handheld and continuous scanning modes, automatic sensing and an included stand.',
  description='The Astrum BS120 is a plug-and-play USB barcode scanner for POS systems, computers and cash registers. It supports manual handheld and continuous scanning, includes a flexible stand and uses a high-speed processor rated by Astrum at 260 scans per second. It decodes standard 1D formats and major 2D formats including QR Code, Data Matrix, Aztec and MaxiCode.',
@@ -44,7 +40,6 @@ update public.store_products set
  brand='Astrum', category='technology-electronics', additional_categories=array['productivity-equipment','computer-accessories'], updated_at=now()
 where supplier_name='Astrum' and supplier_product_ref='A70012-B';
 
--- NA450: manufacturer page A72045-B.
 update public.store_products set
  short_description='Compact USB-C to RJ45 Gigabit Ethernet adapter with plug-and-play setup, LED indicators and support for Windows, macOS, Linux and Chromebook.',
  description='The Astrum NA450 adds wired Ethernet connectivity to USB-C laptops and compatible devices that do not have an RJ45 port. Its compact metal design is intended for portable use, with plug-and-play operation, LED indicators and support for IPv4/IPv6 networking across multiple operating systems.',
@@ -55,7 +50,6 @@ update public.store_products set
  brand='Astrum', category='technology-electronics', additional_categories=array['networking','computer-accessories'], updated_at=now()
 where supplier_name='Astrum' and supplier_product_ref='A72045-B';
 
--- CL770: manufacturer page A90577-B.
 update public.store_products set
  short_description='130W USB-C Power Delivery charger for compatible laptops and mobile devices, with adaptive charging and built-in electrical protection.',
  description='The Astrum CL770 is a 130W USB-C Power Delivery charger designed for compatible Dell laptops and other USB-C devices. It supports adaptive PD output from 5V to 20V according to device requirements and includes protection against over-current, over-voltage, overheating and short circuits. Its compact design is suited to work, replacement-charger and travel use.',
@@ -66,9 +60,8 @@ update public.store_products set
  brand='Astrum', category='technology-electronics', additional_categories=array['power-charging','cables-adapters'], updated_at=now()
 where supplier_name='Astrum' and supplier_product_ref='A90577-B';
 
--- DUOZ PRO10 Black: correct the exact black-SKU source and product content.
 update public.store_inventory_intakes
-set source_url='https://astrum.co.za/product/duoz-pro10-tws-earbuds-hybrid-anc-6mic-b/', updated_at=now()
+set source_url='https://astrum.co.za/product/duoz-pro10-tws-earbuds-hybrid-anc-6mic-b/'
 where supplier_id='3b625ee7-25d4-4604-afd5-2a0909ac04b6'::uuid and supplier_product_ref='ATWDP10B';
 
 update public.store_products set
@@ -81,7 +74,6 @@ update public.store_products set
  brand='Astrum', category='technology-electronics', additional_categories=array['audio','headphones'], updated_at=now()
 where supplier_name='Astrum' and supplier_product_ref='ATWDP10B';
 
--- Keep intake customer content aligned with the repaired public product content.
 update public.store_inventory_intakes i
 set short_description=p.short_description,
     description=p.description,
