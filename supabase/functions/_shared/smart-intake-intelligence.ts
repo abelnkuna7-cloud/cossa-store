@@ -22,7 +22,7 @@ export type CommercialDecision = {
 
 const GENERIC_IMAGE_MARKERS = [
   "logo", "favicon", "placeholder", "banner", "header", "footer", "icon", "avatar",
-  "payment", "woocommerce-placeholder", "astrum-logo", "site-logo",
+  "payment", "woocommerce-placeholder", "astrum-logo", "site-logo", "astrum-2.png",
 ];
 
 export function compactText(value: string) {
@@ -49,6 +49,8 @@ export function classifyProduct(supplierCategory: string | null, title: string):
 
   if (/ip\s*cam|camera|cctv|surveillance|security/.test(hay))
     return result("security-smart-home", ["cctv-cameras", "security-systems"], ["security camera", "smart security", "ip camera"]);
+  if (/barcode|barcode scanner|scanner/.test(hay))
+    return result("technology-electronics", ["productivity-equipment", "computer-accessories"], ["barcode scanner", "business technology", "pos accessories"]);
   if (/keyboard/.test(hay))
     return result("technology-electronics", ["computer-accessories", "productivity-equipment"], ["keyboard", "wireless keyboard", "computer accessories"]);
   if (/mouse|trackball/.test(hay))
@@ -65,8 +67,6 @@ export function classifyProduct(supplierCategory: string | null, title: string):
     return result("technology-electronics", ["power-charging", "cables-adapters"], ["charging", "power", "mobile accessories"]);
   if (/usb|adapter|converter|hub|type-c|type c|cable/.test(hay))
     return result("technology-electronics", ["cables-adapters", "computer-accessories"], ["adapter", "usb", "computer accessories"]);
-  if (/barcode|scanner/.test(hay))
-    return result("technology-electronics", ["productivity-equipment", "computer-accessories"], ["barcode scanner", "business technology"]);
   if (/watch|smartwatch|fitness band|wearable/.test(hay))
     return result("technology-electronics", ["wearables", "smart-devices"], ["wearable", "smartwatch"]);
   if (/ups|backup power/.test(hay))
@@ -122,10 +122,10 @@ export function extractOfficialProductGallery(html: string, title: string, suppl
   }
 
   for (const block of galleryBlocks) {
-    for (const match of block.matchAll(/(?:src|data-src|data-large_image|href)=["'](https:\/\/astrum\.co\.za\/wp-content\/uploads\/[^"']+)["']/gi)) {
+    for (const match of block.matchAll(/(?:src|data-src|data-lazy-src|data-large_image|href)=["'](https:\/\/astrum\.co\.za\/wp-content\/uploads\/[^"']+)["']/gi)) {
       add(match[1], true);
     }
-    for (const match of block.matchAll(/srcset=["']([^"']+)["']/gi)) {
+    for (const match of block.matchAll(/(?:srcset|data-srcset)=["']([^"']+)["']/gi)) {
       for (const part of match[1].split(",")) {
         const url = part.trim().split(/\s+/)[0];
         add(url, true);
@@ -133,10 +133,8 @@ export function extractOfficialProductGallery(html: string, title: string, suppl
     }
   }
 
-  // Fallback for Astrum pages whose theme omits the standard WooCommerce gallery wrapper.
-  // Only retain assets that contain the exact model/ref token; never sweep the whole page blindly.
   if (candidates.size <= 1) {
-    for (const match of html.matchAll(/(?:src|data-src|data-large_image|href)=["'](https:\/\/astrum\.co\.za\/wp-content\/uploads\/[^"']+)["']/gi)) {
+    for (const match of html.matchAll(/(?:src|data-src|data-lazy-src|data-large_image|href)=["'](https:\/\/astrum\.co\.za\/wp-content\/uploads\/[^"']+)["']/gi)) {
       const url = match[1];
       const lower = url.toLowerCase();
       if ((model && lower.includes(model.toLowerCase())) || lower.includes(supplierRef.toLowerCase())) add(url, false);
