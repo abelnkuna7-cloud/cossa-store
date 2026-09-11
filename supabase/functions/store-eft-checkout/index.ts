@@ -12,6 +12,7 @@ import {
   type DeliveryConfirmationClassification,
   type StoredDeliveryConfirmation,
 } from "./_shared/delivery-confirmation.ts";
+import { resolveAstrumDelivery } from "./_shared/astrum-delivery-resolver.ts";
 
 const ALLOWED_ORIGINS = new Set([
   "https://store.cossanexusholdings.co.za",
@@ -24,6 +25,7 @@ const PRINTIFY_BASE = "https://api.printify.com/v1";
 const PRINTIFY_SHOP_ID = "28233755";
 const DEFAULT_USD_ZAR = 16.0141;
 const COSSA_ORGANISATION_ID = "00000000-0000-4000-8000-000000000001";
+const ASTRUM_SUPPLIER_ID = "3b625ee7-25d4-4604-afd5-2a0909ac04b6";
 const DELIVERY_CONFIRMATION_TTL_MS = 24 * 60 * 60 * 1000;
 const SOUTH_AFRICAN_PROVINCES = new Set([
   "Eastern Cape",
@@ -410,15 +412,11 @@ async function deliveryConfirmationTargets(admin: any, lines: ConfiguredPhysical
   return [...targets.values()];
 }
 
-/**
- * Loads supplier delivery evidence exclusively with the service role. It never
- * accepts a browser price, weight, dimensions, supplier or rate ID. An absent
- * migration/configuration is deliberately treated as "quote required".
- */
 async function quoteConfiguredPhysicalDelivery(
   admin: any,
   lines: ConfiguredPhysicalLine[],
   scope: DeliveryConfirmationScope,
+  shippingAddress: ShippingAddress,
   pendingStaffConfirmation: PendingStaffConfirmation | null = null,
 ) {
   const productIds = [...new Set(lines.map((line) => line.productId))];
@@ -541,8 +539,7 @@ async function quoteConfiguredPhysicalDelivery(
   let shippingTotal = 0;
   const shippingMethods: string[] = [];
   const providers: string[] = [];
-  const configuredRates: Array<{ rateId: string; methodCode: string; verifiedAt: string | null }> =
-    [];
+  const configuredRates: Array<Record<string, unknown>> = [];
   const manualQuotes: Array<{
     confirmationId: string | null;
     deliveryMethod: string;
@@ -558,6 +555,7 @@ async function quoteConfiguredPhysicalDelivery(
     customerLabel: string;
     amount: number;
   }> = [];
+
   for (const [key, groupedLines] of groupLines) {
     const [supplierId, fulfilmentProfileId] = key.split(":");
     const supplier = suppliersById.get(supplierId);
@@ -577,10 +575,6 @@ async function quoteConfiguredPhysicalDelivery(
           }
         : (confirmationsByTarget.get(key) ?? null);
 
-    // A staff-approved manual quote remains bound to this exact cart and
-    // address by the confirmation lookup above. It deliberately bypasses the
-    // configured-rate resolver only after the trusted staff workflow has
-    // supplied a non-zero amount, method and audit evidence server-side.
     if (
       storedConfirmation &&
       storedConfirmation.eligibilityClassification === "MANUAL_DELIVERY_QUOTE_REQUIRED"
@@ -612,14 +606,89 @@ async function quoteConfiguredPhysicalDelivery(
       });
       continue;
     }
+
+    if (supplierId === ASTRUM_SUPPLIER_ID) {
+      if (
+        supplier.status !== "active" ||
+        profile.is_active !== true ||
+        profile.delivery_payer !== "customer"
+      ) {
+        throw configurationUnavailable();
+      }
+
+      const allWeightsKnown = groupedLines.every((line) => {
+        const row = attributesByProduct.get(line.productId);
+        return Boolean(row?.weight_verified_at) && Number.isFinite(Number(row?.weight_kg)) && Number(row?.weight_kg) > 0;
+      });
+      if (allWeightsKnown) {
+        const totalWeightKg = groupedLines.reduce((total, line) => {
+          const row = attributesByProduct.get(line.productId)!;
+          return total + Number(row.weight_kg) * line.quantity;
+        }, 0);
+        if (totalWeightKg > 15) {
+          throw new Error(
+            "This Astrum order requires a custom delivery quote because the verified parcel weight is above 15 kg.",
+          );
+        }
+      }
+
+      const decision = await resolveAstrumDelivery(shippingAddress);
+      const matchingRates = (ratesByProfile.get(fulfilmentProfileId) ?? []).filter((rate) => {
+        const verifiedAt = rate.verifiedAt ? Date.parse(rate.verifiedAt) : NaN;
+        const ageDays = Number.isFinite(verifiedAt)
+          ? (Date.now() - verifiedAt) / 86_400_000
+          : Number.POSITIVE_INFINITY;
+        return (
+          rate.methodCode === decision.methodCode &&
+          rate.isActive &&
+          rate.customerSelectable &&
+          rate.currency === "ZAR" &&
+          Number.isFinite(rate.price) &&
+          rate.price > 0 &&
+          Boolean(rate.sourceUrl?.trim()) &&
+          Boolean(rate.sourceEvidence?.trim()) &&
+          ageDays >= 0 &&
+          ageDays <= 30
+        );
+      });
+      if (matchingRates.length !== 1) {
+        throw new Error(
+          `${DELIVERY_QUOTE_REQUIRED} No single current Astrum delivery rate matches this destination.`,
+        );
+      }
+      const rate = matchingRates[0];
+      const amount = money(rate.price);
+      shippingTotal = money(shippingTotal + amount);
+      shippingMethods.push(rate.customerLabel);
+      providers.push(typeof supplier.name === "string" ? supplier.name : "Astrum");
+      configuredRates.push({
+        rateId: rate.id,
+        methodCode: rate.methodCode,
+        verifiedAt: rate.verifiedAt,
+        destinationClass: decision.destinationClass,
+        nearestBranchCode: decision.nearestBranchCode,
+        nearestBranchDistanceKm: decision.nearestBranchDistanceKm,
+        resolver: decision.evidence.resolver,
+        distanceType: decision.evidence.distanceType,
+        evaluatedAt: decision.evidence.evaluatedAt,
+      });
+      confirmationTargets.push({
+        supplierId,
+        fulfilmentProfileId,
+        rateId: rate.id,
+        methodCode: rate.methodCode,
+        customerLabel: rate.customerLabel,
+        amount,
+      });
+      continue;
+    }
+
     const delivery = resolveConfiguredDeliveryGroup({
       supplierId,
       fulfilmentProfileId,
       supplierIsActive: supplier.status === "active",
       fulfilmentProfileIsActive: profile.is_active === true,
       customerPaysDelivery: profile.delivery_payer === "customer",
-      // Destination eligibility is never inferred from the browser address.
-      // It is unlocked only by a private, time-limited staff confirmation.
       addressEligibility: addressEligibilityFromConfirmation(storedConfirmation),
       rates: ratesByProfile.get(fulfilmentProfileId) ?? [],
       items: groupedLines.map((line) => {
@@ -769,15 +838,10 @@ Deno.serve(async (request) => {
                             : null;
     if (!action) throw new Error("Unsupported checkout action.");
 
-    // The Yoco integration is deliberately a merchant-only test path. This
-    // prevents public customers from creating test orders on the live store
-    // while the gateway is being validated.
     if (action === "yoco_create" || action === "yoco_status" || action === "yoco_return") {
       await requireCossaStoreAdmin(admin, userData.user.id);
     }
 
-    // Live Yoco is an explicit, server-only commissioning path. It remains
-    // unavailable unless both the database control and server secret exist.
     if (action === "yoco_live_create") {
       stage = "yoco_live_configuration_gate";
       const liveSecret = Deno.env.get("YOCO_LIVE_SECRET_KEY");
@@ -819,9 +883,6 @@ Deno.serve(async (request) => {
         return_recorded_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      // A browser return is never payment proof. Cancellation and failure are
-      // customer-visible attempt states only; a later signed Yoco event can
-      // still record an actual payment if one completed concurrently.
       if (returnState !== "success" && attemptData.status !== "succeeded") {
         update.status = returnState;
       }
@@ -1170,8 +1231,6 @@ Deno.serve(async (request) => {
         )
         .single();
       if (createError || !created) {
-        // A second click can race the first request. The unique client ID
-        // makes it safe to return the original instead of creating a duplicate.
         if (createError?.code === "23505") {
           const { data: raced } = await admin
             .from("store_delivery_quote_requests")
@@ -1228,6 +1287,7 @@ Deno.serve(async (request) => {
           admin,
           configuredPhysicalLines,
           deliveryScope,
+          shippingAddress,
           { target, ...staffConfirmation },
         );
         const confirmedGroup = configuredDelivery.confirmationTargets[0];
@@ -1316,6 +1376,7 @@ Deno.serve(async (request) => {
         admin,
         configuredPhysicalLines,
         deliveryScope!,
+        shippingAddress!,
       );
       shippingTotal = money(shippingTotal + configuredDelivery.shippingTotal);
       shippingMethods.push(configuredDelivery.shippingMethod);
@@ -1445,9 +1506,6 @@ Deno.serve(async (request) => {
         throw new Error("The Yoco return origin is not allowed.");
       }
 
-      // Yoco returns this signing secret only once. On the first test
-      // checkout, register the single shared webhook and place its secret in
-      // Supabase Vault; neither value is ever returned to the browser.
       const { data: storedWebhookSecret, error: storedWebhookSecretError } = await admin.rpc(
         "get_yoco_test_webhook_secret",
       );

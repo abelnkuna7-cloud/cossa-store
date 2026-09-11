@@ -14,6 +14,16 @@ export type YocoTestPaymentAttempt = {
   verifiedAt: string | null;
 };
 
+export type YocoLivePaymentAttempt = {
+  id: string;
+  status: "created" | "processing" | "succeeded" | "failed" | "cancelled" | "expired";
+  providerCheckoutId: string | null;
+  providerPaymentId: string | null;
+  amountCents: number;
+  currency: "ZAR";
+  verifiedAt: string | null;
+};
+
 type CheckoutInput = {
   customerName: string;
   customerPhone: string;
@@ -47,6 +57,13 @@ async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 
+export function startStoreYocoLiveCheckout(input: CheckoutInput) {
+  return invoke<{ attempt: YocoLivePaymentAttempt; redirectUrl: string }>({
+    action: "yoco_live_create",
+    ...input,
+  });
+}
+
 export function startStoreYocoTestCheckout(input: CheckoutInput) {
   return invoke<{ attempt: YocoTestPaymentAttempt; redirectUrl: string }>({
     action: "yoco_create",
@@ -56,6 +73,13 @@ export function startStoreYocoTestCheckout(input: CheckoutInput) {
 
 export function getStoreYocoTestAttempt(attemptId: string) {
   return invoke<{ attempt: YocoTestPaymentAttempt }>({ action: "yoco_status", attemptId });
+}
+
+export function getStoreYocoLiveAttempt(attemptId: string) {
+  return invoke<{ attempt: YocoLivePaymentAttempt }>({
+    action: "yoco_live_status",
+    attemptId,
+  });
 }
 
 export function recordStoreYocoTestReturn(
