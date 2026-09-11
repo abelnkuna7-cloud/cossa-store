@@ -20,10 +20,10 @@ import { cn } from "@/lib/utils";
 import type { Product } from "@/types/catalog";
 
 const TONE: Record<BadgeTone, string> = {
-  gold: "border-primary/50 text-primary",
-  positive: "border-success/40 text-success",
-  warning: "border-warning/50 text-warning",
-  neutral: "border-border text-muted-foreground",
+  gold: "border-primary/60 bg-primary/10 text-primary",
+  positive: "border-success/70 bg-success/10 text-white",
+  warning: "border-warning/60 bg-warning/10 text-warning",
+  neutral: "border-white/25 bg-white/5 text-white/90",
 };
 
 export function ProductCard({
@@ -41,7 +41,6 @@ export function ProductCard({
   const badges = productBadges(product);
   const image = product.images[0];
 
-  /* product_card_view fires only when the card is genuinely on screen. */
   const cardRef = useRef<HTMLElement | null>(null);
   const viewed = useRef(false);
   useEffect(() => {
@@ -84,7 +83,7 @@ export function ProductCard({
           className="h-full w-full transition-transform duration-300 group-hover:scale-[1.03]"
         />
         {product.is_demo ? (
-          <span className="absolute left-0 top-3 bg-warning px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-background shadow">
+          <span className="absolute left-0 top-3 bg-warning px-2 py-1 text-xs font-bold uppercase tracking-wider text-background shadow">
             Demo — replace before launch
           </span>
         ) : null}
@@ -92,16 +91,16 @@ export function ProductCard({
 
       <div className="flex flex-1 flex-col p-3 sm:p-4">
         {product.collection ? (
-          <p className="truncate text-[11px] uppercase tracking-wide text-muted-foreground">
+          <p className="truncate text-xs font-medium uppercase tracking-wide text-white/80">
             {product.collection.name}
           </p>
         ) : product.brand ? (
-          <p className="truncate text-[11px] uppercase tracking-wide text-muted-foreground">
+          <p className="truncate text-xs font-medium uppercase tracking-wide text-white/80">
             {product.brand}
           </p>
         ) : null}
 
-        <h3 className="mt-1 line-clamp-2 font-sans text-sm font-semibold leading-snug">
+        <h3 className="mt-1 line-clamp-2 font-sans text-base font-semibold leading-snug sm:text-sm">
           <Link
             to="/product/$slug"
             params={{ slug: product.slug }}
@@ -112,12 +111,12 @@ export function ProductCard({
           </Link>
         </h3>
 
-        <div className="mt-2 flex flex-wrap gap-1">
+        <div className="mt-2 flex flex-wrap gap-1.5">
           {badges.map((badge) => (
             <span
               key={badge.label}
               className={cn(
-                "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                "inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold leading-none",
                 TONE[badge.tone],
               )}
             >
@@ -128,26 +127,26 @@ export function ProductCard({
 
         <div className="mt-3">
           {product.requires_quote || product.selling_price <= 0 ? (
-            <p className="text-sm font-semibold">Price on request</p>
+            <p className="text-base font-semibold">Price on request</p>
           ) : (
             <>
               <div className="flex items-baseline gap-2">
-                <span className="text-base font-semibold sm:text-lg">
+                <span className="text-lg font-semibold sm:text-lg">
                   {formatZar(product.selling_price)}
                 </span>
                 {compareAt ? (
-                  <span className="text-xs text-muted-foreground line-through">
+                  <span className="text-sm text-white/75 line-through">
                     {formatZar(compareAt)}
                   </span>
                 ) : null}
               </div>
-              <p className="text-[11px] text-muted-foreground">Incl. VAT</p>
+              <p className="text-xs font-medium text-white/80">Incl. VAT</p>
             </>
           )}
         </div>
 
         {affiliate && product.affiliate ? (
-          <p className="mt-2 text-[11px] text-muted-foreground">
+          <p className="mt-2 text-xs leading-relaxed text-white/80">
             {PARTNER_OFFER_DISCLOSURE}
           </p>
         ) : null}
@@ -251,7 +250,7 @@ export function ProductGrid({ products }: { products: Product[] }) {
           Products are being added
         </h3>
 
-        <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+        <p className="mx-auto mt-2 max-w-xl text-base leading-relaxed text-white/85 sm:text-sm">
           Our live catalogue is currently being prepared. If you need a
           specific product, business supply or project requirement, Cossa Store
           can help source it for you.
